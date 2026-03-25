@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"npx tsc --noEmit 2>&1\",\"timeout\":60000,\"description\":\"Full TypeScript check\"}",
+  "error": "Exit code 2\nscreens/AuthScreen.tsx(38,5): error TS2561: Object literal may only specify known properties, but 'expoClientId' does not exist in type 'Partial<GoogleAuthRequestConfig>'. Did you mean to write 'clientId'?",
+  "timestamp": "2026-03-25T04:44:22.073Z",
+  "retry_count": 1
+}
