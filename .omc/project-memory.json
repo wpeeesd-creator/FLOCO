@@ -1,0 +1,245 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1774417089674,
+  "projectRoot": "C:\\Users\\User\\Downloads\\floco-expo\\floco",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "react",
+        "version": "19.1.0",
+        "category": "frontend"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": "npm run start",
+    "scripts": {
+      "start": "expo start",
+      "android": "expo start --android",
+      "ios": "expo start --ios",
+      "web": "expo start --web"
+    }
+  },
+  "conventions": {
+    "namingStyle": "camelCase",
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "app",
+      "components",
+      "docs",
+      "lib"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "app": {
+      "path": "app",
+      "purpose": "Application code",
+      "fileCount": 2,
+      "lastAccessed": 1774417089595,
+      "keyFiles": [
+        "index.tsx",
+        "_layout.tsx"
+      ]
+    },
+    "components": {
+      "path": "components",
+      "purpose": "UI components",
+      "fileCount": 3,
+      "lastAccessed": 1774417089602,
+      "keyFiles": [
+        "StockChart.tsx",
+        "StockLogo.tsx",
+        "ui.tsx"
+      ]
+    },
+    "context": {
+      "path": "context",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1774417089613,
+      "keyFiles": [
+        "AuthContext.tsx"
+      ]
+    },
+    "data": {
+      "path": "data",
+      "purpose": "Data files",
+      "fileCount": 2,
+      "lastAccessed": 1774417089614,
+      "keyFiles": [
+        "dailyQuestions.ts",
+        "learningContent.ts"
+      ]
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 1,
+      "lastAccessed": 1774417089615,
+      "keyFiles": [
+        "metadata.json"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 3,
+      "lastAccessed": 1774417089615,
+      "keyFiles": [
+        "MOBILE_UX_GUIDELINE.md",
+        "NATIVE_SPEC.md",
+        "PERFORMANCE_GOALS.md"
+      ]
+    },
+    "functions": {
+      "path": "functions",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1774417089616,
+      "keyFiles": [
+        "package-lock.json",
+        "package.json",
+        "tsconfig.json"
+      ]
+    },
+    "hooks": {
+      "path": "hooks",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1774417089618,
+      "keyFiles": [
+        "useRealtimeSync.ts",
+        "useStockPrice.ts",
+        "useWishlist.ts"
+      ]
+    },
+    "lib": {
+      "path": "lib",
+      "purpose": "Library code",
+      "fileCount": 8,
+      "lastAccessed": 1774417089626,
+      "keyFiles": [
+        "analytics.ts",
+        "calculateAsset.ts",
+        "crashlytics.ts",
+        "firebase.ts",
+        "firestoreService.ts"
+      ]
+    },
+    "navigation": {
+      "path": "navigation",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1774417089631,
+      "keyFiles": [
+        "AdminTabs.tsx",
+        "AuthStack.tsx",
+        "CustomTabBar.tsx",
+        "RootNavigator.tsx",
+        "UserTabs.tsx"
+      ]
+    },
+    "screens": {
+      "path": "screens",
+      "purpose": null,
+      "fileCount": 23,
+      "lastAccessed": 1774417089640,
+      "keyFiles": [
+        "AdminScreen.tsx",
+        "AuthScreen.tsx",
+        "ChatScreen.tsx",
+        "CourseListScreen.tsx",
+        "DiscoverScreen.tsx"
+      ]
+    },
+    "store": {
+      "path": "store",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1774417089643,
+      "keyFiles": [
+        "appStore.ts",
+        "authStore.ts"
+      ]
+    },
+    "dist\\assets": {
+      "path": "dist\\assets",
+      "purpose": "Static assets",
+      "fileCount": 6,
+      "lastAccessed": 1774417089660,
+      "keyFiles": [
+        "0ea69b5077e7c4696db85dbcba75b0e1",
+        "5223c8d9b0d08b82a5670fb5f71faf78",
+        "7d40544b395c5949f4646f5e150fe020"
+      ]
+    },
+    "functions\\node_modules": {
+      "path": "functions\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1774417089664,
+      "keyFiles": []
+    },
+    "functions\\src": {
+      "path": "functions\\src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1774417089669,
+      "keyFiles": [
+        "index.ts"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "app.json",
+      "accessCount": 2,
+      "lastAccessed": 1774417128287,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 1,
+      "lastAccessed": 1774417106553,
+      "type": "directory"
+    },
+    {
+      "path": "eas.json",
+      "accessCount": 1,
+      "lastAccessed": 1774417110787,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

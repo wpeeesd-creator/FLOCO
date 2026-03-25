@@ -1,0 +1,9 @@
+{
+  "active": true,
+  "started_at": "2026-03-24T11:33:27.912Z",
+  "original_prompt": "/autopilot\n지금 Expo 프로젝트 실행 중 두 가지 치명적인 에러가 발생했어. 이 에러 로그를 분석해서 단계별 해결책을 제시해줘.\n\n[에러 상황]\n1. WARN: \"./index.tsx\" is missing the required default export.\n2. ERROR: [Error: Exception in HostFunction: <unknown>] - Reanimated 및 Worklets 관련 네이티브 모듈 충돌.\n\n[요청 사항]\n1. 'app/index.tsx' 파일의 코드를 확인해서 반드시 'export default function App()' 형식으로 수정해줘.\n2. Reanimated 관련 에러를 해결하기 위해 'babel.config.js'에 'react-native-reanimated/plugin'이 포함되어 있는지 확인하고, 필요한 설치 명령어를 알려줘.\n3. Expo Go를 사용 중이라면 개발 빌드(Development Build)가 필요한 상황인지 판단해줘.\n4. 캐시 문제일 수 있으니 'npx expo start -c'를 포함한 클린 재시작 프로세스를 가이드해줘.\n\n우리의 '머니몽' 앱이 썸원 스타일의 다정한 말투와 토스 UI를 가질 수 있도록, 에러부터 잡고 코드 구조를 다시 세워보자!",
+  "session_id": "30b8338b-98b4-49c2-aa49-ea5c325886b2",
+  "project_path": "C:\\Users\\User\\Downloads\\floco-expo\\floco",
+  "reinforcement_count": 0,
+  "last_checked_at": "2026-03-24T11:33:27.913Z"
+}

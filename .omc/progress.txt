@@ -1,0 +1,38 @@
+## Ralph Session — HomeScreen UX 원칙 검토 및 수정
+Date: 2026-03-24
+
+### 구현 내용
+
+**변경 파일:**
+- screens/HomeScreen.tsx
+- components/ui.tsx
+
+**US-001: 헤더 아이콘 터치 영역 (HomeScreen.tsx)**
+- headerIcon 스타일: padding 4→12, minWidth:44, minHeight:44 추가
+- TouchableOpacity에 hitSlop={{ top:8, bottom:8, left:8, right:8 }} 추가
+
+**US-002: SectionHeader 액션 버튼 (components/ui.tsx)**
+- action TouchableOpacity에 paddingVertical:10, paddingHorizontal:8 추가
+- hitSlop={{ top:4, bottom:4, left:4, right:4 }} 추가
+
+**US-003: Pull-to-Refresh (HomeScreen.tsx)**
+- RefreshControl import 추가
+- useState(false) refreshing, useCallback onRefresh 추가
+- ScrollView refreshControl prop 연결 (tintColor: Colors.primary)
+
+**US-004: AllocationCard Empty State (HomeScreen.tsx)**
+- holdings.length === 0 조건 분기 추가
+- EmptyState 컴포넌트 import 및 렌더링 (emoji 📊)
+
+**US-005: TodayLesson 완료 상태 (HomeScreen.tsx)**
+- nextLesson null 시 lessonCompleteBox 렌더링
+- progress >= 100 시 progressFill backgroundColor: Colors.gold
+- lessonCompleteBox 스타일 추가 (goldBg 배경)
+
+### 학습된 패턴
+- hitSlop은 이미 minWidth/minHeight가 44px 확보된 경우 보조적 역할
+- EmptyState 컴포넌트가 ui.tsx에 이미 구현되어 있으므로 재사용 가능
+- RefreshControl에 tintColor 지정 시 Colors.primary 사용 (브랜드 일관성)
+
+### Architect 검증 결과
+모든 US-001~US-005 항목 APPROVED

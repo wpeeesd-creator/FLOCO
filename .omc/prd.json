@@ -1,0 +1,53 @@
+{
+  "task": "HomeScreen UX 원칙 검토 및 수정",
+  "description": "MOBILE_UX_GUIDELINE.md 기준으로 HomeScreen.tsx의 UX 원칙 위반 사항을 발견하고 수정한다.",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "터치 영역 보정 — 헤더 알림 아이콘",
+      "passes": true,
+      "acceptanceCriteria": [
+        "headerIcon 스타일 padding: 12, minWidth: 44, minHeight: 44 적용 ✅",
+        "hitSlop={{ top:8, bottom:8, left:8, right:8 }} 추가 ✅"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "터치 영역 보정 — SectionHeader 액션 버튼",
+      "passes": true,
+      "acceptanceCriteria": [
+        "paddingVertical: 10, paddingHorizontal: 8 추가 ✅",
+        "hitSlop top/bottom/left/right 4 추가 ✅"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Pull-to-Refresh 추가",
+      "passes": true,
+      "acceptanceCriteria": [
+        "RefreshControl import 추가 ✅",
+        "refreshing state + onRefresh 핸들러 구현 ✅",
+        "ScrollView refreshControl prop 연결 ✅"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "AllocationCard Empty State 처리",
+      "passes": true,
+      "acceptanceCriteria": [
+        "holdings.length === 0 시 EmptyState 컴포넌트 렌더링 ✅",
+        "emoji '📊', title '보유 종목이 없어요', desc '모의투자로 첫 종목을 매수해보세요' ✅"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "TodayLesson 완료 시 Empty State 처리",
+      "passes": true,
+      "acceptanceCriteria": [
+        "nextLesson null 시 '오늘 학습 완료! 🎉' 메시지 표시 ✅",
+        "progress 100% 시 progressFill 색상 Colors.gold 적용 ✅",
+        "lessonCompleteBox 스타일 추가 ✅"
+      ]
+    }
+  ]
+}
