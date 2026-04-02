@@ -1,7 +1,7 @@
 {
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"npx tsc --noEmit 2>&1\",\"timeout\":60000,\"description\":\"Full TypeScript check\"}",
-  "error": "Exit code 2\nscreens/AuthScreen.tsx(38,5): error TS2561: Object literal may only specify known properties, but 'expoClientId' does not exist in type 'Partial<GoogleAuthRequestConfig>'. Did you mean to write 'clientId'?",
-  "timestamp": "2026-03-25T04:44:22.073Z",
-  "retry_count": 1
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"C:\\\\Users\\\\User\\\\Downloads\\\\floco-expo\\\\floco\\\\store\\\\appStore.ts\"}",
+  "error": "File content (17614 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-04-02T06:34:17.545Z",
+  "retry_count": 3
 }

@@ -1,190 +1,510 @@
 /**
- * 이벤트 상세 화면 — 실시간 뉴스 이벤트 학습 퀴즈
+ * 이벤트 상세 화면 — 리더보드 & 참여
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
+  Alert, ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAppStore, FLO_EVENTS, STOCKS } from '../store/appStore';
-import { Colors, Typography, Button, Badge, BottomSheet } from '../components/ui';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { useAuth } from '../context/AuthContext';
+import { Colors } from '../components/ui';
+import { joinEvent, type AppEvent } from '../lib/adminService';
 
+// ── 타입 ──────────────────────────────────────────
+interface LeaderboardEntry {
+  uid: string;
+  name: string;
+  emoji: string;
+  score: number;
+}
+
+// ── 유틸 ──────────────────────────────────────────
+function formatDate(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+}
+
+function getDaysLeft(endDate: number): string {
+  const days = Math.ceil((endDate - Date.now()) / 86400000);
+  return days > 0 ? `D-${days}` : '마감';
+}
+
+function formatAmount(amount: number): string {
+  return amount.toLocaleString('ko-KR') + '원';
+}
+
+function formatScore(score: number, type: AppEvent['type']): string {
+  if (type === 'profit_rate') return `+${score.toFixed(1)}%`;
+  if (type === 'trade_count') return `${score}회`;
+  return `${score}일`;
+}
+
+function getTypeName(type: AppEvent['type']): string {
+  if (type === 'profit_rate') return '수익률';
+  if (type === 'trade_count') return '거래횟수';
+  return '학습스트릭';
+}
+
+const REWARD_EMOJIS = ['🥇', '🥈', '🥉'];
+const RANK_MEDALS = ['🥇', '🥈', '🥉'];
+
+// ── 메인 화면 ─────────────────────────────────────
 export default function EventDetailScreen() {
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { eventId } = route.params;
-  const { completeEvent, completedEvents } = useAppStore();
+  const { user } = useAuth();
 
-  const event = FLO_EVENTS.find(e => e.id === eventId);
-  const stock = event ? STOCKS.find(s => s.ticker === event.ticker) : null;
+  const event: AppEvent = route.params?.event;
 
-  const [selected, setSelected] = useState<number | null>(null);
-  const [answered, setAnswered] = useState(false);
-  const [showResult, setShowResult] = useState(false);
-  const isCompleted = completedEvents.includes(eventId ?? '');
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [myRank, setMyRank] = useState(0);
+  const [totalParticipants, setTotalParticipants] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [isJoined, setIsJoined] = useState(
+    user?.id ? event?.participants?.includes(user.id) : false,
+  );
 
-  if (!event || !stock) {
+  const fetchLeaderboard = useCallback(async () => {
+    if (!event) return;
+    try {
+      const portfoliosSnap = await getDocs(collection(db, 'portfolios'));
+      const usersSnap = await getDocs(collection(db, 'users'));
+
+      const nameMap: Record<string, { name: string; emoji: string }> = {};
+      usersSnap.docs.forEach(d => {
+        const data = d.data();
+        nameMap[d.id] = {
+          name: data.name ?? data.nickname ?? '익명',
+          emoji: data.investmentType?.emoji ?? '📊',
+        };
+      });
+
+      const entries = portfoliosSnap.docs
+        .map(d => {
+          const data = d.data();
+          const uid = d.id;
+          let score = 0;
+
+          if (event.type === 'profit_rate') {
+            const total = (data.holdings ?? []).reduce(
+              (sum: number, h: any) => sum + (h.qty ?? 0) * 100,
+              data.cash ?? 1000000,
+            );
+            score = ((total - 1000000) / 1000000) * 100;
+          } else if (event.type === 'trade_count') {
+            score = (data.trades ?? []).length;
+          } else if (event.type === 'learning_streak') {
+            score = data.streak ?? 0;
+          }
+
+          return {
+            uid,
+            name: nameMap[uid]?.name ?? data.name ?? '익명',
+            emoji: nameMap[uid]?.emoji ?? '📊',
+            score,
+          };
+        })
+        .sort((a, b) => b.score - a.score);
+
+      setLeaderboard(entries.slice(0, 10));
+      const myIdx = entries.findIndex(e => e.uid === user?.id);
+      setMyRank(myIdx >= 0 ? myIdx + 1 : 0);
+      setTotalParticipants(entries.length);
+    } catch {
+      setLeaderboard([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [event, user?.id]);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
+
+  const handleJoin = async () => {
+    if (!user?.id || !event) return;
+    try {
+      setIsJoined(true);
+      try {
+        await joinEvent(event.id, user.id);
+      } catch {}
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('참여 완료!', '이벤트에 참여했어요! 열심히 투자하세요!');
+    } catch {
+      setIsJoined(false);
+    }
+  };
+
+  if (!event) {
     return (
-      <View style={styles.container}>
-        <Text style={Typography.h2}>이벤트를 찾을 수 없어요</Text>
-        <Button title="돌아가기" onPress={() => navigation.goBack()} />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>이벤트를 찾을 수 없어요</Text>
+          <TouchableOpacity style={styles.backBtnLarge} onPress={() => navigation.goBack()}>
+            <Text style={styles.backBtnLargeText}>돌아가기</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  const isHo = event.badge === '호재';
-
-  function handleAnswer(idx: number) {
-    if (answered || isCompleted) return;
-    setSelected(idx);
-    setAnswered(true);
-  }
-
-  function handleSubmit() {
-    if (!answered) return;
-    completeEvent(event.id, selected === event.ans ? event.xp : 0);
-    setShowResult(true);
-  }
-
-  function handleClose() {
-    setShowResult(false);
-    navigation.goBack();
-  }
+  const daysLeft = getDaysLeft(event.endDate);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* 헤더 */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>← 뒤로</Text>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Badge label="LIVE 이벤트" type="danger" size="sm" />
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {event.title}
+        </Text>
+        <View style={styles.headerRight} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-        {/* 이벤트 카드 */}
-        <View style={[styles.eventCard, { backgroundColor: isHo ? '#1A4D2E' : '#4D1A1A' }]}>
-          <View style={styles.eventBadgeRow}>
-            <View style={[styles.eventBadge, { backgroundColor: isHo ? Colors.green : Colors.red }]}>
-              <Text style={styles.eventBadgeText}>{event.badge}</Text>
-            </View>
-            <View style={styles.tickerBadge}>
-              <Text style={styles.tickerText}>{stock.logo} {event.ticker}</Text>
-            </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* 내 순위 카드 */}
+        <View style={styles.myRankCard}>
+          <Text style={styles.myRankLabel}>내 현재 순위</Text>
+          <View style={styles.myRankRow}>
+            <Text style={styles.myRankNumber}>{myRank > 0 ? myRank : '-'}</Text>
+            {totalParticipants > 0 && (
+              <Text style={styles.myRankTotal}>/ {totalParticipants}명</Text>
+            )}
           </View>
-          <Text style={styles.eventTitle}>{event.title}</Text>
-          <Text style={styles.eventDesc}>{event.desc}</Text>
+          <Text style={styles.myRankDeadline}>마감 {daysLeft} · {formatDate(event.endDate)}</Text>
+        </View>
 
-          {/* 주가 영향 */}
-          <View style={styles.impactRow}>
-            <Text style={styles.impactLabel}>예상 주가 영향</Text>
-            <Text style={[styles.impactValue, { color: isHo ? '#6EE7B7' : '#FCA5A5' }]}>
-              {event.impact >= 0 ? '+' : ''}{event.impact.toFixed(1)}%
+        {/* 이벤트 정보 카드 */}
+        <View style={styles.infoCard}>
+          <Text style={styles.infoDesc}>{event.description}</Text>
+          <View style={styles.infoRow}>
+            <View style={styles.typeBadge}>
+              <Text style={styles.typeBadgeText}>{getTypeName(event.type)}</Text>
+            </View>
+            <Text style={styles.infoPeriod}>
+              {formatDate(event.startDate)} ~ {formatDate(event.endDate)}
             </Text>
           </View>
         </View>
 
-        {/* 퀴즈 섹션 */}
-        <View style={styles.quizSection}>
-          <Text style={styles.quizLabel}>💡 투자 퀴즈</Text>
-          <Text style={[Typography.h3, { lineHeight: 26, marginBottom: 16 }]}>{event.q}</Text>
-
-          {isCompleted ? (
-            <View style={styles.completedBanner}>
-              <Text style={styles.completedText}>✅ 이미 완료한 이벤트예요</Text>
+        {/* 보상 카드 */}
+        <View style={styles.rewardCard}>
+          <Text style={styles.sectionTitle}>🏅 보상</Text>
+          {event.rewards.map((r, i) => (
+            <View key={r.rank} style={styles.rewardRow}>
+              <Text style={styles.rewardEmoji}>{REWARD_EMOJIS[i] ?? `${r.rank}위`}</Text>
+              <Text style={styles.rewardRankText}>{r.rank}위</Text>
+              <Text style={styles.rewardAmount}>{formatAmount(r.amount)}</Text>
             </View>
-          ) : (
-            <>
-              {event.opts.map((opt, i) => {
-                let bg = '#fff';
-                let border = Colors.border;
-                let textColor = Colors.text;
-
-                if (answered) {
-                  if (i === event.ans) { bg = Colors.greenBg; border = Colors.green; textColor = Colors.green; }
-                  else if (i === selected) { bg = Colors.redBg; border = Colors.red; textColor = Colors.red; }
-                } else if (selected === i) {
-                  bg = '#EAF4FF'; border = Colors.primary;
-                }
-
-                return (
-                  <TouchableOpacity
-                    key={i}
-                    style={[styles.optionBtn, { backgroundColor: bg, borderColor: border }]}
-                    onPress={() => handleAnswer(i)}
-                    disabled={answered}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.optLetter, { color: border }]}>{String.fromCharCode(65 + i)}</Text>
-                    <Text style={[Typography.body1, { flex: 1, color: textColor }]}>{opt}</Text>
-                    {answered && i === event.ans && <Text style={{ fontSize: 18 }}>✅</Text>}
-                    {answered && i === selected && i !== event.ans && <Text style={{ fontSize: 18 }}>❌</Text>}
-                  </TouchableOpacity>
-                );
-              })}
-
-              {answered && (
-                <Button
-                  title={selected === event.ans ? `완료 (+${event.xp} XP) 🎉` : '확인 (오답)'}
-                  onPress={handleSubmit}
-                  variant={selected === event.ans ? 'primary' : 'outline'}
-                  size="lg"
-                  fullWidth
-                />
-              )}
-            </>
-          )}
+          ))}
         </View>
-      </ScrollView>
 
-      {/* 결과 Bottom Sheet */}
-      <BottomSheet visible={showResult} onClose={handleClose} title={selected === event.ans ? '🎉 정답!' : '😅 오답'}>
-        <View style={styles.resultContent}>
-          <Text style={styles.resultEmoji}>{selected === event.ans ? '🧠' : '📚'}</Text>
-          <Text style={[Typography.h3, { textAlign: 'center', marginBottom: 8 }]}>
-            {selected === event.ans ? `+${event.xp} XP 획득!` : '다음엔 맞춰봐요'}
-          </Text>
-          <View style={styles.explainBox}>
-            <Text style={Typography.caption}>해설</Text>
-            <Text style={[Typography.body1, { lineHeight: 22, marginTop: 4 }]}>{event.explain}</Text>
+        {/* 순위표 */}
+        <Text style={styles.leaderboardHeader}>🏅 순위표</Text>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={Colors.primary} />
           </View>
-          <Button title="닫기" onPress={handleClose} variant="primary" size="lg" fullWidth />
-        </View>
-      </BottomSheet>
-    </View>
+        ) : leaderboard.length === 0 ? (
+          <View style={styles.emptyLeaderboard}>
+            <Text style={styles.emptyText}>아직 참여자가 없어요</Text>
+          </View>
+        ) : (
+          leaderboard.map((entry, index) => {
+            const rank = index + 1;
+            const isMine = entry.uid === user?.id;
+            const rankDisplay = rank <= 3 ? RANK_MEDALS[rank - 1] : String(rank);
+
+            return (
+              <View
+                key={entry.uid}
+                style={[styles.leaderboardRow, isMine && styles.leaderboardRowMine]}
+              >
+                <Text style={styles.leaderboardRank}>{rankDisplay}</Text>
+                <Text style={styles.leaderboardEmoji}>{entry.emoji}</Text>
+                <Text style={styles.leaderboardName} numberOfLines={1}>
+                  {entry.name}
+                  {isMine ? ' (나)' : ''}
+                </Text>
+                <Text style={styles.leaderboardScore}>
+                  {formatScore(entry.score, event.type)}
+                </Text>
+              </View>
+            );
+          })
+        )}
+
+        {/* 참여 버튼 */}
+        {event.status !== 'ended' && (
+          <View style={styles.joinBtnContainer}>
+            <TouchableOpacity
+              style={[styles.joinBtn, isJoined && styles.joinBtnJoined]}
+              onPress={handleJoin}
+              disabled={isJoined}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.joinBtnText, isJoined && styles.joinBtnTextJoined]}>
+                {isJoined ? '참여중' : '참여하기'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
+// ── 스타일 ────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingBottom: 12,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: Colors.border,
+  container: {
+    flex: 1,
+    backgroundColor: Colors.bg,
   },
-  backBtn: { padding: 4 },
-  backText: { fontSize: 15, color: Colors.primary, fontWeight: '600' },
-  eventCard: { margin: 16, borderRadius: 16, padding: 20, gap: 12 },
-  eventBadgeRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  eventBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  eventBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  tickerBadge: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
-  tickerText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  eventTitle: { color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 26 },
-  eventDesc: { color: 'rgba(255,255,255,0.75)', fontSize: 14, lineHeight: 22 },
-  impactRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.2)', paddingTop: 12 },
-  impactLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13 },
-  impactValue: { fontSize: 22, fontWeight: '800', fontFamily: 'Courier' },
-  quizSection: { margin: 16 },
-  quizLabel: { fontSize: 12, fontWeight: '700', color: Colors.primary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-  completedBanner: { backgroundColor: Colors.greenBg, borderRadius: 10, padding: 16, alignItems: 'center' },
-  completedText: { color: Colors.green, fontWeight: '700', fontSize: 15 },
-  optionBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 2, borderRadius: 12, padding: 14, marginBottom: 10 },
-  optLetter: { fontSize: 15, fontWeight: '800', width: 22, textAlign: 'center' },
-  resultContent: { alignItems: 'center', gap: 14, paddingBottom: 8 },
-  resultEmoji: { fontSize: 52 },
-  explainBox: { backgroundColor: Colors.bg, borderRadius: 10, padding: 14, width: '100%' },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: Colors.textSub,
+  },
+  backBtnLarge: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  backBtnLargeText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  // 헤더
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: Colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  backBtn: {
+    padding: 4,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+    textAlign: 'center',
+    marginHorizontal: 8,
+  },
+  headerRight: {
+    width: 32,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  // 내 순위 카드
+  myRankCard: {
+    backgroundColor: Colors.primary,
+    borderRadius: 20,
+    margin: 16,
+    padding: 24,
+    alignItems: 'center',
+    gap: 6,
+  },
+  myRankLabel: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: '600',
+  },
+  myRankRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  myRankNumber: {
+    fontSize: 40,
+    fontWeight: '700',
+    color: '#fff',
+    lineHeight: 48,
+  },
+  myRankTotal: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 6,
+  },
+  myRankDeadline: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  // 이벤트 정보 카드
+  infoCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 20,
+    gap: 12,
+  },
+  infoDesc: {
+    fontSize: 14,
+    color: Colors.textSub,
+    lineHeight: 22,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  typeBadge: {
+    backgroundColor: Colors.bg,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  typeBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  infoPeriod: {
+    fontSize: 13,
+    color: Colors.textSub,
+  },
+  // 보상 카드
+  rewardCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 20,
+    gap: 10,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  rewardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  rewardEmoji: {
+    fontSize: 20,
+    width: 28,
+    textAlign: 'center',
+  },
+  rewardRankText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSub,
+    width: 28,
+  },
+  rewardAmount: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+    textAlign: 'right',
+  },
+  // 순위표
+  leaderboardHeader: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  loadingContainer: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  emptyLeaderboard: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: Colors.textMuted,
+  },
+  leaderboardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  leaderboardRowMine: {
+    borderWidth: 2,
+    borderColor: Colors.primary,
+  },
+  leaderboardRank: {
+    fontSize: 18,
+    width: 32,
+    textAlign: 'center',
+  },
+  leaderboardEmoji: {
+    fontSize: 20,
+  },
+  leaderboardName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  leaderboardScore: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  // 참여 버튼
+  joinBtnContainer: {
+    marginHorizontal: 16,
+    marginTop: 20,
+  },
+  joinBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  joinBtnJoined: {
+    backgroundColor: Colors.border,
+  },
+  joinBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  joinBtnTextJoined: {
+    color: Colors.textSub,
+  },
 });

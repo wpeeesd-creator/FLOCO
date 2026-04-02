@@ -1,146 +1,450 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { LEVELS, LEVEL_EMOJI, LEVEL_COLOR, getCoursesByLevel, type Level } from '../data/learningContent';
+import { Colors } from '../components/ui';
+import {
+  CATEGORIES,
+  CATEGORY_META,
+  learningContent,
+  type CategoryId,
+} from '../data/learningContent';
+import { getLearningData, type LearningData } from '../lib/learningService';
 
-const DAILY_TERMS = [
-  { term: 'PER', desc: '주가수익비율. 현재 주가가 1주당 순이익의 몇 배인지 나타내는 지표' },
-  { term: 'PBR', desc: '주가순자산비율. 주가를 1주당 순자산으로 나눈 값' },
-  { term: 'ROE', desc: '자기자본이익률. 기업이 자기자본으로 얼마의 이익을 냈는지 측정' },
-  { term: '배당금', desc: '기업이 이익의 일부를 주주에게 나눠주는 금액' },
-  { term: '시가총액', desc: '주가 × 발행주식수. 기업의 전체 가치를 나타냄' },
-  { term: '공매도', desc: '주식을 빌려서 먼저 팔고 나중에 사서 갚는 매도 전략' },
-  { term: 'ETF', desc: '주식처럼 거래되는 펀드. 여러 종목에 분산 투자 가능' },
-];
-
-const LEVEL_DESC: Record<Level, string> = {
-  '입문': '주식이란 · 시장구조 · 기초용어',
-  '초급': '캔들차트 · 이동평균선 · PER·PBR·ROE',
-  '중급': '재무제표 · 기술적분석 · 거시경제',
-  '고급': '포트폴리오 · 리스크관리 · 가치투자',
+const CATEGORY_DESCRIPTIONS: Record<CategoryId, string> = {
+  vocabulary: '시가, 종가, PER, PBR 등 필수 용어',
+  newsLearning: '뉴스가 주가에 미치는 영향 분석',
+  chartAnalysis: '캔들차트, 이동평균선, RSI 분석',
+  companyAnalysis: '재무제표 읽기, 해자 분석',
+  psychology: '공포와 탐욕, 손실회피 편향',
+  macro: '금리, 환율, 경기 사이클',
 };
 
 export default function LearningScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
-  const [progress, setProgress] = useState<Record<string, boolean>>({});
+  const [learningData, setLearningData] = useState<LearningData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Daily term (based on day of year)
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-  const todayTerm = DAILY_TERMS[dayOfYear % DAILY_TERMS.length];
-
-  useEffect(() => {
-    if (!user) { setLoading(false); return; }
-    getDocs(collection(db, 'users', user.id, 'progress'))
-      .then(snap => {
-        const map: Record<string, boolean> = {};
-        snap.forEach(d => { map[d.id] = d.data().completed ?? false; });
-        setProgress(map);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const loadData = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const data = await getLearningData(user.id);
+      setLearningData(data);
+    } catch {}
   }, [user?.id]);
 
+  useEffect(() => {
+    setLoading(true);
+    loadData().finally(() => setLoading(false));
+  }, [loadData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
+
+  const getFirstIncomplete = () => {
+    if (!learningData) return null;
+    for (const catId of CATEGORIES) {
+      const cat = learningContent[catId];
+      for (const level of cat.levels) {
+        const lessonId = `${catId}_${level.id}`;
+        if (!learningData.completedLessons.includes(lessonId)) {
+          return { categoryId: catId, level, lessonId };
+        }
+      }
+    }
+    return null;
+  };
+
+  const firstIncomplete = learningData ? getFirstIncomplete() : null;
+  const streak = learningData?.streak ?? 0;
+  const hearts = learningData?.hearts ?? 3;
+  const points = learningData?.totalPoints ?? 0;
+  const wrongCount = learningData?.wrongAnswers?.length ?? 0;
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>주식 학습</Text>
-          <Text style={styles.headerSub}>단계별로 학습해보세요</Text>
-        </View>
-
-        {loading ? (
-          <ActivityIndicator style={{ flex: 1 }} color="#0066FF" />
-        ) : (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
-            {/* Daily Term Card */}
-            <View style={styles.termCard}>
-              <View style={styles.termHeader}>
-                <Text style={{ fontSize: 20 }}>💡</Text>
-                <Text style={styles.termLabel}>오늘의 용어</Text>
-              </View>
-              <Text style={styles.termTitle}>{todayTerm.term}</Text>
-              <Text style={styles.termDesc}>{todayTerm.desc}</Text>
-            </View>
-
-            {/* Level Cards */}
-            {LEVELS.map((level) => {
-              const courses = getCoursesByLevel(level);
-              const done = courses.filter(c => progress[c.id]).length;
-              const pct = Math.round((done / courses.length) * 100);
-              const color = LEVEL_COLOR[level];
-
-              return (
-                <TouchableOpacity
-                  key={level}
-                  style={styles.levelCard}
-                  onPress={() => navigation.navigate('코스목록', { level })}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.levelTop}>
-                    <View style={[styles.levelIcon, { backgroundColor: color + '18' }]}>
-                      <Text style={{ fontSize: 28 }}>{LEVEL_EMOJI[level]}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.levelTitle}>{level}</Text>
-                      <Text style={styles.levelDesc}>{LEVEL_DESC[level]}</Text>
-                    </View>
-                    <View style={[styles.pctBadge, { backgroundColor: pct === 100 ? '#E8FFF0' : color + '15' }]}>
-                      <Text style={[styles.pctText, { color: pct === 100 ? '#34C759' : color }]}>
-                        {pct === 100 ? '✓' : `${pct}%`}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.progressBg}>
-                    <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: color }]} />
-                  </View>
-                  <Text style={styles.progressText}>{done} / {courses.length} 완료</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        )}
+    <SafeAreaView style={styles.safeArea}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>학습</Text>
       </View>
+
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={{ fontSize: 14, color: Colors.textSub, marginTop: 12 }}>학습 데이터를 불러오는 중...</Text>
+        </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={Colors.primary}
+            />
+          }
+        >
+          {/* Status Bar */}
+          <View style={styles.statusBar}>
+            <View style={styles.statusItem}>
+              <Text style={styles.statusEmoji}>🔥</Text>
+              <Text style={styles.statusValue}>{streak}</Text>
+              <Text style={styles.statusLabel}>연속학습</Text>
+            </View>
+            <View style={styles.statusDivider} />
+            <View style={styles.statusItem}>
+              <Text style={styles.statusEmoji}>❤️</Text>
+              <Text style={styles.statusValue}>{hearts}/3</Text>
+              <Text style={styles.statusLabel}>하트</Text>
+            </View>
+            <View style={styles.statusDivider} />
+            <View style={styles.statusItem}>
+              <Text style={styles.statusEmoji}>⭐</Text>
+              <Text style={styles.statusValue}>{points.toLocaleString()}</Text>
+              <Text style={styles.statusLabel}>포인트</Text>
+            </View>
+          </View>
+
+          {/* Today's Lesson Card */}
+          {firstIncomplete && (
+            <View style={styles.todayCard}>
+              <Text style={styles.todayLabel}>오늘의 레슨</Text>
+              <Text style={styles.todayTitle} numberOfLines={2}>
+                {firstIncomplete.level.title}
+              </Text>
+              <Text style={styles.todayCategoryName}>
+                {CATEGORY_META[firstIncomplete.categoryId].emoji}{' '}
+                {CATEGORY_META[firstIncomplete.categoryId].title}
+              </Text>
+              <TouchableOpacity
+                style={styles.todayBtn}
+                onPress={() =>
+                  navigation.navigate('레슨플레이어', {
+                    categoryId: firstIncomplete.categoryId,
+                    levelId: firstIncomplete.level.id,
+                    lessons: firstIncomplete.level.lessons,
+                    levelTitle: firstIncomplete.level.title,
+                  })
+                }
+                activeOpacity={0.85}
+              >
+                <Text style={styles.todayBtnText}>학습하기 →</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Category Section */}
+          <Text style={styles.sectionTitle}>카테고리</Text>
+
+          {CATEGORIES.map((catId) => {
+            const meta = CATEGORY_META[catId];
+            const color = meta.color[0];
+            const progress = learningData?.categoryProgress?.[catId];
+            const completed = progress?.completed ?? 0;
+            const total = progress?.total ?? 1;
+            const pct = Math.round((completed / total) * 100);
+            const allDone = pct === 100;
+
+            return (
+              <TouchableOpacity
+                key={catId}
+                style={[styles.categoryCard, { borderLeftColor: color }]}
+                onPress={() => navigation.navigate('코스목록', { categoryId: catId })}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.categoryIcon, { backgroundColor: color + '33' }]}>
+                  <Text style={styles.categoryEmoji}>{meta.emoji}</Text>
+                </View>
+                <View style={styles.categoryCenter}>
+                  <Text style={styles.categoryTitle}>{meta.title}</Text>
+                  <Text style={styles.categoryDesc} numberOfLines={1}>
+                    {CATEGORY_DESCRIPTIONS[catId]}
+                  </Text>
+                  <View style={styles.progressBg}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${pct}%` as any, backgroundColor: color },
+                      ]}
+                    />
+                  </View>
+                </View>
+                <View style={styles.categoryRight}>
+                  {allDone ? (
+                    <Text style={styles.categoryDone}>✅</Text>
+                  ) : (
+                    <Text style={[styles.categoryPct, { color }]}>{pct}%</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          {/* Wrong Answers Card */}
+          <TouchableOpacity
+            style={styles.wrongCard}
+            onPress={() => navigation.navigate('오답노트')}
+            activeOpacity={0.75}
+          >
+            <View style={styles.wrongLeft}>
+              <Text style={styles.wrongEmoji}>📝</Text>
+              <View style={styles.wrongTextBlock}>
+                <View style={styles.wrongTitleRow}>
+                  <Text style={styles.wrongTitle}>오답 노트</Text>
+                  {wrongCount > 0 && (
+                    <View style={styles.wrongBadge}>
+                      <Text style={styles.wrongBadgeText}>{wrongCount}</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.wrongSub}>틀린 문제를 복습하세요</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={Colors.textSub} />
+          </TouchableOpacity>
+
+          <View style={{ height: 32 }} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
   header: {
-    backgroundColor: '#FFFFFF', paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#191919' },
-  headerSub: { fontSize: 13, color: '#8E8E93', marginTop: 2 },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  scrollContent: {
+    paddingBottom: 16,
+  },
 
-  termCard: {
-    backgroundColor: '#0066FF', marginHorizontal: 16, marginTop: 16,
-    borderRadius: 16, padding: 20,
+  // Status bar
+  statusBar: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  termHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  termLabel: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
-  termTitle: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 6 },
-  termDesc: { fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 20 },
+  statusItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statusEmoji: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  statusValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  statusLabel: {
+    fontSize: 12,
+    color: Colors.textSub,
+    marginTop: 2,
+  },
+  statusDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: Colors.border,
+  },
 
-  levelCard: {
-    backgroundColor: '#FFFFFF', marginHorizontal: 16, marginTop: 12,
-    borderRadius: 16, padding: 18,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
+  // Today's lesson card
+  todayCard: {
+    backgroundColor: Colors.primary,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 20,
+    padding: 20,
   },
-  levelTop: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 },
-  levelIcon: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  levelTitle: { fontSize: 17, fontWeight: '700', color: '#191919' },
-  levelDesc: { fontSize: 12, color: '#8E8E93', marginTop: 3 },
-  pctBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  pctText: { fontSize: 13, fontWeight: '800' },
-  progressBg: { height: 6, backgroundColor: '#F2F2F7', borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 3 },
-  progressText: { fontSize: 12, color: '#8E8E93', marginTop: 8 },
+  todayLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  todayTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  todayCategoryName: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 16,
+  },
+  todayBtn: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    alignSelf: 'flex-start',
+  },
+  todayBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+
+  // Section title
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.text,
+    marginHorizontal: 16,
+    marginTop: 24,
+    marginBottom: 12,
+  },
+
+  // Category cards
+  categoryCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+    gap: 14,
+  },
+  categoryIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryEmoji: {
+    fontSize: 28,
+  },
+  categoryCenter: {
+    flex: 1,
+    gap: 4,
+  },
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  categoryDesc: {
+    fontSize: 13,
+    color: Colors.textSub,
+  },
+  progressBg: {
+    height: 4,
+    backgroundColor: Colors.border,
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginTop: 6,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  categoryRight: {
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  categoryDone: {
+    fontSize: 22,
+  },
+  categoryPct: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  // Wrong answers card
+  wrongCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  wrongLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  wrongEmoji: {
+    fontSize: 28,
+  },
+  wrongTextBlock: {
+    gap: 2,
+  },
+  wrongTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  wrongTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  wrongBadge: {
+    backgroundColor: '#FF4B4B',
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+  },
+  wrongBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  wrongSub: {
+    fontSize: 13,
+    color: Colors.textSub,
+  },
 });

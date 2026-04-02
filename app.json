@@ -6,29 +6,54 @@
     "scheme": "floco",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#0066FF"
+    },
+    "assetBundlePatterns": ["**/*"],
     "ios": {
+      "icon": "./assets/icon.png",
       "supportsTablet": false,
-      "bundleIdentifier": "com.floco.app",
-      "buildNumber": "1"
+      "bundleIdentifier": "com.floco.app"
     },
     "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0066FF"
+      },
       "package": "com.floco.app",
       "versionCode": 1,
-      "adaptiveIcon": {
-        "backgroundColor": "#0066FF"
-      }
+      "permissions": [
+        "NOTIFICATIONS",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "extra": {
       "googleClientId": "572965735174-esma8uktkqtk92pqai7dm9ci80s7uhli.apps.googleusercontent.com",
       "expoClientId": "572965735174-3hrl5qope4q11o5eqphlmf28rn41fehf.apps.googleusercontent.com",
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
-      }
+        "projectId": "93e59a30-ea83-405b-b260-fb07c6280577"
+      },
+      "router": {}
     },
     "plugins": [
       "expo-web-browser",
       "expo-secure-store",
-      "expo-router"
-    ]
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#0066FF"
+        }
+      ],
+      "expo-image-picker",
+      "expo-splash-screen"
+    ],
+    "owner": "seoyoung10"
   }
 }

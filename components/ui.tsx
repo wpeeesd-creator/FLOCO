@@ -1,47 +1,47 @@
 /**
- * FLOCO 공통 컴포넌트
- * 토스 디자인 패턴 기반
+ * FLOCO 디자인 시스템 — 토스증권 스타일
  */
 
 import React from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Modal, Animated,
+  ActivityIndicator, Modal,
 } from 'react-native';
 
-// ── 토스 컬러 시스템 (마스터 프롬프트 기준) ──────────────────────────
+// ── 토스증권 컬러 시스템 ────────────────────────
 export const Colors = {
   primary: '#0066FF',
   primaryDark: '#0052CC',
-  bg: '#FFFFFF',
+  bg: '#F2F4F6',
   card: '#FFFFFF',
-  navy: '#191919',
-  green: '#FF3B30',       // 상승 (한국식 빨강)
+  navy: '#191F28',
+  green: '#F04452',        // 상승 (한국식 빨강)
   greenBg: '#FFF0F1',
-  red: '#3182F6',         // 하락 (한국식 파랑)
+  red: '#2175F3',          // 하락 (한국식 파랑)
   redBg: '#EBF2FF',
   gold: '#F59E0B',
   goldBg: '#FFF3D6',
-  text: '#191919',
-  textSub: '#8E8E93',
-  textMuted: '#B0B8C1',
-  border: '#F2F2F7',
-  shadow: 'rgba(0,0,0,0.04)',
+  text: '#191F28',
+  textSub: '#8B95A1',
+  textMuted: '#ADB5BD',
+  border: '#E5E8EB',
+  shadow: '#00000010',
+  inactive: '#ADB5BD',
 };
 
-// ── 토스 타이포그래피 ──────────────────────────
+// ── 토스증권 타이포그래피 ────────────────────────
 export const Typography = {
-  h1: { fontSize: 28, fontWeight: '700' as const, color: Colors.text },
+  h1: { fontSize: 24, fontWeight: '700' as const, color: Colors.text },
   h2: { fontSize: 18, fontWeight: '600' as const, color: Colors.text },
   h3: { fontSize: 16, fontWeight: '600' as const, color: Colors.text },
-  body1: { fontSize: 15, fontWeight: '400' as const, color: Colors.text },
-  body2: { fontSize: 13, fontWeight: '400' as const, color: Colors.textSub },
-  caption: { fontSize: 11, fontWeight: '400' as const, color: Colors.textMuted },
-  mono: { fontSize: 15, fontFamily: 'Courier', fontWeight: '700' as const, color: Colors.text },
+  body1: { fontSize: 16, fontWeight: '400' as const, color: Colors.text },
+  body2: { fontSize: 14, fontWeight: '400' as const, color: Colors.textSub },
+  caption: { fontSize: 12, fontWeight: '400' as const, color: Colors.textMuted },
+  mono: { fontSize: 16, fontFamily: 'Courier', fontWeight: '700' as const, color: Colors.text },
   monoLg: { fontSize: 28, fontFamily: 'Courier', fontWeight: '700' as const, color: Colors.text },
 };
 
-// ── 카드 컴포넌트 (토스 스타일) ──────────────────
+// ── 카드 ────────────────────────────────────
 interface CardProps {
   children: React.ReactNode;
   style?: object;
@@ -60,7 +60,7 @@ export function Card({ children, style, onPress }: CardProps) {
   return content;
 }
 
-// ── 버튼 컴포넌트 (토스 스타일) ──────────────────
+// ── 버튼 ────────────────────────────────────
 interface ButtonProps {
   title: string;
   onPress: () => void;
@@ -108,7 +108,7 @@ export function Button({
   );
 }
 
-// ── 배지 컴포넌트 ──────────────────────────────
+// ── 배지 ────────────────────────────────────
 interface BadgeProps {
   label: string;
   type?: 'success' | 'danger' | 'warning' | 'info' | 'default';
@@ -141,7 +141,7 @@ export function Badge({ label, type = 'default', size = 'md' }: BadgeProps) {
   );
 }
 
-// ── 수익률 표시 컴포넌트 (토스 스타일) ──────────────
+// ── 수익률 배지 ────────────────────────────────
 interface ReturnBadgeProps {
   value: number;
   showArrow?: boolean;
@@ -152,19 +152,19 @@ export function ReturnBadge({ value, showArrow = true }: ReturnBadgeProps) {
   return (
     <View style={[styles.returnBadge, { backgroundColor: isUp ? Colors.greenBg : Colors.redBg }]}>
       <Text style={[styles.returnBadgeText, { color: isUp ? Colors.green : Colors.red }]}>
-        {showArrow ? (isUp ? '↗ ' : '↘ ') : ''}
+        {showArrow ? (isUp ? '▲ ' : '▼ ') : ''}
         {isUp ? '+' : ''}{value.toFixed(2)}%
       </Text>
     </View>
   );
 }
 
-// ── 구분선 ──────────────────────────────────
+// ── 구분선 ────────────────────────────────────
 export function Divider({ margin = 0 }: { margin?: number }) {
   return <View style={[styles.divider, { marginVertical: margin }]} />;
 }
 
-// ── 빈 상태 (Empty State) ──────────────────────
+// ── 빈 상태 ────────────────────────────────────
 interface EmptyStateProps {
   emoji: string;
   title: string;
@@ -185,14 +185,14 @@ export function EmptyState({ emoji, title, desc, action }: EmptyStateProps) {
   );
 }
 
-// ── 스켈레톤 로딩 ──────────────────────────────
+// ── 스켈레톤 ────────────────────────────────────
 export function Skeleton({ width, height, borderRadius = 8 }: { width: number | string; height: number; borderRadius?: number }) {
   return (
-    <View style={{ width: width as number, height, borderRadius, backgroundColor: '#E8ECF0' }} />
+    <View style={{ width: width as number, height, borderRadius, backgroundColor: '#E5E8EB' }} />
   );
 }
 
-// ── XP 진행 바 (듀오링고 스타일) ──────────────────
+// ── XP Bar ────────────────────────────────────
 interface XpBarProps {
   current: number;
   max: number;
@@ -216,7 +216,7 @@ export function XpBar({ current, max, showLabel = true }: XpBarProps) {
   );
 }
 
-// ── 하트 표시 (듀오링고 스타일) ──────────────────
+// ── Hearts ────────────────────────────────────
 export function Hearts({ count, max = 5 }: { count: number; max?: number }) {
   return (
     <View style={styles.hearts}>
@@ -227,7 +227,7 @@ export function Hearts({ count, max = 5 }: { count: number; max?: number }) {
   );
 }
 
-// ── 스트릭 표시 ──────────────────────────────
+// ── Streak ────────────────────────────────────
 export function Streak({ count }: { count: number }) {
   return (
     <View style={styles.streak}>
@@ -237,7 +237,7 @@ export function Streak({ count }: { count: number }) {
   );
 }
 
-// ── Bottom Sheet (토스 스타일) ──────────────────
+// ── Bottom Sheet ────────────────────────────────
 interface BottomSheetProps {
   visible: boolean;
   onClose: () => void;
@@ -258,7 +258,7 @@ export function BottomSheet({ visible, onClose, children, title }: BottomSheetPr
   );
 }
 
-// ── 토스트 메시지 ──────────────────────────────
+// ── Toast ────────────────────────────────────
 interface ToastProps {
   message: string;
   type?: 'success' | 'error' | 'info';
@@ -267,7 +267,7 @@ interface ToastProps {
 
 export function Toast({ message, type = 'info', visible }: ToastProps) {
   if (!visible) return null;
-  const bgColor = type === 'success' ? Colors.green : type === 'error' ? Colors.red : Colors.navy;
+  const bgColor = type === 'success' ? '#34C759' : type === 'error' ? '#FF3B30' : Colors.navy;
   return (
     <View style={[styles.toast, { backgroundColor: bgColor }]}>
       <Text style={styles.toastText}>{message}</Text>
@@ -275,7 +275,7 @@ export function Toast({ message, type = 'info', visible }: ToastProps) {
   );
 }
 
-// ── 섹션 헤더 ──────────────────────────────────
+// ── 섹션 헤더 ────────────────────────────────────
 interface SectionHeaderProps {
   title: string;
   action?: { label: string; onPress: () => void };
@@ -284,7 +284,7 @@ interface SectionHeaderProps {
 export function SectionHeader({ title, action }: SectionHeaderProps) {
   return (
     <View style={styles.sectionHeader}>
-      <Text style={Typography.h3}>{title}</Text>
+      <Text style={Typography.h2}>{title}</Text>
       {action && (
         <TouchableOpacity
           onPress={action.onPress}
@@ -297,39 +297,63 @@ export function SectionHeader({ title, action }: SectionHeaderProps) {
   );
 }
 
-// ── 스타일 ──────────────────────────────────────
+// ── 로딩 화면 ────────────────────────────────────
+export function LoadingScreen({ message }: { message?: string }) {
+  return (
+    <View style={styles.loadingScreen}>
+      <ActivityIndicator size="large" color={Colors.primary} />
+      {message && <Text style={[Typography.body2, { marginTop: 12 }]}>{message}</Text>}
+    </View>
+  );
+}
+
+// ── 에러 화면 ────────────────────────────────────
+export function ErrorState({ emoji = '😵', title, desc, onRetry }: {
+  emoji?: string; title: string; desc?: string; onRetry?: () => void;
+}) {
+  return (
+    <View style={styles.emptyState}>
+      <Text style={styles.emptyEmoji}>{emoji}</Text>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      {desc && <Text style={styles.emptyDesc}>{desc}</Text>}
+      {onRetry && <Button title="다시 시도" onPress={onRetry} variant="outline" size="sm" />}
+    </View>
+  );
+}
+
+// ── 스타일 ────────────────────────────────────────
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.card,
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
     shadowColor: Colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 8,
-    elevation: 3,
-    marginBottom: 12,
+    elevation: 2,
+    marginBottom: 8,
   },
   btn: {
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   btn_primary: { backgroundColor: Colors.primary },
   btn_outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: Colors.primary },
   btn_ghost: { backgroundColor: 'transparent' },
-  btn_danger: { backgroundColor: Colors.red },
+  btn_danger: { backgroundColor: '#FF3B30' },
   btn_disabled: { opacity: 0.5 },
   btn_sm: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 6 },
-  btn_md: { paddingHorizontal: 20, paddingVertical: 12 },
-  btn_lg: { paddingHorizontal: 24, paddingVertical: 16 },
+  btn_md: { paddingHorizontal: 20, height: 52, borderRadius: 8 },
+  btn_lg: { paddingHorizontal: 24, height: 52, borderRadius: 8 },
   btnText: { fontWeight: '700' },
   btnText_primary: { color: '#fff' },
   btnText_outline: { color: Colors.primary },
   btnText_ghost: { color: Colors.primary },
   btnText_danger: { color: '#fff' },
   btnText_sm: { fontSize: 13 },
-  btnText_md: { fontSize: 15 },
+  btnText_md: { fontSize: 16 },
   btnText_lg: { fontSize: 16 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   badge_sm: { paddingHorizontal: 6, paddingVertical: 2 },
@@ -341,7 +365,7 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', padding: 40, gap: 8 },
   emptyEmoji: { fontSize: 40, marginBottom: 4 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
-  emptyDesc: { fontSize: 13, color: Colors.textSub, textAlign: 'center' },
+  emptyDesc: { fontSize: 14, color: Colors.textSub, textAlign: 'center' },
   xpBarLabel: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   xpBarBg: { height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden' },
   xpBarFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 3 },
@@ -359,5 +383,6 @@ const styles = StyleSheet.create({
     borderRadius: 10, padding: 14, alignItems: 'center',
   },
   toastText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 16 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 20 },
+  loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg },
 });

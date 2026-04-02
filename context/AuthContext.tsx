@@ -29,6 +29,9 @@ type AuthContextType = {
 
 const TOKEN_KEY = 'userToken';
 const INFO_KEY  = 'userInfo';
+const EMAIL_KEY = 'user_email';
+const PASS_KEY  = 'user_password';
+const AUTO_KEY  = 'auto_login';
 
 // ── Firestore users/{uid} 조회 또는 신규 생성 ─────
 async function fetchOrCreateUser(uid: string, email: string, name: string): Promise<User> {
@@ -45,9 +48,15 @@ async function fetchOrCreateUser(uid: string, email: string, name: string): Prom
     };
   }
 
-  // 문서 없으면 기본값(role: 'user')으로 생성
+  // 문서 없으면 기본값(role: 'user')으로 생성 + 초대 코드
   const newUser: User = { id: uid, email, name, role: 'user' };
-  await setDoc(ref, { uid, email, name, role: 'user', createdAt: Date.now() });
+  await setDoc(ref, {
+    uid, email, name, role: 'user', createdAt: Date.now(),
+    inviteCode: uid.slice(0, 6).toUpperCase(),
+    invitedBy: null,
+    invitedFriends: [],
+    inviteReward: 0,
+  });
   return newUser;
 }
 
@@ -83,9 +92,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 앱 시작 시 세션 복원 + Firebase Auth 리스너
+  // ── 자동 로그인 시도 (SecureStore 저장된 이메일/비밀번호로 재인증) ──
+  const tryAutoLogin = async (): Promise<boolean> => {
+    try {
+      const autoFlag = await SecureStore.getItemAsync(AUTO_KEY);
+      if (autoFlag !== 'true') return false;
+
+      const email = await SecureStore.getItemAsync(EMAIL_KEY);
+      const password = await SecureStore.getItemAsync(PASS_KEY);
+      if (!email || !password) return false;
+
+      await signInWithEmailAndPassword(auth, email, password);
+      return true; // onAuthStateChanged가 유저 세팅 처리
+    } catch {
+      // 자동 로그인 실패 → 저장 정보 삭제
+      await SecureStore.deleteItemAsync(AUTO_KEY);
+      await SecureStore.deleteItemAsync(EMAIL_KEY);
+      await SecureStore.deleteItemAsync(PASS_KEY);
+      return false;
+    }
+  };
+
+  // 앱 시작 시 Firebase Auth 리스너 + 자동 로그인
   useEffect(() => {
-    restoreSession();
+    let autoLoginAttempted = false;
 
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser && fbUser.email) {
@@ -94,12 +124,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(userData);
         await SecureStore.setItemAsync(TOKEN_KEY, fbUser.uid);
         await SecureStore.setItemAsync(INFO_KEY, JSON.stringify(userData));
+        setIsLoading(false);
+      } else if (!autoLoginAttempted) {
+        // 첫 번째 null → 자동 로그인 시도
+        autoLoginAttempted = true;
+        const success = await tryAutoLogin();
+        if (!success) {
+          // 자동 로그인 실패 → 로그인 화면
+          setUser(null);
+          await SecureStore.deleteItemAsync(TOKEN_KEY);
+          await SecureStore.deleteItemAsync(INFO_KEY);
+          setIsLoading(false);
+        }
+        // 성공 시 onAuthStateChanged가 다시 호출되어 위 분기에서 처리
       } else {
+        // 자동 로그인 이후 로그아웃
         setUser(null);
-        await SecureStore.deleteItemAsync(TOKEN_KEY);
-        await SecureStore.deleteItemAsync(INFO_KEY);
+        setIsLoading(false);
       }
-      setIsLoading(false);
     });
 
     return unsubscribe;
@@ -114,6 +156,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       await SecureStore.setItemAsync(TOKEN_KEY, cred.user.uid);
       await SecureStore.setItemAsync(INFO_KEY, JSON.stringify(userData));
+      // 자동 로그인용 저장
+      await SecureStore.setItemAsync(EMAIL_KEY, email.trim());
+      await SecureStore.setItemAsync(PASS_KEY, password);
+      await SecureStore.setItemAsync(AUTO_KEY, 'true');
       return { success: true, message: '로그인 완료' };
     } catch (e: any) {
       return { success: false, message: translateError(e.code ?? '') };
@@ -129,6 +175,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       await SecureStore.setItemAsync(TOKEN_KEY, cred.user.uid);
       await SecureStore.setItemAsync(INFO_KEY, JSON.stringify(userData));
+      // 자동 로그인용 저장
+      await SecureStore.setItemAsync(EMAIL_KEY, email.trim());
+      await SecureStore.setItemAsync(PASS_KEY, password);
+      await SecureStore.setItemAsync(AUTO_KEY, 'true');
       return { success: true, message: '회원가입 완료' };
     } catch (e: any) {
       return { success: false, message: translateError(e.code ?? '') };
@@ -157,6 +207,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     await SecureStore.deleteItemAsync(INFO_KEY);
+    await SecureStore.deleteItemAsync(EMAIL_KEY);
+    await SecureStore.deleteItemAsync(PASS_KEY);
+    await SecureStore.deleteItemAsync(AUTO_KEY);
   };
 
   return (
@@ -182,8 +235,11 @@ function translateError(code: string): string {
     'auth/email-already-in-use':   '이미 사용 중인 이메일이에요.',
     'auth/invalid-email':          '올바른 이메일 형식이 아니에요.',
     'auth/weak-password':          '비밀번호는 6자 이상이어야 해요.',
-    'auth/too-many-requests':      '잠시 후 다시 시도해주세요.',
-    'auth/network-request-failed': '네트워크 연결을 확인해주세요.',
+    'auth/too-many-requests':      '너무 많이 시도했어요. 잠시 후 다시 시도해주세요.',
+    'auth/network-request-failed': '인터넷 연결이 끊겨 있어요. 연결을 확인해주세요.',
+    'auth/internal-error':         '서버에 문제가 생겼어요. 잠시 후 다시 시도해주세요.',
+    'auth/timeout':                '서버 응답이 느려요. 잠시 후 다시 시도해주세요.',
+    'auth/user-disabled':          '비활성화된 계정이에요. 관리자에게 문의해주세요.',
   };
   return map[code] ?? '오류가 발생했어요. 다시 시도해주세요.';
 }

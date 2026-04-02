@@ -20,7 +20,7 @@ export default function LessonScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { courseId } = route.params as { courseId: string };
+  const courseId = route.params?.courseId ?? '';
   const { user } = useAuth();
 
   const course = COURSES.find(c => c.id === courseId);

@@ -8,9 +8,9 @@
  * 4. 프로젝트 설정 → 앱 추가(웹) → config 복사 → 아래에 붙여넣기
  */
 
-import { initializeApp, getApps } from 'firebase/app';
-import { initializeAuth, getAuth, inMemoryPersistence } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { initializeAuth, getAuth, inMemoryPersistence, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyAfuOxeysX16Q9XC2VrtQrp05QB7wrwnpY',
@@ -22,11 +22,25 @@ const firebaseConfig = {
   measurementId:     'G-7P7H42N00L',
 };
 
-// 중복 초기화 방지 (핫리로드 시 크래시 방지)
-const isNew = getApps().length === 0;
-export const app = isNew ? initializeApp(firebaseConfig) : getApps()[0];
+let app: FirebaseApp;
+let auth: Auth;
+let db: Firestore;
 
-export const auth = isNew
-  ? initializeAuth(app, { persistence: inMemoryPersistence })
-  : getAuth(app);
-export const db = getFirestore(app);
+try {
+  // 중복 초기화 방지 (핫리로드 시 크래시 방지)
+  const isNew = getApps().length === 0;
+  app = isNew ? initializeApp(firebaseConfig) : getApps()[0];
+
+  auth = isNew
+    ? initializeAuth(app, { persistence: inMemoryPersistence })
+    : getAuth(app);
+  db = getFirestore(app);
+} catch (error) {
+  console.error('Firebase 초기화 오류:', error);
+  // 초기화 실패 시에도 앱이 크래시하지 않도록 재시도
+  app = getApps()[0] ?? initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+}
+
+export { app, auth, db };

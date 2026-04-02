@@ -4,9 +4,18 @@ import {
   RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getAllPortfolios, type PortfolioSnapshot } from '../lib/firestoreService';
+import { getAllPortfolios, getAllUserProfiles, type PortfolioSnapshot } from '../lib/firestoreService';
 import { useAppStore, STOCKS } from '../store/appStore';
 import { useAuth } from '../context/AuthContext';
+
+const BG = '#F2F4F6';
+const CARD = '#FFFFFF';
+const PRIMARY = '#0066FF';
+const RISE = '#F04452';
+const FALL = '#2175F3';
+const TEXT = '#191F28';
+const TEXT_SUB = '#8B95A1';
+const BORDER = '#E5E8EB';
 
 const INITIAL_FUND = 1_000_000;
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -25,6 +34,7 @@ interface RankEntry {
   totalValue: number;
   returnRate: number;
   tradeCount: number;
+  investEmoji?: string;
 }
 
 export default function RankingScreen() {
@@ -38,7 +48,14 @@ export default function RankingScreen() {
 
   const load = useCallback(async () => {
     try {
-      const all = await getAllPortfolios();
+      const [all, users] = await Promise.all([getAllPortfolios(), getAllUserProfiles()]);
+      const emojiMap: Record<string, string> = {};
+      users.forEach((u: any) => {
+        if (u.investmentType?.emoji) {
+          emojiMap[u.uid] = u.investmentType.emoji;
+        }
+      });
+
       const entries: RankEntry[] = all.map(snap => {
         const totalValue = calcTotal(snap);
         return {
@@ -47,9 +64,9 @@ export default function RankingScreen() {
           totalValue,
           returnRate: ((totalValue - INITIAL_FUND) / INITIAL_FUND) * 100,
           tradeCount: (snap.trades ?? []).length,
+          investEmoji: emojiMap[snap.uid] ?? undefined,
         };
       }).sort((a, b) => b.returnRate - a.returnRate);
-      console.log('RankingScreen 로드 완료:', entries.length, '명');
       setRanked(entries);
     } catch {
       setRanked([]);
@@ -66,17 +83,17 @@ export default function RankingScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#0066FF" />
-          <Text style={{ fontSize: 13, color: '#8E8E93', marginTop: 12 }}>순위 불러오는 중...</Text>
+          <ActivityIndicator size="large" color={PRIMARY} />
+          <Text style={styles.loadingText}>순위 불러오는 중...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -93,69 +110,65 @@ export default function RankingScreen() {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 30 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0066FF" />}
+          contentContainerStyle={{ paddingBottom: 32 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />
+          }
         >
-          {/* My Rank Banner */}
-          {myRank > 0 && (
-            <View style={styles.myBanner}>
-              <View>
-                <Text style={styles.myBannerLabel}>내 순위</Text>
-                <Text style={styles.myBannerName}>{currentUser?.name}</Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.myBannerRank}>{myRank}위</Text>
-                <Text style={styles.myBannerTotal}>/ {ranked.length}명</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Top 3 Podium */}
+          {/* Top 3 포디움 + 내 순위 카드 */}
           {ranked.length >= 3 && (
-            <View style={styles.podium}>
-              <PodiumCard entry={ranked[1]} rank={2} />
-              <PodiumCard entry={ranked[0]} rank={1} isFirst />
-              <PodiumCard entry={ranked[2]} rank={3} />
-            </View>
+            <TopThreePodium ranked={ranked} />
+          )}
+          {myRank > 0 && (
+            <MyRankCard rank={myRank} total={ranked.length} name={currentUser?.name ?? ''} />
           )}
 
-          {/* Full List */}
+          {/* 전체 랭킹 리스트 */}
           <View style={styles.listCard}>
-            {ranked.map((item, idx) => {
-              const isMe = item.uid === userId;
-              const isPositive = item.returnRate >= 0;
-              return (
-                <View key={item.uid} style={[styles.row, isMe && styles.rowMe, idx < ranked.length - 1 && styles.rowBorder]}>
-                  <Text style={styles.rowRank}>
-                    {idx < 3 ? MEDALS[idx] : `${idx + 1}`}
-                  </Text>
-                  <View style={[styles.avatar, { backgroundColor: isMe ? '#0066FF' : '#E8ECF0' }]}>
-                    <Text style={[styles.avatarText, { color: isMe ? '#fff' : '#191919' }]}>
-                      {item.name[0]?.toUpperCase() ?? '?'}
+            {ranked.length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyIcon}>🏆</Text>
+                <Text style={styles.emptyTitle}>아직 참가자가 없어요</Text>
+                <Text style={styles.emptySub}>거래를 시작하면 랭킹에 표시돼요</Text>
+              </View>
+            ) : (
+              ranked.map((item, idx) => {
+                const isMe = item.uid === userId;
+                const isPositive = item.returnRate >= 0;
+                return (
+                  <View
+                    key={item.uid}
+                    style={[
+                      styles.row,
+                      isMe && styles.rowMe,
+                      idx < ranked.length - 1 && styles.rowBorder,
+                    ]}
+                  >
+                    <Text style={styles.rowRank}>
+                      {idx < 3 ? MEDALS[idx] : `${idx + 1}`}
                     </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.rowName, isMe && { color: '#0066FF' }]}>
-                      {item.name}{isMe ? ' (나)' : ''}
-                    </Text>
-                    <Text style={styles.rowSub}>거래 {item.tradeCount}건</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[styles.rowRate, { color: isPositive ? '#FF3B30' : '#0066FF' }]}>
+                    <View style={[styles.avatar, { backgroundColor: isMe ? PRIMARY : '#EEF2F6' }]}>
+                      <Text style={[styles.avatarText, { color: isMe ? '#fff' : TEXT }]}>
+                        {item.name[0]?.toUpperCase() ?? '?'}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={[styles.rowName, isMe && { color: PRIMARY }]}>
+                          {item.name}{isMe ? ' (나)' : ''}
+                        </Text>
+                        {item.investEmoji ? (
+                          <Text style={{ fontSize: 14 }}>{item.investEmoji}</Text>
+                        ) : null}
+                      </View>
+                      <Text style={styles.rowSub}>총 자산 ₩{Math.round(item.totalValue).toLocaleString()}</Text>
+                    </View>
+                    <Text style={[styles.rowRate, { color: isPositive ? RISE : FALL }]}>
                       {isPositive ? '+' : ''}{item.returnRate.toFixed(2)}%
                     </Text>
-                    <Text style={styles.rowValue}>₩{Math.round(item.totalValue).toLocaleString()}</Text>
                   </View>
-                </View>
-              );
-            })}
-
-            {ranked.length === 0 && (
-              <View style={styles.empty}>
-                <Text style={{ fontSize: 48 }}>🏆</Text>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#191919', marginTop: 8 }}>아직 참가자가 없어요</Text>
-                <Text style={{ fontSize: 13, color: '#8E8E93', marginTop: 4 }}>거래를 시작하면 랭킹에 표시돼요</Text>
-              </View>
+                );
+              })
             )}
           </View>
         </ScrollView>
@@ -164,18 +177,74 @@ export default function RankingScreen() {
   );
 }
 
+function TopThreePodium({ ranked }: { ranked: RankEntry[] }) {
+  const first = ranked[0];
+  const second = ranked[1];
+  const third = ranked[2];
+
+  const PodiumSlot = ({ entry, rank, barHeight }: { entry: RankEntry; rank: number; barHeight: number }) => {
+    const isPositive = entry.returnRate >= 0;
+    const medal = MEDALS[rank - 1];
+    return (
+      <View style={styles.podiumSlot}>
+        {rank === 1 && <Text style={styles.podiumCrown}>👑</Text>}
+        <Text style={styles.podiumSlotMedal}>{medal}</Text>
+        <View style={styles.podiumSlotAvatarWrap}>
+          <Text style={[styles.podiumSlotAvatarText, rank === 1 && { fontSize: 26 }]}>
+            {entry.investEmoji ?? entry.name[0]?.toUpperCase() ?? '?'}
+          </Text>
+        </View>
+        <Text style={styles.podiumSlotName} numberOfLines={1}>{entry.name}</Text>
+        <Text style={[styles.podiumSlotRate, { color: isPositive ? RISE : FALL }]}>
+          {isPositive ? '+' : ''}{entry.returnRate.toFixed(1)}%
+        </Text>
+        <View style={[styles.podiumBar, { height: barHeight }]} />
+        <Text style={styles.podiumBarLabel}>{rank}위</Text>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.topThreePodium}>
+      <PodiumSlot entry={second} rank={2} barHeight={60} />
+      <PodiumSlot entry={first} rank={1} barHeight={80} />
+      <PodiumSlot entry={third} rank={3} barHeight={40} />
+    </View>
+  );
+}
+
+function MyRankCard({ rank, total, name }: { rank: number; total: number; name: string }) {
+  return (
+    <View style={styles.myRankCard}>
+      <View>
+        <Text style={styles.myRankCardLabel}>내 순위</Text>
+        <Text style={styles.myRankCardName}>{name}</Text>
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={styles.myRankCardRank}>{rank}위</Text>
+        <Text style={styles.myRankCardTotal}>/ {total}명</Text>
+      </View>
+    </View>
+  );
+}
+
 function PodiumCard({ entry, rank, isFirst }: { entry: RankEntry; rank: number; isFirst?: boolean }) {
   const isPositive = entry.returnRate >= 0;
   return (
     <View style={[styles.podiumItem, isFirst && styles.podiumFirst]}>
       <Text style={styles.podiumMedal}>{MEDALS[rank - 1]}</Text>
-      <View style={[styles.podiumAvatar, isFirst && { width: 52, height: 52, borderRadius: 26 }]}>
+      <View
+        style={[
+          styles.podiumAvatar,
+          isFirst && { width: 52, height: 52, borderRadius: 26 },
+        ]}
+      >
         <Text style={[styles.podiumAvatarText, isFirst && { fontSize: 18 }]}>
           {entry.name[0]?.toUpperCase() ?? '?'}
         </Text>
       </View>
       <Text style={styles.podiumName} numberOfLines={1}>{entry.name}</Text>
-      <Text style={[styles.podiumRate, { color: isPositive ? '#FF3B30' : '#0066FF' }]}>
+      <Text style={[styles.podiumRate, { color: isPositive ? RISE : FALL }]}>
         {isPositive ? '+' : ''}{entry.returnRate.toFixed(1)}%
       </Text>
       <Text style={styles.podiumValue}>₩{Math.round(entry.totalValue / 10000)}만</Text>
@@ -184,70 +253,219 @@ function PodiumCard({ entry, rank, isFirst }: { entry: RankEntry; rank: number; 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  container: { flex: 1, backgroundColor: BG },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: {
-    backgroundColor: '#FFFFFF', paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-  },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#191919' },
-  headerSub: { fontSize: 12, color: '#8E8E93', marginTop: 2 },
-  countBadge: { backgroundColor: '#EBF5FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  countText: { fontSize: 12, fontWeight: '600', color: '#0066FF' },
+  loadingText: { fontSize: 13, color: TEXT_SUB, marginTop: 12 },
 
+  // Header
+  header: {
+    backgroundColor: CARD,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: TEXT },
+  headerSub: { fontSize: 12, color: TEXT_SUB, marginTop: 2 },
+  countBadge: {
+    backgroundColor: '#EBF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  countText: { fontSize: 12, fontWeight: '600', color: PRIMARY },
+
+  // 내 순위 카드
   myBanner: {
-    marginHorizontal: 16, marginTop: 16, backgroundColor: '#0066FF',
-    borderRadius: 16, padding: 20,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    shadowColor: '#0066FF', shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: PRIMARY,
+    borderRadius: 12,
+    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
   myBannerLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
   myBannerName: { color: '#fff', fontSize: 17, fontWeight: '700', marginTop: 2 },
-  myBannerRank: { color: '#fff', fontSize: 28, fontWeight: '800', fontFamily: 'Courier' },
+  myBannerRank: { color: '#fff', fontSize: 28, fontWeight: '800' },
   myBannerTotal: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 2 },
 
+  // 포디움
   podium: {
-    flexDirection: 'row', alignItems: 'flex-end',
-    justifyContent: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, gap: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 8,
   },
   podiumItem: {
-    flex: 1, alignItems: 'center', backgroundColor: '#FFFFFF',
-    borderRadius: 16, padding: 12, paddingTop: 16,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: CARD,
+    borderRadius: 12,
+    padding: 12,
+    paddingTop: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   podiumFirst: {
-    paddingTop: 20, paddingBottom: 16,
+    paddingTop: 20,
+    paddingBottom: 16,
     shadowOpacity: 0.08,
   },
   podiumMedal: { fontSize: 24, marginBottom: 4 },
   podiumAvatar: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#E8ECF0', alignItems: 'center', justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EEF2F6',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 6,
   },
-  podiumAvatarText: { fontSize: 14, fontWeight: '700', color: '#191919' },
-  podiumName: { fontSize: 12, fontWeight: '600', color: '#191919', textAlign: 'center' },
-  podiumRate: { fontSize: 16, fontWeight: '800', fontFamily: 'Courier', marginTop: 4 },
-  podiumValue: { fontSize: 11, color: '#8E8E93', marginTop: 2 },
+  podiumAvatarText: { fontSize: 14, fontWeight: '700', color: TEXT },
+  podiumName: { fontSize: 12, fontWeight: '600', color: TEXT, textAlign: 'center' },
+  podiumRate: { fontSize: 15, fontWeight: '800', marginTop: 4 },
+  podiumValue: { fontSize: 11, color: TEXT_SUB, marginTop: 2 },
 
+  // 전체 랭킹 리스트 카드
   listCard: {
-    backgroundColor: '#FFFFFF', marginHorizontal: 16, marginTop: 12,
-    borderRadius: 16, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
+    backgroundColor: CARD,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   row: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    height: 64,
+    gap: 10,
   },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
-  rowMe: { backgroundColor: '#EBF5FF' },
-  rowRank: { width: 28, fontSize: 15, fontWeight: '800', textAlign: 'center', color: '#191919' },
-  avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  rowBorder: { borderBottomWidth: 1, borderBottomColor: BORDER },
+  rowMe: { backgroundColor: '#EBF2FF' },
+  rowRank: { width: 28, fontSize: 15, fontWeight: '700', textAlign: 'center', color: TEXT },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   avatarText: { fontWeight: '700', fontSize: 14 },
-  rowName: { fontSize: 14, fontWeight: '600', color: '#191919' },
-  rowSub: { fontSize: 11, color: '#8E8E93', marginTop: 2 },
-  rowRate: { fontSize: 15, fontWeight: '800', fontFamily: 'Courier' },
-  rowValue: { fontSize: 11, color: '#8E8E93', marginTop: 2 },
+  rowName: { fontSize: 14, fontWeight: '600', color: TEXT },
+  rowSub: { fontSize: 11, color: TEXT_SUB, marginTop: 2 },
+  rowRate: { fontSize: 17, fontWeight: '800' },
 
+  // Top 3 포디움 (다크)
+  topThreePodium: {
+    backgroundColor: '#191F28',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingTop: 20,
+    paddingHorizontal: 8,
+    paddingBottom: 0,
+    gap: 4,
+    overflow: 'hidden',
+  },
+  podiumSlot: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  podiumCrown: {
+    fontSize: 18,
+    marginBottom: 2,
+  },
+  podiumSlotMedal: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  podiumSlotAvatarWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  podiumSlotAvatarText: {
+    fontSize: 20,
+  },
+  podiumSlotName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    paddingHorizontal: 4,
+    marginBottom: 2,
+  },
+  podiumSlotRate: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  podiumBar: {
+    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+  },
+  podiumBarLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.5)',
+    paddingVertical: 4,
+  },
+
+  // 내 순위 카드
+  myRankCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: PRIMARY,
+    borderRadius: 12,
+    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  myRankCardLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  myRankCardName: { color: '#fff', fontSize: 17, fontWeight: '700', marginTop: 2 },
+  myRankCardRank: { color: '#fff', fontSize: 28, fontWeight: '800' },
+  myRankCardTotal: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 2 },
+
+  // 빈 상태
   empty: { alignItems: 'center', paddingVertical: 60, gap: 4 },
+  emptyIcon: { fontSize: 48 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: TEXT, marginTop: 8 },
+  emptySub: { fontSize: 13, color: TEXT_SUB, marginTop: 4 },
 });

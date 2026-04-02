@@ -12,6 +12,8 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import { validateEmail, validatePassword, validateName } from '../lib/errorHandler';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -29,13 +31,14 @@ export default function AuthScreen() {
   const [error, setError] = useState('');
 
   const { login, register, loginWithGoogle, isLoading } = useAuth();
+  const { isConnected } = useNetworkStatus();
   const loading = isLoading;
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   const [, googleResponse, googlePrompt] = Google.useAuthRequest({
-    webClientId: EXPO_CLIENT_ID,
+    clientId: EXPO_CLIENT_ID,
+    webClientId: WEB_CLIENT_ID,
     iosClientId: EXPO_CLIENT_ID,
-    expoClientId: EXPO_CLIENT_ID,
   });
 
   useEffect(() => {
@@ -64,6 +67,24 @@ export default function AuthScreen() {
 
   async function handleSubmit() {
     setError('');
+
+    // 네트워크 체크
+    if (!isConnected) {
+      setError('인터넷 연결이 끊겨 있어요. 연결을 확인해주세요.');
+      shake();
+      return;
+    }
+
+    // 입력값 검증
+    if (mode === 'register') {
+      const nameErr = validateName(name);
+      if (nameErr) { setError(nameErr); shake(); return; }
+    }
+    const emailErr = validateEmail(email);
+    if (emailErr) { setError(emailErr); shake(); return; }
+    const passErr = validatePassword(password);
+    if (passErr) { setError(passErr); shake(); return; }
+
     const result = mode === 'login'
       ? await login(email.trim(), password)
       : await register(email.trim(), password, name.trim());

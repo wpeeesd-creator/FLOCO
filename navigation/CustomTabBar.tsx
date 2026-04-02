@@ -5,22 +5,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 const ACTIVE_COLOR = '#0066FF';
-const INACTIVE_COLOR = '#8E8E93';
+const INACTIVE_COLOR = '#ADB5BD';
 
 const TABS = [
-  { name: '홈Tab',       label: '홈',       iconActive: 'home' as const,        iconInactive: 'home-outline' as const },
-  { name: '증권Tab',     label: '증권',     iconActive: 'stats-chart' as const, iconInactive: 'stats-chart-outline' as const },
-  { name: '발견Tab',     label: '발견',     iconActive: 'compass' as const,     iconInactive: 'compass-outline' as const },
-  { name: '랭킹Tab',     label: '랭킹',     iconActive: 'trophy' as const,      iconInactive: 'trophy-outline' as const },
-  { name: '플로월드Tab',  label: '월드',     iconActive: 'planet' as const,      iconInactive: 'planet-outline' as const },
-  { name: '마이페이지Tab', label: 'MY',      iconActive: 'person' as const,      iconInactive: 'person-outline' as const },
+  { name: '홈Tab',       label: '홈',   iconActive: 'home' as const,        iconInactive: 'home-outline' as const },
+  { name: '투자Tab',     label: '투자', iconActive: 'stats-chart' as const, iconInactive: 'stats-chart-outline' as const },
+  { name: '랭킹Tab',     label: '랭킹', iconActive: 'trophy' as const,      iconInactive: 'trophy-outline' as const },
+  { name: '학습Tab',     label: '학습', iconActive: 'book' as const,        iconInactive: 'book-outline' as const },
+  { name: '마이페이지Tab', label: 'MY',  iconActive: 'person' as const,      iconInactive: 'person-outline' as const },
 ];
 
 export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 6) }]}>
       <View style={styles.separator} />
       <View style={styles.tabRow}>
         {state.routes.map((route, index) => {
@@ -50,7 +49,7 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
             >
               <Ionicons
                 name={isFocused ? meta.iconActive : meta.iconInactive}
-                size={24}
+                size={22}
                 color={color}
               />
               <Text style={[styles.label, { color }]}>{meta.label}</Text>
@@ -67,22 +66,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   separator: {
-    height: 1,
-    backgroundColor: '#E8ECF0',
+    height: 0.5,
+    backgroundColor: '#E5E8EB',
   },
   tabRow: {
     flexDirection: 'row',
-    height: 60,
+    height: 56,
     alignItems: 'center',
+    paddingTop: 4,
   },
   tabBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 2,
   },
   label: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
   },
 });

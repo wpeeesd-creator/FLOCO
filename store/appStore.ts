@@ -21,6 +21,7 @@ export interface Stock {
   change: number;
   logo: string;
   krw: boolean;
+  sector?: string;
 }
 
 export interface Holding {
@@ -86,82 +87,177 @@ const STREAK_MILESTONE = 7;
 
 // ── 데이터 ──────────────────────────────
 
-export const STOCKS: Stock[] = [
-  // ── 미국 빅테크 ──
-  { ticker: 'AAPL',  name: '애플',           market: '미국', price: 189.42, change: +2.14, logo: '🍎', krw: false },
-  { ticker: 'NVDA',  name: '엔비디아',        market: '미국', price: 875.20, change: +3.87, logo: '🟩', krw: false },
-  { ticker: 'MSFT',  name: '마이크로소프트',   market: '미국', price: 415.30, change: +1.05, logo: '🔷', krw: false },
-  { ticker: 'GOOGL', name: '알파벳(구글)',     market: '미국', price: 175.80, change: +1.24, logo: '🔍', krw: false },
-  { ticker: 'AMZN',  name: '아마존',          market: '미국', price: 192.10, change: +0.78, logo: '📦', krw: false },
-  { ticker: 'META',  name: '메타',            market: '미국', price: 502.30, change: +1.56, logo: '👤', krw: false },
-  { ticker: 'TSLA',  name: '테슬라',          market: '미국', price: 214.78, change: -1.23, logo: '⚡', krw: false },
-  // ── 미국 반도체 ──
-  { ticker: 'AMD',   name: 'AMD',            market: '미국', price: 162.40, change: +2.31, logo: '🔴', krw: false },
-  { ticker: 'INTC',  name: '인텔',            market: '미국', price: 35.20,  change: -0.87, logo: '🔵', krw: false },
-  { ticker: 'TSM',   name: 'TSMC',           market: '미국', price: 158.70, change: +1.82, logo: '🇹🇼', krw: false },
-  { ticker: 'ASML',  name: 'ASML',           market: '미국', price: 894.50, change: +0.63, logo: '🔬', krw: false },
-  { ticker: 'QCOM',  name: '퀄컴',            market: '미국', price: 162.80, change: +1.14, logo: '📡', krw: false },
-  // ── 미국 금융 ──
-  { ticker: 'JPM',   name: 'JP모건',          market: '미국', price: 198.30, change: +0.45, logo: '🏦', krw: false },
-  { ticker: 'BAC',   name: '뱅크오브아메리카', market: '미국', price: 38.40,  change: +0.32, logo: '🏛️', krw: false },
-  { ticker: 'GS',    name: '골드만삭스',       market: '미국', price: 478.90, change: +0.71, logo: '💼', krw: false },
-  { ticker: 'V',     name: '비자',            market: '미국', price: 278.60, change: +0.58, logo: '💳', krw: false },
-  { ticker: 'PYPL',  name: '페이팔',          market: '미국', price: 64.20,  change: -0.93, logo: '🅿️', krw: false },
-  { ticker: 'COIN',  name: '코인베이스',       market: '미국', price: 224.10, change: +4.21, logo: '🪙', krw: false },
-  // ── 미국 소비재·엔터 ──
-  { ticker: 'NFLX',  name: '넷플릭스',        market: '미국', price: 628.40, change: +1.87, logo: '🎬', krw: false },
-  { ticker: 'DIS',   name: '디즈니',          market: '미국', price: 112.30, change: -0.54, logo: '🏰', krw: false },
-  { ticker: 'SPOT',  name: '스포티파이',       market: '미국', price: 342.80, change: +2.10, logo: '🎵', krw: false },
-  { ticker: 'RBLX',  name: '로블록스',        market: '미국', price: 42.60,  change: +1.34, logo: '🎮', krw: false },
-  { ticker: 'SNAP',  name: '스냅',            market: '미국', price: 11.40,  change: -2.17, logo: '👻', krw: false },
-  // ── 미국 이커머스·공유경제 ──
-  { ticker: 'SHOP',  name: '쇼피파이',        market: '미국', price: 78.90,  change: +1.62, logo: '🛍️', krw: false },
-  { ticker: 'UBER',  name: '우버',            market: '미국', price: 74.30,  change: +0.89, logo: '🚗', krw: false },
-  { ticker: 'ABNB',  name: '에어비앤비',       market: '미국', price: 158.20, change: +0.47, logo: '🏠', krw: false },
-  { ticker: 'DASH',  name: '도어대시',         market: '미국', price: 164.50, change: +1.23, logo: '🍔', krw: false },
-  // ── 미국 AI·클라우드 ──
-  { ticker: 'PLTR',  name: '팔란티어',        market: '미국', price: 24.80,  change: +3.14, logo: '🔭', krw: false },
-  { ticker: 'SNOW',  name: '스노우플레이크',   market: '미국', price: 168.40, change: +2.05, logo: '❄️', krw: false },
-  { ticker: 'CRM',   name: '세일즈포스',       market: '미국', price: 298.70, change: +0.83, logo: '☁️', krw: false },
-  // ── 미국 전기차·에너지 ──
-  { ticker: 'RIVN',  name: '리비안',          market: '미국', price: 14.20,  change: -1.82, logo: '🚙', krw: false },
-  { ticker: 'NIO',   name: '니오',            market: '미국', price: 5.40,   change: -2.53, logo: '🔋', krw: false },
-  { ticker: 'XOM',   name: '엑슨모빌',        market: '미국', price: 115.80, change: +0.34, logo: '🛢️', krw: false },
-  // ── 미국 ETF ──
-  { ticker: 'SPY',   name: 'S&P500 ETF',     market: '미국', price: 512.30, change: +0.94, logo: '🌐', krw: false },
-  { ticker: 'QQQ',   name: '나스닥100 ETF',   market: '미국', price: 440.20, change: +1.12, logo: '💡', krw: false },
-  { ticker: 'ARKK',  name: 'ARK 이노베이션',  market: '미국', price: 48.30,  change: +2.34, logo: '🚀', krw: false },
+function applyRandomVariation(price: number): number {
+  const variation = (Math.random() - 0.48) * 0.06; // -3% ~ +3%
+  return Math.round(price * (1 + variation));
+}
 
-  // ── 한국 반도체·IT ──
-  { ticker: '005930', name: '삼성전자',        market: '한국', price:  73400, change: -0.68, logo: '📱', krw: true },
-  { ticker: '000660', name: 'SK하이닉스',      market: '한국', price: 187000, change: +3.22, logo: '🔬', krw: true },
-  { ticker: '035420', name: 'NAVER',          market: '한국', price: 196500, change: +2.11, logo: '🟩', krw: true },
-  { ticker: '035720', name: '카카오',          market: '한국', price:  51200, change: -1.40, logo: '💬', krw: true },
-  { ticker: '066570', name: 'LG전자',          market: '한국', price:  98400, change: +0.72, logo: '📺', krw: true },
-  // ── 한국 2차전지 ──
-  { ticker: '373220', name: 'LG에너지솔루션',  market: '한국', price: 387000, change: -0.52, logo: '🔋', krw: true },
-  { ticker: '006400', name: '삼성SDI',         market: '한국', price: 298000, change: +1.01, logo: '⚡', krw: true },
-  { ticker: '051910', name: 'LG화학',          market: '한국', price: 312000, change: -0.32, logo: '🧪', krw: true },
+function applyRandomChange(): number {
+  return parseFloat(((Math.random() - 0.48) * 6).toFixed(2));
+}
+
+export const STOCKS: Stock[] = [
+  // ── 미국 기술 ──
+  { ticker: 'AAPL',  name: '애플',           market: '미국', price: 189.50, change: +0.9,  logo: '🍎', krw: false, sector: '기술' },
+  { ticker: 'MSFT',  name: '마이크로소프트',   market: '미국', price: 415.30, change: +0.8,  logo: '🔷', krw: false, sector: '기술' },
+  { ticker: 'GOOGL', name: '알파벳(구글)',     market: '미국', price: 175.20, change: +0.4,  logo: '🔍', krw: false, sector: '기술' },
+  { ticker: 'META',  name: '메타',            market: '미국', price: 512.60, change: +1.3,  logo: '👤', krw: false, sector: '기술' },
+  { ticker: 'AMZN',  name: '아마존',          market: '미국', price: 198.70, change: -0.6,  logo: '📦', krw: false, sector: '기술' },
+  { ticker: 'NFLX',  name: '넷플릭스',        market: '미국', price: 628.40, change: -0.5,  logo: '🎬', krw: false, sector: '기술' },
+  { ticker: 'ADBE',  name: '어도비',          market: '미국', price: 412.80, change: +0.7,  logo: '🎨', krw: false, sector: '기술' },
+  { ticker: 'CRM',   name: '세일즈포스',       market: '미국', price: 298.60, change: +1.4,  logo: '☁️', krw: false, sector: '기술' },
+  { ticker: 'NOW',   name: '서비스나우',       market: '미국', price: 798.30, change: +1.1,  logo: '⚙️', krw: false, sector: '기술' },
+  { ticker: 'INTU',  name: '인튜이트',        market: '미국', price: 612.80, change: +0.8,  logo: '📊', krw: false, sector: '기술' },
+  { ticker: 'ORCL',  name: '오라클',          market: '미국', price: 142.30, change: +0.9,  logo: '🔶', krw: false, sector: '기술' },
+  { ticker: 'IBM',   name: 'IBM',            market: '미국', price: 198.40, change: +0.3,  logo: '🔵', krw: false, sector: '기술' },
+  { ticker: 'UBER',  name: '우버',            market: '미국', price: 78.40,  change: +0.7,  logo: '🚗', krw: false, sector: '기술' },
+  { ticker: 'SNAP',  name: '스냅',            market: '미국', price: 12.40,  change: -2.1,  logo: '👻', krw: false, sector: '기술' },
+  { ticker: 'PINS',  name: '핀터레스트',       market: '미국', price: 34.80,  change: +1.5,  logo: '📌', krw: false, sector: '기술' },
+  { ticker: 'SPOT',  name: '스포티파이',       market: '미국', price: 312.50, change: +1.6,  logo: '🎵', krw: false, sector: '기술' },
+  { ticker: 'ABNB',  name: '에어비앤비',       market: '미국', price: 142.80, change: -0.3,  logo: '🏠', krw: false, sector: '기술' },
+  { ticker: 'RBLX',  name: '로블록스',         market: '미국', price: 42.60,  change: +1.3,  logo: '🎮', krw: false, sector: '기술' },
+  { ticker: 'DASH',  name: '도어대시',         market: '미국', price: 164.50, change: +1.2,  logo: '🍔', krw: false, sector: '기술' },
+  // ── 미국 반도체 ──
+  { ticker: 'NVDA',  name: '엔비디아',         market: '미국', price: 875.40, change: +3.2,  logo: '🟩', krw: false, sector: '반도체' },
+  { ticker: 'AMD',   name: 'AMD',            market: '미국', price: 178.90, change: +2.1,  logo: '🔴', krw: false, sector: '반도체' },
+  { ticker: 'INTC',  name: '인텔',            market: '미국', price: 43.20,  change: -0.8,  logo: '🔵', krw: false, sector: '반도체' },
+  { ticker: 'QCOM',  name: '퀄컴',            market: '미국', price: 168.40, change: +0.5,  logo: '📡', krw: false, sector: '반도체' },
+  { ticker: 'TXN',   name: '텍사스인스트루먼트', market: '미국', price: 198.70, change: -0.3, logo: '📐', krw: false, sector: '반도체' },
+  { ticker: 'MU',    name: '마이크론',         market: '미국', price: 112.30, change: +3.1,  logo: '💾', krw: false, sector: '반도체' },
+  { ticker: 'AMAT',  name: '어플라이드머티리얼즈', market: '미국', price: 198.60, change: +1.9, logo: '🔧', krw: false, sector: '반도체' },
+  { ticker: 'LRCX',  name: '램리서치',         market: '미국', price: 912.40, change: +2.3,  logo: '🔬', krw: false, sector: '반도체' },
+  { ticker: 'AVGO',  name: '브로드컴',         market: '미국', price: 215.60, change: +1.2,  logo: '📶', krw: false, sector: '반도체' },
+  { ticker: 'TSM',   name: 'TSMC',           market: '미국', price: 178.90, change: +2.4,  logo: '🇹🇼', krw: false, sector: '반도체' },
+  { ticker: 'ASML',  name: 'ASML',           market: '미국', price: 892.40, change: -0.6,  logo: '🔬', krw: false, sector: '반도체' },
+  // ── 미국 금융 ──
+  { ticker: 'JPM',   name: 'JP모건',          market: '미국', price: 198.70, change: +0.8,  logo: '🏦', krw: false, sector: '금융' },
+  { ticker: 'GS',    name: '골드만삭스',       market: '미국', price: 478.20, change: -0.2,  logo: '💼', krw: false, sector: '금융' },
+  { ticker: 'V',     name: '비자',            market: '미국', price: 278.40, change: +0.3,  logo: '💳', krw: false, sector: '금융' },
+  { ticker: 'MA',    name: '마스터카드',       market: '미국', price: 478.90, change: +0.5,  logo: '💳', krw: false, sector: '금융' },
+  { ticker: 'BAC',   name: '뱅크오브아메리카', market: '미국', price: 38.40,  change: +0.4,  logo: '🏛️', krw: false, sector: '금융' },
+  { ticker: 'WFC',   name: '웰스파고',        market: '미국', price: 58.90,  change: +0.6,  logo: '🏛️', krw: false, sector: '금융' },
+  { ticker: 'MS',    name: '모건스탠리',       market: '미국', price: 98.40,  change: +0.3,  logo: '💼', krw: false, sector: '금융' },
+  { ticker: 'PYPL',  name: '페이팔',          market: '미국', price: 78.40,  change: -1.2,  logo: '🅿️', krw: false, sector: '금융' },
+  { ticker: 'SQ',    name: '블록',            market: '미국', price: 68.30,  change: -0.9,  logo: '⬛', krw: false, sector: '금융' },
+  { ticker: 'COIN',  name: '코인베이스',       market: '미국', price: 198.30, change: +4.2,  logo: '🪙', krw: false, sector: '금융' },
+  { ticker: 'BRKB',  name: '버크셔해서웨이',   market: '미국', price: 452.30, change: +0.3,  logo: '🦉', krw: false, sector: '금융' },
+  // ── 미국 헬스케어 ──
+  { ticker: 'JNJ',   name: '존슨앤드존슨',    market: '미국', price: 152.30, change: +0.4,  logo: '🏥', krw: false, sector: '헬스케어' },
+  { ticker: 'PFE',   name: '화이자',          market: '미국', price: 28.40,  change: -0.7,  logo: '💊', krw: false, sector: '헬스케어' },
+  { ticker: 'LLY',   name: '일라이릴리',      market: '미국', price: 782.40, change: +1.8,  logo: '💉', krw: false, sector: '헬스케어' },
+  { ticker: 'ABBV',  name: '애브비',          market: '미국', price: 178.40, change: +0.9,  logo: '🧬', krw: false, sector: '헬스케어' },
+  { ticker: 'MRK',   name: '머크',            market: '미국', price: 128.60, change: +0.5,  logo: '💊', krw: false, sector: '헬스케어' },
+  { ticker: 'UNH',   name: '유나이티드헬스',   market: '미국', price: 512.80, change: +0.7,  logo: '🩺', krw: false, sector: '헬스케어' },
+  // ── 미국 소비재 ──
+  { ticker: 'TSLA',  name: '테슬라',          market: '미국', price: 242.30, change: -1.4,  logo: '⚡', krw: false, sector: '자동차' },
+  { ticker: 'NKE',   name: '나이키',          market: '미국', price: 98.60,  change: -0.4,  logo: '👟', krw: false, sector: '소비재' },
+  { ticker: 'SBUX',  name: '스타벅스',        market: '미국', price: 89.30,  change: +0.6,  logo: '☕', krw: false, sector: '소비재' },
+  { ticker: 'MCD',   name: '맥도날드',        market: '미국', price: 298.40, change: +0.3,  logo: '🍔', krw: false, sector: '소비재' },
+  { ticker: 'DIS',   name: '디즈니',          market: '미국', price: 112.40, change: +0.5,  logo: '🏰', krw: false, sector: '미디어' },
+  // ── 미국 에너지 ──
+  { ticker: 'XOM',   name: '엑슨모빌',        market: '미국', price: 112.80, change: +1.1,  logo: '🛢️', krw: false, sector: '에너지' },
+  { ticker: 'CVX',   name: '셰브론',          market: '미국', price: 158.40, change: +0.8,  logo: '⛽', krw: false, sector: '에너지' },
+  // ── 미국 AI·성장주 ──
+  { ticker: 'PLTR',  name: '팔란티어',        market: '미국', price: 24.60,  change: +2.8,  logo: '🔭', krw: false, sector: 'AI' },
+  { ticker: 'RIVN',  name: '리비안',          market: '미국', price: 12.40,  change: -2.3,  logo: '🚙', krw: false, sector: '전기차' },
+  { ticker: 'LCID',  name: '루시드',          market: '미국', price: 3.80,   change: -1.6,  logo: '🔋', krw: false, sector: '전기차' },
+  { ticker: 'HOOD',  name: '로빈후드',        market: '미국', price: 18.70,  change: +3.1,  logo: '🏹', krw: false, sector: '핀테크' },
+  { ticker: 'SHOP',  name: '쇼피파이',        market: '미국', price: 78.90,  change: +1.4,  logo: '🛍️', krw: false, sector: '이커머스' },
+  { ticker: 'SNOW',  name: '스노우플레이크',   market: '미국', price: 168.40, change: -1.2,  logo: '❄️', krw: false, sector: '클라우드' },
+  // ── 미국 ETF ──
+  { ticker: 'SPY',   name: 'S&P500 ETF',     market: '미국', price: 512.30, change: +0.94, logo: '🌐', krw: false, sector: 'ETF' },
+  { ticker: 'QQQ',   name: '나스닥100 ETF',   market: '미국', price: 440.20, change: +1.12, logo: '💡', krw: false, sector: 'ETF' },
+  { ticker: 'ARKK',  name: 'ARK 이노베이션',  market: '미국', price: 48.30,  change: +2.34, logo: '🚀', krw: false, sector: 'ETF' },
+
+  // ── 한국 반도체 ──
+  { ticker: '005930', name: '삼성전자',        market: '한국', price: 75400,  change: +1.2,  logo: '📱', krw: true, sector: '반도체' },
+  { ticker: '000660', name: 'SK하이닉스',      market: '한국', price: 198500, change: -0.8,  logo: '🔬', krw: true, sector: '반도체' },
+  { ticker: '009150', name: '삼성전기',        market: '한국', price: 145000, change: +2.1,  logo: '⚡', krw: true, sector: '반도체' },
+  // ── 한국 IT ──
+  { ticker: '035420', name: 'NAVER',          market: '한국', price: 215000, change: -0.3,  logo: '🟩', krw: true, sector: 'IT' },
+  { ticker: '035720', name: '카카오',          market: '한국', price: 48200,  change: +2.1,  logo: '💬', krw: true, sector: 'IT' },
+  { ticker: '377300', name: '카카오페이',       market: '한국', price: 38750,  change: +1.7,  logo: '💸', krw: true, sector: 'IT' },
+  { ticker: '323410', name: '카카오뱅크',       market: '한국', price: 24150,  change: -1.1,  logo: '🏦', krw: true, sector: 'IT' },
+  { ticker: '018260', name: '삼성에스디에스',   market: '한국', price: 152000, change: +1.1,  logo: '💻', krw: true, sector: 'IT' },
+  { ticker: '066570', name: 'LG전자',          market: '한국', price: 98400,  change: +0.7,  logo: '📺', krw: true, sector: 'IT' },
+  // ── 한국 바이오 ──
+  { ticker: '207940', name: '삼성바이오로직스', market: '한국', price: 798000, change: -0.4,  logo: '🧬', krw: true, sector: '바이오' },
+  { ticker: '068270', name: '셀트리온',        market: '한국', price: 178500, change: +0.9,  logo: '💊', krw: true, sector: '바이오' },
+  { ticker: '000100', name: '유한양행',        market: '한국', price: 98500,  change: +1.2,  logo: '💊', krw: true, sector: '바이오' },
+  { ticker: '128940', name: '한미약품',        market: '한국', price: 312000, change: +2.4,  logo: '💉', krw: true, sector: '바이오' },
   // ── 한국 자동차 ──
-  { ticker: '005380', name: '현대자동차',       market: '한국', price: 214000, change: +0.47, logo: '🚗', krw: true },
-  { ticker: '000270', name: '기아',            market: '한국', price:  98500, change: +0.61, logo: '🚙', krw: true },
-  { ticker: '012330', name: '현대모비스',       market: '한국', price: 248000, change: +0.20, logo: '🔧', krw: true },
+  { ticker: '005380', name: '현대차',          market: '한국', price: 245000, change: +0.5,  logo: '🚗', krw: true, sector: '자동차' },
+  { ticker: '000270', name: '기아',            market: '한국', price: 118500, change: +0.7,  logo: '🚙', krw: true, sector: '자동차' },
+  { ticker: '012330', name: '현대모비스',       market: '한국', price: 245000, change: +0.3,  logo: '🔧', krw: true, sector: '자동차' },
+  { ticker: '161390', name: '한국타이어',       market: '한국', price: 52300,  change: +0.4,  logo: '⭕', krw: true, sector: '자동차' },
+  // ── 한국 2차전지 ──
+  { ticker: '373220', name: 'LG에너지솔루션',  market: '한국', price: 412000, change: +1.8,  logo: '🔋', krw: true, sector: '2차전지' },
+  { ticker: '006400', name: '삼성SDI',         market: '한국', price: 289000, change: -0.6,  logo: '⚡', krw: true, sector: '2차전지' },
+  { ticker: '051910', name: 'LG화학',          market: '한국', price: 312000, change: +1.5,  logo: '🧪', krw: true, sector: '2차전지' },
   // ── 한국 금융 ──
-  { ticker: '105560', name: 'KB금융',          market: '한국', price:  78500, change: +0.89, logo: '🏦', krw: true },
-  { ticker: '086790', name: '하나금융지주',     market: '한국', price:  54200, change: +0.56, logo: '🏛️', krw: true },
-  { ticker: '032830', name: '삼성생명',         market: '한국', price:  82000, change: +0.37, logo: '🛡️', krw: true },
-  // ── 한국 바이오·제약 ──
-  { ticker: '068270', name: '셀트리온',         market: '한국', price: 176000, change: +1.14, logo: '💊', krw: true },
-  { ticker: '207940', name: '삼성바이오로직스', market: '한국', price: 840000, change: +0.48, logo: '🧬', krw: true },
-  // ── 한국 철강·에너지·통신 ──
-  { ticker: '005490', name: 'POSCO홀딩스',     market: '한국', price: 312000, change: -0.64, logo: '🏗️', krw: true },
-  { ticker: '015760', name: '한국전력',         market: '한국', price:  22050, change: +0.23, logo: '💡', krw: true },
-  { ticker: '017670', name: 'SK텔레콤',         market: '한국', price:  52300, change: +0.19, logo: '📶', krw: true },
-  { ticker: '030200', name: 'KT',              market: '한국', price:  37800, change: +0.27, logo: '📞', krw: true },
-  // ── 한국 유통·엔터 ──
-  { ticker: '028260', name: '삼성물산',         market: '한국', price: 118500, change: +0.42, logo: '🏢', krw: true },
-  { ticker: '003550', name: 'LG',              market: '한국', price:  82000, change: +0.61, logo: '🔴', krw: true },
+  { ticker: '105560', name: 'KB금융',          market: '한국', price: 72300,  change: +0.5,  logo: '🏦', krw: true, sector: '금융' },
+  { ticker: '055550', name: '신한지주',        market: '한국', price: 47850,  change: +1.3,  logo: '🏛️', krw: true, sector: '금융' },
+  { ticker: '086790', name: '하나금융지주',     market: '한국', price: 58200,  change: +0.8,  logo: '🏛️', krw: true, sector: '금융' },
+  { ticker: '032830', name: '삼성생명',        market: '한국', price: 98500,  change: +1.5,  logo: '🛡️', krw: true, sector: '금융' },
+  { ticker: '000810', name: '삼성화재',        market: '한국', price: 298000, change: +0.7,  logo: '🛡️', krw: true, sector: '금융' },
+  { ticker: '024110', name: '기업은행',        market: '한국', price: 14850,  change: +0.3,  logo: '🏦', krw: true, sector: '금융' },
+  // ── 한국 게임 ──
+  { ticker: '259960', name: '크래프톤',        market: '한국', price: 298000, change: +2.3,  logo: '🎮', krw: true, sector: '게임' },
+  { ticker: '251270', name: '넷마블',          market: '한국', price: 54300,  change: +0.6,  logo: '🎲', krw: true, sector: '게임' },
+  { ticker: '036570', name: '엔씨소프트',       market: '한국', price: 178000, change: -1.8,  logo: '⚔️', krw: true, sector: '게임' },
+  { ticker: '263750', name: '펄어비스',        market: '한국', price: 38500,  change: +1.2,  logo: '🏴', krw: true, sector: '게임' },
+  { ticker: '293490', name: '카카오게임즈',     market: '한국', price: 21800,  change: -0.7,  logo: '🎯', krw: true, sector: '게임' },
+  // ── 한국 에너지 ──
+  { ticker: '096770', name: 'SK이노베이션',    market: '한국', price: 132000, change: -1.3,  logo: '⛽', krw: true, sector: '에너지' },
+  { ticker: '010950', name: 'S-Oil',          market: '한국', price: 78400,  change: +0.6,  logo: '🛢️', krw: true, sector: '에너지' },
+  { ticker: '034020', name: '두산에너빌리티',   market: '한국', price: 19450,  change: +0.4,  logo: '⚙️', krw: true, sector: '에너지' },
+  { ticker: '015760', name: '한국전력',        market: '한국', price: 21350,  change: -0.5,  logo: '💡', krw: true, sector: '에너지' },
+  { ticker: '036460', name: '한국가스공사',     market: '한국', price: 32150,  change: +0.2,  logo: '🔥', krw: true, sector: '에너지' },
+  // ── 한국 방산 ──
+  { ticker: '012450', name: '한화에어로스페이스', market: '한국', price: 289000, change: +3.1, logo: '✈️', krw: true, sector: '방산' },
+  { ticker: '047810', name: '한국항공우주',     market: '한국', price: 68500,  change: +1.8,  logo: '🛩️', krw: true, sector: '방산' },
+  // ── 한국 통신 ──
+  { ticker: '017670', name: 'SK텔레콤',        market: '한국', price: 52300,  change: +0.8,  logo: '📶', krw: true, sector: '통신' },
+  { ticker: '030200', name: 'KT',             market: '한국', price: 39850,  change: -0.4,  logo: '📞', krw: true, sector: '통신' },
+  // ── 한국 철강·소재 ──
+  { ticker: '005490', name: 'POSCO홀딩스',     market: '한국', price: 398000, change: -0.2,  logo: '🏗️', krw: true, sector: '소재' },
+  { ticker: '010130', name: '고려아연',        market: '한국', price: 678000, change: -0.3,  logo: '🪨', krw: true, sector: '소재' },
+  { ticker: '011170', name: '롯데케미칼',       market: '한국', price: 89400,  change: +0.8,  logo: '🧪', krw: true, sector: '소재' },
+  // ── 한국 지주·건설 ──
+  { ticker: '034730', name: 'SK',             market: '한국', price: 178000, change: -0.9,  logo: '🔴', krw: true, sector: '지주' },
+  { ticker: '003550', name: 'LG',             market: '한국', price: 78200,  change: -0.8,  logo: '🔴', krw: true, sector: '지주' },
+  { ticker: '028260', name: '삼성물산',        market: '한국', price: 145000, change: +0.6,  logo: '🏢', krw: true, sector: '건설' },
+  // ── 한국 엔터 ──
+  { ticker: '352820', name: '하이브',          market: '한국', price: 198000, change: -0.9,  logo: '🎵', krw: true, sector: '엔터' },
+  // ── 한국 기타 ──
+  { ticker: '033780', name: 'KT&G',           market: '한국', price: 108500, change: +0.7,  logo: '🚬', krw: true, sector: '담배' },
+  { ticker: '021240', name: '코웨이',          market: '한국', price: 62400,  change: +0.9,  logo: '💧', krw: true, sector: '가전' },
+  { ticker: '011200', name: 'HMM',            market: '한국', price: 18450,  change: -1.3,  logo: '🚢', krw: true, sector: '해운' },
+  { ticker: '010120', name: 'LS일렉트릭',      market: '한국', price: 198000, change: +1.9,  logo: '⚡', krw: true, sector: '전기' },
+  // ── 한국 추가 종목 ──
+  { ticker: '034220', name: 'LG디스플레이',     market: '한국', price: 14500,  change: -1.2,  logo: '📺', krw: true, sector: '전자' },
+  { ticker: '247540', name: '에코프로비엠',     market: '한국', price: 198000, change: +2.8,  logo: '🔋', krw: true, sector: '2차전지' },
+  { ticker: '086520', name: '에코프로',         market: '한국', price: 89000,  change: +3.1,  logo: '🔋', krw: true, sector: '2차전지' },
+  { ticker: '326030', name: '에이비엘바이오',   market: '한국', price: 28500,  change: +1.5,  logo: '🧬', krw: true, sector: '바이오' },
+  { ticker: '195870', name: '해성디에스',       market: '한국', price: 78500,  change: +0.8,  logo: '🔧', krw: true, sector: '자동차' },
+  { ticker: '064350', name: '현대로템',         market: '한국', price: 45800,  change: +2.1,  logo: '🚂', krw: true, sector: '방산' },
+  { ticker: '032640', name: 'LG유플러스',       market: '한국', price: 11850,  change: -0.5,  logo: '📡', krw: true, sector: '통신' },
+  { ticker: '225570', name: '넥슨게임즈',       market: '한국', price: 21500,  change: +1.3,  logo: '🎮', krw: true, sector: '게임' },
+  // ── 미국 추가 종목 ──
+  { ticker: 'COST',  name: '코스트코',         market: '미국', price: 912.30, change: +0.6,  logo: '🏪', krw: false, sector: '소비재' },
+  { ticker: 'WMT',   name: '월마트',           market: '미국', price: 68.40,  change: +0.3,  logo: '🏬', krw: false, sector: '소비재' },
+  { ticker: 'NET',   name: '클라우드플레어',    market: '미국', price: 98.40,  change: +1.8,  logo: '☁️', krw: false, sector: '클라우드' },
+  { ticker: 'DDOG',  name: '데이터독',         market: '미국', price: 128.60, change: +2.1,  logo: '🐕', krw: false, sector: '클라우드' },
+  { ticker: 'ZM',    name: '줌',              market: '미국', price: 68.40,  change: -0.8,  logo: '📹', krw: false, sector: '기술' },
+  { ticker: 'T',     name: 'AT&T',            market: '미국', price: 18.40,  change: +0.2,  logo: '📞', krw: false, sector: '통신' },
+  { ticker: 'VZ',    name: '버라이즌',         market: '미국', price: 42.30,  change: -0.3,  logo: '📶', krw: false, sector: '통신' },
 ];
+
+// Apply random price variation on each app start
+STOCKS.forEach(s => {
+  s.price = s.krw ? applyRandomVariation(s.price) : parseFloat((s.price * (1 + (Math.random() - 0.48) * 0.06)).toFixed(2));
+  s.change = applyRandomChange();
+});
 
 export const LESSONS: Lesson[] = [
   {
@@ -403,7 +499,7 @@ export const useAppStore = create<AppState>()(
         }
 
         // 롤백용 스냅샷
-        const snapshot = { cash, holdings: [...holdings], trades: [...get().trades] };
+        const snapshot = { cash, holdings: [...holdings], trades: [...(get().trades ?? [])] };
 
         const existing = holdings.find(h => h.ticker === ticker);
         const newHoldings = existing
@@ -419,7 +515,7 @@ export const useAppStore = create<AppState>()(
         };
 
         // ① 즉시 로컬 상태 반영 (Optimistic Update)
-        set({ cash: cash - totalWithFee, holdings: newHoldings, trades: [...snapshot.trades, newTrade], isTradePending: true });
+        set({ cash: cash - totalWithFee, holdings: newHoldings, trades: [...(snapshot.trades ?? []), newTrade], isTradePending: true });
 
         try {
           // ② 백그라운드 Firestore 동기화
@@ -445,7 +541,7 @@ export const useAppStore = create<AppState>()(
         }
 
         // 롤백용 스냅샷
-        const snapshot = { cash, holdings: [...holdings], trades: [...get().trades] };
+        const snapshot = { cash, holdings: [...holdings], trades: [...(get().trades ?? [])] };
 
         const total = price * qty;
         const fee = total * 0.001;
@@ -462,7 +558,7 @@ export const useAppStore = create<AppState>()(
         };
 
         // ① 즉시 로컬 상태 반영 (Optimistic Update)
-        set({ cash: cash + netAmount, holdings: newHoldings, trades: [...snapshot.trades, newTrade], isTradePending: true });
+        set({ cash: cash + netAmount, holdings: newHoldings, trades: [...(snapshot.trades ?? []), newTrade], isTradePending: true });
 
         try {
           // ② 백그라운드 Firestore 동기화
@@ -480,7 +576,8 @@ export const useAppStore = create<AppState>()(
 
       // ── 듀오링고: 레슨 완료 ──
       completeLesson: (lessonId) => {
-        const { completedLessons, xp, level, streak, floPoints } = get();
+        const { xp, level, streak, floPoints } = get();
+        const completedLessons = get().completedLessons ?? [];
         if (completedLessons.includes(lessonId)) return { xpGained: 0, levelUp: false, streakBonus: false };
 
         const lesson = LESSONS.find(l => l.id === lessonId);
@@ -514,7 +611,8 @@ export const useAppStore = create<AppState>()(
 
       // ── 듀오링고: 이벤트 완료 ──
       completeEvent: (eventId, xp) => {
-        const { completedEvents, floPoints } = get();
+        const completedEvents = get().completedEvents ?? [];
+        const { floPoints } = get();
         if (completedEvents.includes(eventId)) return;
         set({ completedEvents: [...completedEvents, eventId], floPoints: floPoints + xp });
         get().syncToAuth();
@@ -522,7 +620,8 @@ export const useAppStore = create<AppState>()(
 
       // ── 오늘의 질문 답변 ──
       answerDailyQuestion: (key, floReward) => {
-        const { completedEvents, floPoints } = get();
+        const completedEvents = get().completedEvents ?? [];
+        const { floPoints } = get();
         if (completedEvents.includes(key)) return { floGained: 0 };
         set({ completedEvents: [...completedEvents, key], floPoints: floPoints + floReward });
         get().syncToAuth();
@@ -577,7 +676,7 @@ export const useAppStore = create<AppState>()(
 
       // ── 듀오링고: 단계별 잠금해제 ──
       getLessonStatus: (lessonId) => {
-        const { completedLessons } = get();
+        const completedLessons = get().completedLessons ?? [];
         if (completedLessons.includes(lessonId)) return 'completed';
         const lesson = LESSONS.find(l => l.id === lessonId);
         if (!lesson) return 'locked';

@@ -44,6 +44,7 @@ export default function MyPageScreen() {
       <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color="#0066FF" />
+          <Text style={{ fontSize: 14, color: '#8B95A1', marginTop: 12 }}>내 정보를 불러오는 중...</Text>
         </View>
       </SafeAreaView>
     );

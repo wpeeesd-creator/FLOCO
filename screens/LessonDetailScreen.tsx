@@ -16,7 +16,7 @@ export default function LessonDetailScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { lessonId } = route.params;
+  const lessonId = route.params?.lessonId ?? '';
   const { completeLesson, loseHeart, hearts, getLessonStatus, completedLessons } = useAppStore();
 
   const lesson = LESSONS.find(l => l.id === lessonId);
