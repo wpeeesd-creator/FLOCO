@@ -5,7 +5,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { STOCKS } from '../store/appStore';
+import { useAppStore, STOCKS } from '../store/appStore';
+import { fetchWithTimeout, classifyError } from '../lib/errorHandler';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -22,10 +24,19 @@ const SUGGESTED_QUESTIONS = [
 export default function ChatScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { ticker } = route.params;
+  const ticker = route.params?.ticker ?? '';
   const stock = STOCKS.find(s => s.ticker === ticker);
   const stockName = stock?.name ?? ticker;
 
+  const { holdings, cash, getTotalValue, getReturnRate } = useAppStore();
+  const holding = holdings?.find(h => h.ticker === ticker);
+  const ownedQty = holding?.qty ?? 0;
+  const avgPrice = holding?.avgPrice ?? 0;
+  const evalProfit = ownedQty > 0 && stock ? (stock.price - avgPrice) * ownedQty : 0;
+  const totalAsset = getTotalValue?.() ?? 1_000_000;
+  const profitRate = getReturnRate?.() ?? 0;
+
+  const { isConnected } = useNetworkStatus();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,6 +49,15 @@ export default function ChatScreen() {
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
 
+    // 네트워크 체크
+    if (!isConnected) {
+      setMessages(prev => [...prev,
+        { role: 'user', content: text.trim() },
+        { role: 'assistant', content: '인터넷 연결이 끊겨 있어요. 연결 후 다시 시도해주세요 📡' },
+      ]);
+      return;
+    }
+
     const userMsg: Message = { role: 'user', content: text.trim() };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
@@ -45,20 +65,19 @@ export default function ChatScreen() {
     setLoading(true);
 
     try {
-      const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
+      const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
       console.log('API Key 존재 여부:', !!apiKey);
 
-      if (!apiKey) {
-        console.error('ANTHROPIC_API_KEY가 설정되지 않았습니다');
+      if (!apiKey || apiKey === 'dummy') {
         setMessages([...newMessages, {
           role: 'assistant',
-          content: 'API 키가 설정되지 않았어요. .env 파일에 EXPO_PUBLIC_ANTHROPIC_API_KEY를 추가해주세요.',
+          content: '머니몽 AI가 준비 중이에요! 🐾\n관리자에게 API 키 설정을 요청해주세요.',
         }]);
         setLoading(false);
         return;
       }
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -67,37 +86,84 @@ export default function ChatScreen() {
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
+          model: 'claude-sonnet-4-20250514',
           max_tokens: 1024,
-          system: `당신은 주식 투자 교육 도우미 AI "머니몽"입니다.
-현재 종목: ${stockName} (${ticker})
-현재가: ${stock?.krw ? `₩${stock.price.toLocaleString()}` : `$${stock?.price.toFixed(2)}`}
-등락률: ${stock?.change?.toFixed(2)}%
+          system: `당신은 FLOCO 앱의 AI 투자 어시스턴트 "머니몽"입니다.
+청소년 모의투자 앱에서 사용자의 투자를 도와주는 친근한 AI예요.
 
-규칙:
-- 청소년 눈높이에 맞게 쉽고 친근하게 설명해주세요
-- 투자 권유는 절대 하지 말고 교육적인 답변만 해주세요
-- 답변은 짧고 명확하게 (200자 이내)
-- 이모지를 적절히 사용해주세요`,
+${stock ? `현재 앱에서 보고 있는 종목 정보 (실시간):
+- 종목명: ${stock.name}
+- 티커: ${ticker}
+- 현재가: ${stock.krw ? `₩${stock.price.toLocaleString()}` : `$${stock.price.toFixed(2)}`}
+- 등락률: ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
+- 섹터: ${stock.sector ?? '기타'}
+- 시장: ${stock.market}
+
+유저 보유 현황:
+- 보유수량: ${ownedQty}주
+- 평균매수가: ${ownedQty > 0 ? `${Math.round(avgPrice).toLocaleString()}원` : '미보유'}
+- 평가손익: ${ownedQty > 0 ? `${Math.round(evalProfit).toLocaleString()}원` : '해당없음'}` : '종목 미선택 상태'}
+
+유저 투자 현황:
+- 총 자산: ${Math.round(totalAsset).toLocaleString()}원
+- 보유 현금: ${Math.round(cash ?? 1_000_000).toLocaleString()}원
+- 수익률: ${profitRate.toFixed(2)}%
+
+중요 규칙:
+1. 위의 실시간 데이터를 기반으로 답변하세요
+2. 절대 실제 투자를 권유하지 마세요 — "모의투자 앱"임을 인식하세요
+3. 청소년 눈높이에 맞게 쉽고 친근하게 설명해주세요
+4. 답변은 짧고 명확하게 (300자 이내)
+5. 이모지를 적절히 사용해주세요
+6. 주가는 반드시 위에 제공된 현재가를 사용하세요`,
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('API 에러:', errorData);
-        throw new Error((errorData as any).error?.message ?? `API 오류: ${response.status}`);
+        console.error('API 에러:', response.status, errorData);
+        const errorType = (errorData as any)?.error?.type ?? '';
+        const errorMsg = (errorData as any)?.error?.message ?? '';
+
+        if (response.status === 429 || errorType === 'rate_limit_error') {
+          setMessages([...newMessages, {
+            role: 'assistant',
+            content: '요청이 너무 많아요. 잠시 후 다시 시도해주세요 ⏳',
+          }]);
+          return;
+        }
+        if (response.status === 401 || errorType === 'authentication_error') {
+          setMessages([...newMessages, {
+            role: 'assistant',
+            content: 'API 키가 유효하지 않아요. 관리자에게 문의해주세요 🔑',
+          }]);
+          return;
+        }
+        if (errorType === 'invalid_request_error' && errorMsg.includes('credit')) {
+          setMessages([...newMessages, {
+            role: 'assistant',
+            content: 'AI 크레딧이 부족해요. 관리자에게 문의해주세요 🙏',
+          }]);
+          return;
+        }
+        throw new Error(errorMsg || `API 오류: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('API 응답:', JSON.stringify(data).slice(0, 200));
-      const aiMessage = data.content?.[0]?.text ?? '응답을 받지 못했어요.';
+      const aiMessage = data?.content?.[0]?.text ?? '응답을 받지 못했어요.';
       setMessages([...newMessages, { role: 'assistant', content: aiMessage }]);
     } catch (error: any) {
       console.error('ChatScreen API error:', error);
+      const appError = classifyError(error);
+      const errorMessages: Record<string, string> = {
+        network: '인터넷 연결이 불안정해요. 연결을 확인하고 다시 시도해주세요 📡',
+        timeout: '서버 응답이 너무 느려요. 잠시 후 다시 물어봐주세요 ⏳',
+        server: '서버에 문제가 생겼어요. 잠시 후 다시 시도해주세요 🔧',
+      };
       setMessages([...newMessages, {
         role: 'assistant',
-        content: '죄송해요, 잠시 후 다시 시도해주세요 🙏',
+        content: errorMessages[appError.category] ?? '일시적인 오류가 발생했어요. 다시 시도해주세요 🙏',
       }]);
     } finally {
       setLoading(false);
@@ -140,9 +206,22 @@ export default function ChatScreen() {
               <View style={styles.welcomeBox}>
                 <Text style={styles.welcomeEmoji}>🐾</Text>
                 <Text style={styles.welcomeTitle}>머니몽이 도와줄게!</Text>
-                <Text style={styles.welcomeDesc}>
-                  {stockName}에 대해 궁금한 게 있으면 물어봐~
-                </Text>
+                {stock ? (
+                  <>
+                    <Text style={styles.welcomeDesc}>
+                      {stock.name} 현재가: {stock.krw ? `₩${stock.price.toLocaleString()}` : `$${stock.price.toFixed(2)}`} ({stock.change >= 0 ? '▲' : '▼'}{Math.abs(stock.change).toFixed(2)}%)
+                    </Text>
+                    <Text style={styles.welcomeDesc}>
+                      {ownedQty > 0
+                        ? `${ownedQty}주 보유 중 · 평균 ${Math.round(avgPrice).toLocaleString()}원`
+                        : '아직 보유하지 않은 종목이에요'}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.welcomeDesc}>
+                    투자에 대해 궁금한 게 있으면 물어봐~
+                  </Text>
+                )}
               </View>
             )}
 

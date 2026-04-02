@@ -1,124 +1,162 @@
 /**
- * 코스 목록 화면 — 레벨별 코스 리스트
+ * 코스 목록 화면 — 카테고리별 레벨 리스트 (Duolingo 스타일)
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { getCoursesByLevel, LEVEL_COLOR, LEVEL_EMOJI, type Level, type Course } from '../data/learningContent';
-import { Colors, Typography } from '../components/ui';
+import { Colors } from '../components/ui';
+import {
+  learningContent, CATEGORY_META,
+  type CategoryId, type DuoLevel,
+} from '../data/learningContent';
+import { getLearningData } from '../lib/learningService';
 
 export default function CourseListScreen() {
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { level } = route.params as { level: Level };
   const { user } = useAuth();
 
-  const courses = getCoursesByLevel(level);
-  const [progress, setProgress] = useState<Record<string, { completed: boolean; score: number }>>({});
+  const params = route.params as { level?: string; categoryId?: string };
+  const categoryId = (params.categoryId ?? params.level ?? 'vocabulary') as CategoryId;
+  const category = learningContent[categoryId];
+  const meta = CATEGORY_META[categoryId];
+  const levels: DuoLevel[] = category?.levels ?? [];
+
+  const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) { setLoading(false); return; }
-    getDocs(collection(db, 'users', user.id, 'progress'))
-      .then(snap => {
-        const map: Record<string, { completed: boolean; score: number }> = {};
-        snap.forEach(d => { map[d.id] = d.data() as any; });
-        setProgress(map);
-      })
+    if (!user?.id) { setLoading(false); return; }
+    getLearningData(user.id)
+      .then(data => { setCompletedLessons(data.completedLessons ?? []); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user?.id]);
 
-  // 첫 번째 코스는 항상 잠금 해제, 이후는 이전 코스 완료 시 잠금 해제
-  function isUnlocked(idx: number): boolean {
-    if (idx === 0) return true;
-    return !!progress[courses[idx - 1].id]?.completed;
+  const borderColor = meta?.color?.[0] ?? Colors.primary;
+
+  function renderLevel({ item: level, index }: { item: DuoLevel; index: number }) {
+    const isCompleted = completedLessons.includes(`${categoryId}_${level.id}`);
+    const isLocked = index > 0 && !completedLessons.includes(`${categoryId}_${levels[index - 1].id}`);
+
+    const cardBorderColor = isCompleted ? '#34C759' : isLocked ? '#E5E8EB' : borderColor;
+    const iconBg = isCompleted ? '#E8FFF0' : isLocked ? '#F2F4F6' : (meta?.color?.[0] ?? Colors.primary) + '20';
+
+    return (
+      <TouchableOpacity
+        style={[styles.card, { borderLeftColor: cardBorderColor }, isLocked && styles.cardLocked]}
+        activeOpacity={isLocked ? 1 : 0.8}
+        onPress={() => {
+          if (isLocked) {
+            Alert.alert('잠김', '이전 코스를 먼저 완료해주세요!');
+            return;
+          }
+          navigation.navigate('레슨플레이어', {
+            categoryId,
+            levelId: level.id,
+            lessons: level.lessons,
+            levelTitle: level.title,
+          });
+        }}
+      >
+        <View style={styles.cardRow}>
+          <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
+            {isCompleted ? (
+              <Text style={styles.iconEmoji}>✅</Text>
+            ) : isLocked ? (
+              <Text style={styles.iconEmoji}>🔒</Text>
+            ) : (
+              <Text style={styles.iconEmoji}>{meta?.emoji ?? '📖'}</Text>
+            )}
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={[styles.levelTitle, isLocked && styles.lockedText]}>{level.title}</Text>
+            <Text style={styles.levelSub}>{level.lessons.length}개 레슨</Text>
+            <View style={styles.progressBarBg}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    backgroundColor: isCompleted ? '#34C759' : isLocked ? '#E5E8EB' : (meta?.color?.[0] ?? Colors.primary),
+                    width: isCompleted ? '100%' : '0%',
+                  },
+                ]}
+              />
+            </View>
+          </View>
+          {!isLocked && (
+            <Ionicons name="chevron-forward" size={20} color={isCompleted ? '#34C759' : (meta?.color?.[0] ?? Colors.primary)} />
+          )}
+        </View>
+      </TouchableOpacity>
+    );
   }
 
-  const color = LEVEL_COLOR[level];
-
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { backgroundColor: color, paddingTop: insets.top + 10 }]}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>←</Text>
+          <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerEmoji}>{LEVEL_EMOJI[level]} {level}</Text>
-          <Text style={styles.headerSub}>{courses.length}개 코스</Text>
-        </View>
+        <Text style={styles.headerEmoji}>{meta?.emoji ?? '📖'}</Text>
+        <Text style={styles.headerTitle}>{meta?.title ?? categoryId}</Text>
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ flex: 1 }} color={Colors.primary} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={{ fontSize: 14, color: '#8B95A1', marginTop: 12 }}>강좌를 불러오는 중...</Text>
+        </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scroll}>
-          {courses.map((course, idx) => {
-            const unlocked = isUnlocked(idx);
-            const done = !!progress[course.id]?.completed;
-            const score = progress[course.id]?.score ?? 0;
-            return (
-              <TouchableOpacity
-                key={course.id}
-                style={[styles.card, done && styles.cardDone, !unlocked && styles.cardLocked]}
-                onPress={() => unlocked && navigation.navigate('레슨', { courseId: course.id })}
-                activeOpacity={unlocked ? 0.8 : 1}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                  <View style={[styles.iconBox, { backgroundColor: done ? color + '20' : '#F0F0F0' }]}>
-                    <Text style={styles.icon}>{unlocked ? course.emoji : '🔒'}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.courseTitle, !unlocked && styles.lockedText]}>{course.title}</Text>
-                    <Text style={styles.courseDesc}>{course.desc}</Text>
-                    {done && (
-                      <Text style={[styles.scoreText, { color }]}>✅ 완료 · {score}/{course.quizzes.length} 정답</Text>
-                    )}
-                    {!unlocked && (
-                      <Text style={styles.lockedHint}>이전 코스를 먼저 완료하세요</Text>
-                    )}
-                  </View>
-                  {unlocked && (
-                    <Text style={[styles.arrow, { color }]}>›</Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <FlatList
+          data={levels}
+          keyExtractor={item => item.id}
+          renderItem={renderLevel}
+          contentContainerStyle={styles.list}
+        />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingBottom: 18,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: '#F0F2F5',
   },
   backBtn: { padding: 4 },
-  backText: { fontSize: 22, color: '#fff', fontWeight: '600' },
-  headerEmoji: { fontSize: 20, fontWeight: '800', color: '#fff' },
-  headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
-  scroll: { padding: 16, gap: 12 },
+  headerEmoji: { fontSize: 22 },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, flex: 1 },
+  list: { padding: 16, gap: 12 },
   card: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderLeftWidth: 4,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  cardDone: { borderWidth: 1.5, borderColor: '#E0FFE8' },
   cardLocked: { opacity: 0.6 },
-  iconBox: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  icon: { fontSize: 24 },
-  courseTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
-  courseDesc: { fontSize: 13, color: Colors.textSub, marginTop: 2 },
-  scoreText: { fontSize: 12, fontWeight: '600', marginTop: 4 },
-  lockedText: { color: Colors.textMuted },
-  lockedHint: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
-  arrow: { fontSize: 28, fontWeight: '300' },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  iconCircle: {
+    width: 56, height: 56, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  iconEmoji: { fontSize: 24 },
+  cardContent: { flex: 1 },
+  levelTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  lockedText: { color: Colors.textMuted ?? '#9CA3AF' },
+  levelSub: { fontSize: 13, color: Colors.textSub ?? '#6B7280', marginTop: 2 },
+  progressBarBg: {
+    height: 4, backgroundColor: '#F0F2F5', borderRadius: 2, marginTop: 8, overflow: 'hidden',
+  },
+  progressBarFill: { height: 4, borderRadius: 2 },
 });

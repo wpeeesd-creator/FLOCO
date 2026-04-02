@@ -15,15 +15,25 @@ import { fetchAllNews, fetchKRNews, formatNewsTime, type NewsItem } from '../lib
 const { width } = Dimensions.get('window');
 
 const ZONES = [
-  { id: 'tech',    name: '테크 시티',    emoji: '🏙️', active: true,  wide: true  },
-  { id: 'energy',  name: '에너지플랜트', emoji: '⚡',  active: true,  wide: false },
-  { id: 'finance', name: '파이낸스타워', emoji: '🏦',  active: true,  wide: false },
-  { id: 'port',    name: '글로벌항구',   emoji: '🚢',  active: false, wide: false },
-  { id: 'space',   name: '스페이스베이스', emoji: '🚀', active: false, wide: true  },
+  { id: 'tech',    name: '테크 시티',      emoji: '🏙️', active: true,  wide: true  },
+  { id: 'energy',  name: '에너지플랜트',   emoji: '⚡',  active: true,  wide: false },
+  { id: 'finance', name: '파이낸스타워',   emoji: '🏦',  active: true,  wide: false },
+  { id: 'port',    name: '글로벌항구',     emoji: '🚢',  active: false, wide: false },
+  { id: 'space',   name: '스페이스베이스', emoji: '🚀',  active: false, wide: true  },
 ];
+
+// Zone gradient colours (active zones use distinct tones)
+const ZONE_COLORS: Record<string, string> = {
+  tech:    '#1A3A6E',
+  energy:  '#1A3A2E',
+  finance: '#2E1A5E',
+  port:    '#1A2B4A',
+  space:   '#1A1A3A',
+};
 
 function ZoneCard({ zone }: { zone: typeof ZONES[0] }) {
   const scale = useRef(new Animated.Value(1)).current;
+
   const handlePress = () => {
     Animated.sequence([
       Animated.timing(scale, { toValue: 0.95, duration: 100, useNativeDriver: true }),
@@ -32,16 +42,21 @@ function ZoneCard({ zone }: { zone: typeof ZONES[0] }) {
     if (zone.active) Vibration.vibrate(30);
   };
 
+  const bg = zone.active ? ZONE_COLORS[zone.id] : '#1A2438';
+
   return (
     <Animated.View style={[zone.wide ? styles.zoneWide : styles.zoneNormal, { transform: [{ scale }] }]}>
       <TouchableOpacity
-        style={[styles.zoneCard, zone.active ? styles.zoneCard_active : styles.zoneCard_locked]}
+        style={[styles.zoneCard, { backgroundColor: bg }]}
         onPress={handlePress}
         activeOpacity={0.85}
       >
         {!zone.active && <Text style={styles.zoneLock}>🔒</Text>}
         <Text style={[styles.zoneEmoji, !zone.active && { opacity: 0.4 }]}>{zone.emoji}</Text>
-        <Text style={[styles.zoneName,  !zone.active && { opacity: 0.5 }]}>{zone.name}</Text>
+        <Text style={[styles.zoneName, !zone.active && { opacity: 0.5 }]}>{zone.name}</Text>
+        {zone.active && (
+          <View style={styles.zoneActiveDot} />
+        )}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -63,7 +78,7 @@ export default function FloWorldScreen() {
       const items = await fetchAllNews();
       setNews(items);
     } catch (error) {
-      console.error('뉴스 로드 오류:', error);
+      // ignore — keep previous state
     } finally {
       setNewsLoading(false);
     }
@@ -91,19 +106,26 @@ export default function FloWorldScreen() {
     <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0066FF" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
-        {/* 우주 히어로 */}
+        {/* 우주 그라디언트 헤더 */}
         <View style={styles.floHero}>
+          {/* Star field */}
           {[...Array(20)].map((_, i) => (
             <View
               key={i}
               style={[
                 styles.star,
-                { top: `${(i * 17 + 5) % 80}%` as any, left: `${(i * 23 + 3) % 100}%` as any, opacity: 0.3 + (i % 5) * 0.14 },
+                {
+                  top: `${(i * 17 + 5) % 80}%` as any,
+                  left: `${(i * 23 + 3) % 100}%` as any,
+                  opacity: 0.3 + (i % 5) * 0.14,
+                },
               ]}
             />
           ))}
+
+          {/* Title row */}
           <View style={{ alignItems: 'center' }}>
             <View style={styles.floTitleRow}>
               <Text style={styles.floTitle}>FLOCO WORLD</Text>
@@ -114,12 +136,14 @@ export default function FloWorldScreen() {
             </View>
             <Text style={styles.floSubtitle}>실시간 세계 이벤트로 배우는 투자</Text>
           </View>
+
+          {/* Stats row */}
           <View style={styles.heroStats}>
             <View style={styles.heroStat}>
               <Text style={styles.heroStatNum}>{streak}일</Text>
               <Text style={styles.heroStatLabel}>스트릭 🔥</Text>
             </View>
-            <View style={[styles.heroStat, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }]}>
+            <View style={[styles.heroStat, styles.heroStatMiddle]}>
               <Text style={styles.heroStatNum}>{floPoints}</Text>
               <Text style={styles.heroStatLabel}>FLO</Text>
             </View>
@@ -130,10 +154,10 @@ export default function FloWorldScreen() {
           </View>
         </View>
 
-        {/* 오늘의 주요 뉴스 */}
+        {/* 오늘의 주요 뉴스 카드 */}
         {todayEvent && (
           <TouchableOpacity
-            onPress={() => todayEvent.url ? Linking.openURL(todayEvent.url) : null}
+            onPress={() => todayEvent.url ? Linking.openURL(todayEvent.url) : undefined}
             style={styles.todayEventCard}
             activeOpacity={0.8}
           >
@@ -156,12 +180,13 @@ export default function FloWorldScreen() {
           {ZONES.map(z => <ZoneCard key={z.id} zone={z} />)}
         </View>
 
-        {/* 실시간 이벤트 */}
+        {/* 실시간 이벤트 피드 */}
         <View style={styles.eventSection}>
           <View style={styles.eventSectionHeader}>
             <Text style={Typography.h3}>실시간 이벤트</Text>
             <View style={styles.liveDotRed} />
           </View>
+
           <View style={{ gap: 10 }}>
             {FLO_EVENTS.map(event => {
               const stock = STOCKS.find(s => s.ticker === event.ticker);
@@ -199,13 +224,12 @@ export default function FloWorldScreen() {
             })}
           </View>
         </View>
+
         {/* 실시간 뉴스 */}
         <View style={styles.newsSection}>
           <View style={styles.newsSectionHeader}>
             <Text style={Typography.h3}>실시간 뉴스</Text>
-            <Text style={{ fontSize: 12, color: Colors.textMuted }}>
-              {news.length}건
-            </Text>
+            <Text style={{ fontSize: 12, color: Colors.textMuted }}>{news.length}건</Text>
           </View>
 
           {/* 뉴스 탭 */}
@@ -215,6 +239,7 @@ export default function FloWorldScreen() {
                 key={t}
                 style={[styles.newsTab, newsTab === t && styles.newsTabActive]}
                 onPress={() => setNewsTab(t)}
+                activeOpacity={0.7}
               >
                 <Text style={[styles.newsTabText, newsTab === t && styles.newsTabTextActive]}>
                   {t === '국내' ? '🇰🇷 국내' : t === '미국' ? '🇺🇸 미국' : '전체'}
@@ -224,7 +249,6 @@ export default function FloWorldScreen() {
           </View>
 
           {newsLoading ? (
-            /* 스켈레톤 UI */
             <View style={{ gap: 12 }}>
               {[1, 2, 3].map(i => (
                 <View key={i} style={styles.skeleton} />
@@ -233,24 +257,24 @@ export default function FloWorldScreen() {
           ) : filteredNews.length === 0 ? (
             <View style={{ padding: 40, alignItems: 'center' }}>
               <Text style={{ fontSize: 40 }}>📭</Text>
-              <Text style={{ color: '#8E8E93', marginTop: 12 }}>뉴스를 불러오지 못했어요</Text>
+              <Text style={{ color: Colors.textSub, marginTop: 12 }}>뉴스를 불러오지 못했어요</Text>
             </View>
           ) : (
-            <View style={{ gap: 12 }}>
+            <View style={{ gap: 10 }}>
               {filteredNews.slice(0, 15).map((item, i) => (
                 <TouchableOpacity
                   key={item.id + i}
                   style={styles.newsCard}
-                  onPress={() => item.url ? Linking.openURL(item.url) : null}
+                  onPress={() => item.url ? Linking.openURL(item.url) : undefined}
                   activeOpacity={0.7}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                     <View style={{ flex: 1 }}>
                       <View style={styles.newsCardTop}>
                         <View style={[styles.newsCountryBadge, {
-                          backgroundColor: item.country === 'KR' ? '#EBF2FF' : '#FFF3E0',
+                          backgroundColor: item.country === 'KR' ? Colors.redBg ?? '#EBF2FF' : '#FFF3E0',
                         }]}>
-                          <Text style={{ fontSize: 11, color: item.country === 'KR' ? '#0066FF' : '#FF6B35' }}>
+                          <Text style={{ fontSize: 11, color: item.country === 'KR' ? Colors.primary : '#FF6B35' }}>
                             {item.country === 'KR' ? '🇰🇷 국내' : '🇺🇸 미국'}
                           </Text>
                         </View>
@@ -264,10 +288,7 @@ export default function FloWorldScreen() {
                       ) : null}
                     </View>
                     {item.imageUrl ? (
-                      <Image
-                        source={{ uri: item.imageUrl }}
-                        style={styles.newsImage}
-                      />
+                      <Image source={{ uri: item.imageUrl }} style={styles.newsImage} />
                     ) : null}
                   </View>
                 </TouchableOpacity>
@@ -284,93 +305,117 @@ export default function FloWorldScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
+
+  // Hero / header
   floHero: {
-    backgroundColor: '#0A1628', padding: 24, paddingTop: 32,
-    alignItems: 'center', gap: 16, minHeight: 180,
+    backgroundColor: '#0A0E27',
+    padding: 24, paddingTop: 36,
+    alignItems: 'center', gap: 18,
+    minHeight: 190,
     position: 'relative', overflow: 'hidden',
   },
   star: { position: 'absolute', width: 2, height: 2, backgroundColor: '#fff', borderRadius: 1 },
   floTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  floTitle: { color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: -0.5 },
+  floTitle: { color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 1 },
   liveBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Colors.red, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
+    backgroundColor: Colors.green,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
   },
   liveDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' },
-  liveDotRed: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.red },
   liveText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  floSubtitle: { color: 'rgba(255,255,255,0.55)', fontSize: 13 },
+  floSubtitle: { color: 'rgba(255,255,255,0.50)', fontSize: 13 },
+
   heroStats: {
     flexDirection: 'row', width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 12, padding: 14,
   },
   heroStat: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
-  heroStatNum: { color: '#fff', fontSize: 18, fontWeight: '700', fontFamily: 'Courier' },
-  heroStatLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 2 },
-  zoneGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 10, marginBottom: 8 },
-  zoneWide: { width: '100%' },
-  zoneNormal: { width: (width - 34) / 2 },
-  zoneCard: {
-    borderRadius: 12, padding: 16, alignItems: 'center',
-    justifyContent: 'center', minHeight: 90, position: 'relative',
+  heroStatMiddle: {
+    borderLeftWidth: 1, borderRightWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
-  zoneCard_active: { backgroundColor: Colors.primary },
-  zoneCard_locked: { backgroundColor: '#1A2B4A' },
+  heroStatNum: { color: '#fff', fontSize: 18, fontWeight: '700', fontFamily: 'Courier' },
+  heroStatLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 10, marginTop: 3 },
+
+  // Today's news card
+  todayEventCard: {
+    marginHorizontal: 16, marginTop: 16, marginBottom: 4,
+    backgroundColor: Colors.primary,
+    borderRadius: 12, padding: 20,
+  },
+  todayEventLabel: { color: 'rgba(255,255,255,0.65)', fontSize: 12 },
+  todayEventTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginTop: 8, lineHeight: 24 },
+  todayEventMeta: { color: 'rgba(255,255,255,0.65)', fontSize: 12, marginTop: 8 },
+  todayEventBtn: {
+    marginTop: 12, backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14,
+    alignSelf: 'flex-start',
+  },
+  todayEventBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+
+  // Zone grid
+  zoneGrid: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    paddingHorizontal: 16, gap: 10, marginBottom: 8,
+  },
+  zoneWide: { width: '100%' },
+  zoneNormal: { width: (width - 42) / 2 },
+  zoneCard: {
+    borderRadius: 12, padding: 16,
+    alignItems: 'center', justifyContent: 'center',
+    minHeight: 90, position: 'relative',
+  },
   zoneLock: { position: 'absolute', top: 8, right: 8, fontSize: 14 },
   zoneEmoji: { fontSize: 28, marginBottom: 6 },
   zoneName: { color: '#fff', fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  eventSection: { padding: 16, gap: 12 },
+  zoneActiveDot: {
+    position: 'absolute', bottom: 8, right: 8,
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: Colors.green,
+  },
+
+  // Event section
+  eventSection: { paddingHorizontal: 16, paddingBottom: 8, gap: 12 },
   eventSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  liveDotRed: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.green },
   eventCard: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 14,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+    backgroundColor: Colors.card,
+    borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: Colors.border,
   },
   eventCardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  stockLogo: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#EAF6FF', alignItems: 'center', justifyContent: 'center' },
+  stockLogo: {
+    width: 40, height: 40, borderRadius: 8,
+    backgroundColor: '#EAF4FF',
+    alignItems: 'center', justifyContent: 'center',
+  },
 
-  // 오늘의 이벤트
-  todayEventCard: {
-    marginHorizontal: 16, marginBottom: 16, backgroundColor: '#0066FF',
-    borderRadius: 20, padding: 20,
-  },
-  todayEventLabel: { color: '#FFFFFF80', fontSize: 12 },
-  todayEventTitle: {
-    color: '#FFFFFF', fontSize: 16, fontWeight: '700', marginTop: 8, lineHeight: 24,
-  },
-  todayEventMeta: { color: '#FFFFFF80', fontSize: 12, marginTop: 8 },
-  todayEventBtn: {
-    marginTop: 12, backgroundColor: '#FFFFFF20', borderRadius: 12,
-    paddingVertical: 8, paddingHorizontal: 16, alignSelf: 'flex-start',
-  },
-  todayEventBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
-
-  // 뉴스 섹션
-  newsSection: { padding: 16, gap: 12 },
+  // News section
+  newsSection: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, gap: 12 },
   newsSectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
   newsTabRow: { flexDirection: 'row', gap: 8 },
   newsTab: {
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: Colors.card,
+    borderWidth: 1, borderColor: Colors.border,
   },
-  newsTabActive: { backgroundColor: '#0066FF' },
-  newsTabText: { fontSize: 13, color: '#8E8E93', fontWeight: '700' },
-  newsTabTextActive: { color: '#FFFFFF', fontWeight: '700' },
-  skeleton: {
-    backgroundColor: '#F2F2F7', borderRadius: 16, height: 100,
-  },
+  newsTabActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  newsTabText: { fontSize: 13, color: Colors.textSub, fontWeight: '600' },
+  newsTabTextActive: { color: '#fff', fontWeight: '700' },
+  skeleton: { backgroundColor: Colors.border, borderRadius: 12, height: 100 },
   newsCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+    backgroundColor: Colors.card,
+    borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: Colors.border,
   },
   newsCardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 },
-  newsCountryBadge: {
-    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2,
-  },
-  newsSource: { fontSize: 12, color: '#8E8E93' },
-  newsTitle: { fontSize: 15, fontWeight: '600', color: '#191919', lineHeight: 22 },
-  newsDesc: { fontSize: 13, color: '#8E8E93', marginTop: 6, lineHeight: 18 },
-  newsImage: { width: 72, height: 72, borderRadius: 12, marginLeft: 12 },
+  newsCountryBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  newsSource: { fontSize: 12, color: Colors.textSub },
+  newsTitle: { fontSize: 15, fontWeight: '600', color: Colors.text, lineHeight: 22 },
+  newsDesc: { fontSize: 13, color: Colors.textSub, marginTop: 6, lineHeight: 18 },
+  newsImage: { width: 72, height: 72, borderRadius: 10, marginLeft: 12 },
 });

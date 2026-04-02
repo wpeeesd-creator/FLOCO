@@ -1,46 +1,26 @@
 {
   "cli": {
-    "version": ">= 10.0.0",
-    "appVersionSource": "local"
+    "version": ">= 5.0.0"
   },
   "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "ios": {
-        "simulator": true
-      },
-      "android": {
-        "buildType": "apk"
-      }
-    },
     "preview": {
-      "distribution": "internal",
-      "ios": {
-        "simulator": false
-      },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "EXPO_PUBLIC_ANTHROPIC_API_KEY": "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",
+        "EXPO_PUBLIC_NEWS_API_KEY": "bf6be20738ff462eb31d38d5cf57cecc"
       }
     },
     "production": {
-      "distribution": "store",
-      "ios": {},
       "android": {
         "buildType": "app-bundle"
-      }
-    }
-  },
-  "submit": {
-    "production": {
-      "ios": {
-        "appleId": "your-apple-id@email.com",
-        "ascAppId": "your-app-store-connect-app-id",
-        "appleTeamId": "your-apple-team-id"
       },
-      "android": {
-        "serviceAccountKeyPath": "./google-service-account.json",
-        "track": "internal"
+      "ios": {},
+      "env": {
+        "EXPO_PUBLIC_ANTHROPIC_API_KEY": "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",
+        "EXPO_PUBLIC_NEWS_API_KEY": "bf6be20738ff462eb31d38d5cf57cecc"
       }
     }
   }

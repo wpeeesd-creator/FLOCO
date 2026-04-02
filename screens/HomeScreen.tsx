@@ -1,460 +1,1238 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, RefreshControl, TextInput, ActivityIndicator,
+  TouchableOpacity, RefreshControl, ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAppStore, STOCKS } from '../store/appStore';
+import { useAuth } from '../context/AuthContext';
+import { Colors } from '../components/ui';
 import StockLogo from '../components/StockLogo';
+import NewsCard from '../components/NewsCard';
+import { useAllNews } from '../hooks/useNews';
+import { loadTodayMissions, ALL_COMPLETE_BONUS, type DailyMission } from '../lib/missionService';
 
-type TopTab = '보유' | '국내' | '해외';
-type MarketFilter = '전체' | '한국' | '미국';
+type TopTab = '보유' | '관심';
+type MarketFilter = '국내' | '미국' | '기타';
 type SortType = 'value' | 'return';
 
 export default function HomeScreen() {
+  const { user } = useAuth();
   const navigation = useNavigation<any>();
   const { holdings, cash, getTotalValue, getReturnRate } = useAppStore();
-  const [isLoading, setIsLoading] = useState(true);
+  const { news, loading: newsLoading } = useAllNews(5);
+
   const [topTab, setTopTab] = useState<TopTab>('보유');
-  const [marketFilter, setMarketFilter] = useState<MarketFilter>('전체');
+  const [marketFilter, setMarketFilter] = useState<MarketFilter>('국내');
   const [sortType, setSortType] = useState<SortType>('value');
   const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState('');
+  const [nickname, setNickname] = useState('투자자');
+  const [investmentType, setInvestmentType] = useState<{ emoji: string; name: string } | null>(null);
+  const [firestoreBalance, setFirestoreBalance] = useState<number | null>(null);
+  const [firestoreTotalAsset, setFirestoreTotalAsset] = useState<number | null>(null);
+  const [missionData, setMissionData] = useState<{ completed: number; total: number; maxReward: number }>({ completed: 0, total: 0, maxReward: 0 });
 
+  // ── Firestore real-time listener ──────────────────
   useEffect(() => {
-    console.log('HomeScreen 마운트');
-    try {
-      console.log('holdings:', holdings);
-      console.log('cash:', cash);
-      setIsLoading(false);
-    } catch (error) {
-      console.error('HomeScreen 초기화 오류:', error);
-      setIsLoading(false);
-    }
-  }, []);
+    if (!user?.id) return;
+    const unsubscribe = onSnapshot(doc(db, 'users', user.id), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setNickname(data?.name ?? data?.nickname ?? '투자자');
+        if (data?.investmentType) {
+          setInvestmentType(data.investmentType);
+        }
+        if (data?.balance !== undefined) {
+          setFirestoreBalance(data.balance);
+          // appStore(Zustand)도 동기화 → derived values 즉시 반영
+          useAppStore.setState({ cash: data.balance });
+        }
+        if (data?.totalAsset !== undefined) {
+          setFirestoreTotalAsset(data.totalAsset);
+        }
+        // portfolio → appStore holdings 동기화
+        if (Array.isArray(data?.portfolio)) {
+          const synced = data.portfolio.map((p: any) => ({
+            ticker: p.ticker,
+            qty: p.quantity ?? p.qty ?? 0,
+            avgPrice: p.avgPrice ?? 0,
+          }));
+          useAppStore.setState({ holdings: synced });
+        }
+      }
+    }, (error) => {
+      console.error('홈 유저 실시간 리스너 오류:', error);
+    });
+    return () => unsubscribe();
+  }, [user?.id]);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+  // ── 데일리 미션 로드 ──────────────────────────────
+  useEffect(() => {
+    if (!user?.id) return;
+    loadTodayMissions(user.id).then((missions) => {
+      const completed = missions.filter((m) => m.completed).length;
+      const total = missions.length;
+      const maxReward = missions.reduce((s, m) => s + m.reward, 0) + ALL_COMPLETE_BONUS;
+      setMissionData({ completed, total, maxReward });
+    }).catch(() => {});
+  }, [user?.id]);
 
-  if (isLoading) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#0066FF" />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  console.log('HomeScreen 렌더링 시작');
-
-  let totalValue = 0;
-  let returnRate = 0;
-  try {
-    totalValue = getTotalValue() ?? 0;
-    returnRate = getReturnRate() ?? 0;
-  } catch (error) {
-    console.error('HomeScreen 자산 계산 오류:', error);
-  }
-  const profit = totalValue - 1_000_000;
-  const stockValue = totalValue - (cash ?? 0);
+  // ── Derived values ────────────────────────────────
+  // appStore (Zustand) 값 우선 — 거래 후 즉시 반영 (Optimistic UI)
+  // cash가 0일 수 있으므로 !== undefined 체크
+  const balance = cash !== undefined ? cash : (firestoreBalance ?? 1_000_000);
+  const totalValue = getTotalValue ? getTotalValue() : (firestoreTotalAsset ?? 1_000_000);
+  const initialBalance = 1_000_000;
+  const profit = totalValue - initialBalance;
+  const profitRate = (profit / initialBalance) * 100;
   const isUp = profit >= 0;
+  const portfolioValue = totalValue - balance;
 
-  // Holdings with stock data
+  // ── Holdings computation ──────────────────────────
   const safeHoldings = holdings ?? [];
   const holdingsData = safeHoldings.map(h => {
     const stock = STOCKS.find(s => s.ticker === h.ticker);
     if (!stock) return null;
     const evalAmt = (stock.price ?? 0) * (h.qty ?? 0);
     const pnlAmt = ((stock.price ?? 0) - (h.avgPrice ?? 0)) * (h.qty ?? 0);
-    const pnlRate = (h.avgPrice ?? 0) > 0 ? (((stock.price ?? 0) - (h.avgPrice ?? 0)) / (h.avgPrice ?? 0)) * 100 : 0;
+    const pnlRate = (h.avgPrice ?? 0) > 0
+      ? (((stock.price ?? 0) - (h.avgPrice ?? 0)) / (h.avgPrice ?? 0)) * 100
+      : 0;
     return { ...h, stock, evalAmt, pnlAmt, pnlRate };
-  }).filter(Boolean) as Array<{ ticker: string; qty: number; avgPrice: number; stock: typeof STOCKS[0]; evalAmt: number; pnlAmt: number; pnlRate: number }>;
+  }).filter(Boolean) as Array<{
+    ticker: string; qty: number; avgPrice: number;
+    stock: typeof STOCKS[0]; evalAmt: number; pnlAmt: number; pnlRate: number;
+  }>;
 
-  // Filter by market
+  const marketKey = marketFilter === '국내' ? '한국' : marketFilter === '미국' ? '미국' : undefined;
   const filteredHoldings = holdingsData.filter(h => {
-    if (marketFilter === '전체') return true;
-    return h.stock.market === marketFilter;
+    if (marketFilter === '기타') return h.stock.market !== '한국' && h.stock.market !== '미국';
+    return h.stock.market === marketKey;
   });
 
-  // Sort
   const sortedHoldings = [...filteredHoldings].sort((a, b) => {
     if (sortType === 'value') return b.evalAmt - a.evalAmt;
     return b.pnlRate - a.pnlRate;
   });
 
-  // Apply search filter
-  const displayHoldings = search.trim()
-    ? sortedHoldings.filter(h =>
-        h.stock.name.includes(search) ||
-        h.stock.ticker.toUpperCase().includes(search.toUpperCase())
-      )
-    : sortedHoldings;
+  const summaryEval = sortedHoldings.reduce((sum, h) => sum + h.evalAmt, 0);
+  const summaryPnl = sortedHoldings.reduce((sum, h) => sum + h.pnlAmt, 0);
+  const summaryRate = summaryEval - summaryPnl > 0
+    ? (summaryPnl / (summaryEval - summaryPnl)) * 100
+    : 0;
+  const summaryUp = summaryPnl >= 0;
 
-  // For 국내/해외 tabs: show all stocks in that market
-  const marketStocks = STOCKS.filter(s => {
-    if (topTab === '국내') return s.market === '한국';
-    if (topTab === '해외') return s.market === '미국';
-    return false;
-  });
+  const watchlistStocks = STOCKS.slice(0, 8);
 
-  const displayMarketStocks = search.trim()
-    ? marketStocks.filter(s =>
-        s.name.includes(search) ||
-        s.ticker.toUpperCase().includes(search.toUpperCase())
-      )
-    : marketStocks;
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
+
+  // ── Shared banners ────────────────────────────────
+  const renderNoticeBanner = () => (
+    <View style={styles.noticeBanner}>
+      <Ionicons name="megaphone-outline" size={16} color={Colors.primary} />
+      <Text style={styles.noticeText} numberOfLines={1}>
+        투자 전 반드시 설명서를 읽어보세요. 원금손실이 발생할 수 있습니다.
+      </Text>
+      <Ionicons name="chevron-forward" size={14} color={Colors.textSub} />
+    </View>
+  );
+
+  const renderLearnBanner = () => (
+    <TouchableOpacity
+      style={styles.learnBanner}
+      onPress={() => navigation.getParent()?.navigate('학습Tab')}
+      activeOpacity={0.85}
+    >
+      <View style={styles.learnBannerLeft}>
+        <Text style={styles.learnBannerEmoji}>📚</Text>
+        <View style={styles.learnBannerTexts}>
+          <Text style={styles.learnBannerTitle}>오늘의 학습</Text>
+          <Text style={styles.learnBannerSub}>주식 공부하고 FLO 포인트 받기!</Text>
+        </View>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
+    </TouchableOpacity>
+  );
+
+  const renderEventBanner = () => (
+    <TouchableOpacity
+      style={styles.eventBanner}
+      onPress={() => navigation.navigate('이벤트')}
+      activeOpacity={0.85}
+    >
+      <Text style={styles.eventBannerEmoji}>🏆</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.eventBannerTitle}>이벤트 & 챌린지</Text>
+        <Text style={styles.eventBannerSub}>참여하고 보상 받아보세요!</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+    </TouchableOpacity>
+  );
+
+  const getMarketStatus = () => {
+    const now = new Date();
+    const koreaOffset = 9 * 60; // UTC+9
+    const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+    const koreaMs = utcMs + koreaOffset * 60000;
+    const korea = new Date(koreaMs);
+    const koreaHour = korea.getHours();
+    const koreaMin = korea.getMinutes();
+    const koreaDay = korea.getDay();
+
+    const nyOffset = -5 * 60; // UTC-5 (EST, simplified)
+    const nyMs = utcMs + nyOffset * 60000;
+    const ny = new Date(nyMs);
+    const nyHour = ny.getHours();
+    const nyMin = ny.getMinutes();
+    const nyDay = ny.getDay();
+
+    const isKoreaWeekday = koreaDay >= 1 && koreaDay <= 5;
+    const isNYWeekday = nyDay >= 1 && nyDay <= 5;
+
+    const koreaOpen = isKoreaWeekday && ((koreaHour > 9 || (koreaHour === 9 && koreaMin >= 0)) && (koreaHour < 15 || (koreaHour === 15 && koreaMin <= 30)));
+    const nyOpen = isNYWeekday && ((nyHour > 9 || (nyHour === 9 && nyMin >= 30)) && nyHour < 16);
+
+    return { koreaOpen, nyOpen };
+  };
+
+  const MarketStatus = () => {
+    const { koreaOpen, nyOpen } = getMarketStatus();
+    return (
+      <View style={styles.marketStatusRow}>
+        <View style={styles.marketStatusCard}>
+          <Text style={styles.marketStatusFlag}>🇰🇷</Text>
+          <View style={styles.marketStatusInfo}>
+            <Text style={styles.marketStatusName}>KOSPI</Text>
+            <Text style={styles.marketStatusHours}>09:00 – 15:30 KST</Text>
+          </View>
+          <View style={[styles.marketStatusDot, { backgroundColor: koreaOpen ? '#00C853' : '#F04452' }]} />
+          <Text style={[styles.marketStatusLabel, { color: koreaOpen ? '#00C853' : '#F04452' }]}>
+            {koreaOpen ? '개장' : '마감'}
+          </Text>
+        </View>
+        <View style={styles.marketStatusCard}>
+          <Text style={styles.marketStatusFlag}>🇺🇸</Text>
+          <View style={styles.marketStatusInfo}>
+            <Text style={styles.marketStatusName}>NASDAQ</Text>
+            <Text style={styles.marketStatusHours}>09:30 – 16:00 ET</Text>
+          </View>
+          <View style={[styles.marketStatusDot, { backgroundColor: nyOpen ? '#00C853' : '#F04452' }]} />
+          <Text style={[styles.marketStatusLabel, { color: nyOpen ? '#00C853' : '#F04452' }]}>
+            {nyOpen ? '개장' : '마감'}
+          </Text>
+        </View>
+      </View>
+    );
+  };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <View style={styles.container}>
-        {/* Top Header */}
-        <View style={styles.topHeader}>
-          <Text style={styles.logoText}>FLOCO</Text>
-          <View style={styles.topIcons}>
-            <TouchableOpacity style={styles.iconBtn}>
-              <Ionicons name="search-outline" size={22} color="#191919" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconBtn}>
-              <Ionicons name="notifications-outline" size={22} color="#191919" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Top Tabs */}
-        <View style={styles.topTabs}>
-          {(['보유', '국내', '해외'] as TopTab[]).map(t => (
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* ── 상단 탭바 ── */}
+      <View style={styles.header}>
+        <View style={styles.headerTabs}>
+          {(['보유', '관심'] as TopTab[]).map(t => (
             <TouchableOpacity
               key={t}
-              style={[styles.topTabBtn, topTab === t && styles.topTabBtnActive]}
+              style={styles.headerTabBtn}
               onPress={() => setTopTab(t)}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.topTabText, topTab === t && styles.topTabTextActive]}>{t}</Text>
+              <Text style={[styles.headerTabText, topTab === t && styles.headerTabTextActive]}>
+                {t}
+              </Text>
+              {topTab === t && <View style={styles.headerTabUnderline} />}
             </TouchableOpacity>
           ))}
         </View>
+        <View style={styles.headerIcons}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            activeOpacity={0.7}
+            onPress={() => navigation.getParent()?.navigate('투자Tab', { screen: '종목검색' })}
+          >
+            <Ionicons name="search-outline" size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('알림')}
+          >
+            <Ionicons name="notifications-outline" size={22} color={Colors.text} />
+          </TouchableOpacity>
+        </View>
+      </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 24 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0066FF" />}
-        >
-          {topTab === '보유' ? (
-            <>
-              {/* Asset Overview Card */}
-              <View style={styles.assetCard}>
-                <Text style={styles.assetCardTitle}>총 자산</Text>
-                <Text style={styles.assetMainValue}>
-                  {Math.round(totalValue).toLocaleString()}원
-                </Text>
-                <Text style={[styles.assetProfitText, { color: isUp ? '#FFD700' : '#FF6B6B' }]}>
-                  {isUp ? '+' : ''}{Math.round(profit).toLocaleString()}원
-                  {' '}({isUp ? '+' : ''}{Math.abs(returnRate).toFixed(2)}%)
-                </Text>
+      <MarketStatus />
 
-                <View style={styles.assetSubRow}>
-                  <View style={styles.assetSubCard}>
-                    <Text style={styles.assetSubLabel}>남은 현금</Text>
-                    <Text style={styles.assetSubValue}>
-                      {Math.round(cash ?? 0).toLocaleString()}원
+      <ScrollView
+        style={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+        }
+      >
+        {topTab === '보유' ? (
+          <>
+            {/* ── 계좌 카드 ── */}
+            <View style={styles.accountCard}>
+              {/* 닉네임 + 투자 유형 배지 */}
+              <View style={styles.accountTopRow}>
+                <Text style={styles.accountNickname}>{nickname}님의 계좌</Text>
+                {investmentType && (
+                  <View style={styles.investTypeBadge}>
+                    <Text style={styles.investTypeBadgeText}>
+                      {investmentType.emoji} {investmentType.name}
                     </Text>
                   </View>
-                  <View style={styles.assetSubCard}>
-                    <Text style={styles.assetSubLabel}>투자 중</Text>
-                    <Text style={styles.assetSubValue}>
-                      {Math.round(stockValue).toLocaleString()}원
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Cash Highlight Card */}
-              <View style={styles.cashCard}>
-                <Text style={styles.cashLabel}>💰 투자 가능한 현금</Text>
-                <Text style={styles.cashValue}>
-                  {Math.round(cash ?? 0).toLocaleString()}원
-                </Text>
-                <Text style={styles.cashPercent}>
-                  전체 자산의 {totalValue > 0 ? (((cash ?? 0) / totalValue) * 100).toFixed(1) : '0.0'}%
-                </Text>
-              </View>
-
-              {/* Action Buttons */}
-              <View style={styles.actionRow}>
-                <TouchableOpacity style={styles.actionBtn}>
-                  <Text style={styles.actionBtnText}>총자산</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  onPress={() => navigation.navigate('거래내역')}
-                >
-                  <Text style={styles.actionBtnText}>거래내역</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionBtn, styles.actionBtnPrimary]}>
-                  <Text style={styles.actionBtnTextPrimary}>학습하기</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Search */}
-              <View style={styles.searchRow}>
-                <Text style={{ fontSize: 16, color: '#B0B8C1' }}>🔍</Text>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="종목명 또는 티커 검색"
-                  value={search}
-                  onChangeText={setSearch}
-                  placeholderTextColor="#B0B8C1"
-                />
-                {search.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearch('')}>
-                    <Text style={{ color: '#B0B8C1', fontSize: 16 }}>✕</Text>
-                  </TouchableOpacity>
                 )}
               </View>
 
-              {/* Market Filter */}
-              <View style={styles.marketFilter}>
-                {(['전체', '한국', '미국'] as MarketFilter[]).map(m => (
+              {/* 총 자산 */}
+              <Text style={styles.totalAssetLabel}>총 자산</Text>
+              <Text style={styles.totalAssetValue}>
+                {Math.round(totalValue).toLocaleString()}원
+              </Text>
+
+              {/* 수익금 + 수익률 */}
+              <View style={styles.profitRow}>
+                <Text style={[styles.profitAmt, { color: isUp ? Colors.green : Colors.red }]}>
+                  {isUp ? '+' : ''}{Math.round(profit).toLocaleString()}원
+                </Text>
+                <View style={[
+                  styles.profitRateBadge,
+                  { backgroundColor: isUp ? Colors.greenBg : Colors.redBg },
+                ]}>
+                  <Text style={[styles.profitRateText, { color: isUp ? Colors.green : Colors.red }]}>
+                    {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{profitRate.toFixed(2)}%
+                  </Text>
+                </View>
+              </View>
+
+              {/* 액션 버튼 3개 */}
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => navigation.navigate('자산상세')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.actionBtnEmoji}>📊</Text>
+                  <Text style={styles.actionBtnText}>총자산</Text>
+                </TouchableOpacity>
+                <View style={styles.actionBtnDivider} />
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => navigation.navigate('보상내역')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.actionBtnEmoji}>🎁</Text>
+                  <Text style={styles.actionBtnText}>보상내역</Text>
+                </TouchableOpacity>
+                <View style={styles.actionBtnDivider} />
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => navigation.navigate('거래내역')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.actionBtnEmoji}>🔄</Text>
+                  <Text style={styles.actionBtnText}>거래내역</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* ── 잔고 카드 ── */}
+            <View style={styles.balanceCard}>
+              <View style={styles.balanceRow}>
+                <View style={styles.balanceItem}>
+                  <Text style={styles.balanceLabel}>주문가능금액</Text>
+                  <Text style={styles.balancePrimaryValue}>
+                    {Math.round(balance).toLocaleString()}원
+                  </Text>
+                </View>
+                <View style={styles.balanceDivider} />
+                <View style={styles.balanceItem}>
+                  <Text style={styles.balanceLabel}>투자중 금액</Text>
+                  <Text style={styles.balanceValue}>
+                    {Math.round(portfolioValue).toLocaleString()}원
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <Text style={styles.rewardHint}>
+              💡 학습을 완료하면 가상 자산이 늘어나요!
+            </Text>
+
+            {/* ── 국내/미국/기타 필터 탭 ── */}
+            <View style={styles.pillTabRow}>
+              {(['국내', '미국', '기타'] as MarketFilter[]).map(m => (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.pillTab, marketFilter === m && styles.pillTabActive]}
+                  onPress={() => setMarketFilter(m)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.pillTabText, marketFilter === m && styles.pillTabTextActive]}>
+                    {m}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* ── 평가금/수익금/수익률 summary ── */}
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>평가금</Text>
+                <Text style={styles.summaryValue}>
+                  {Math.round(summaryEval).toLocaleString()}원
+                </Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>수익금</Text>
+                <Text style={[styles.summaryValue, { color: summaryUp ? Colors.green : Colors.red }]}>
+                  {summaryUp ? '+' : ''}{Math.round(summaryPnl).toLocaleString()}원
+                </Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>수익률</Text>
+                <Text style={[styles.summaryValue, { color: summaryUp ? Colors.green : Colors.red }]}>
+                  {summaryUp ? '+' : ''}{summaryRate.toFixed(2)}%
+                </Text>
+              </View>
+            </View>
+
+            {/* ── 정렬 ── */}
+            <View style={styles.sortRow}>
+              <Text style={styles.sortCount}>보유 {sortedHoldings.length}종목</Text>
+              <View style={styles.sortBtns}>
+                {([
+                  { key: 'value' as SortType, label: '평가금액순' },
+                  { key: 'return' as SortType, label: '수익률순' },
+                ]).map(s => (
                   <TouchableOpacity
-                    key={m}
-                    style={[styles.marketBtn, marketFilter === m && styles.marketBtnActive]}
-                    onPress={() => setMarketFilter(m)}
+                    key={s.key}
+                    style={[styles.sortBtn, sortType === s.key && styles.sortBtnActive]}
+                    onPress={() => setSortType(s.key)}
+                    activeOpacity={0.7}
                   >
-                    <Text style={[styles.marketText, marketFilter === m && styles.marketTextActive]}>{m}</Text>
+                    <Text style={[styles.sortBtnText, sortType === s.key && styles.sortBtnTextActive]}>
+                      {s.label}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
+            </View>
 
-              {/* Sort */}
-              <View style={styles.sortRow}>
-                <Text style={styles.sortLabel}>보유 {displayHoldings.length}종목</Text>
-                <View style={styles.sortBtns}>
-                  {(['value', 'return'] as SortType[]).map(s => (
-                    <TouchableOpacity
-                      key={s}
-                      onPress={() => setSortType(s)}
-                      style={[styles.sortBtn, sortType === s && styles.sortBtnActive]}
-                    >
-                      <Text style={[styles.sortBtnText, sortType === s && styles.sortBtnTextActive]}>
-                        {s === 'value' ? '평가금액순' : '수익률순'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Holdings List */}
-              {displayHoldings.length === 0 ? (
-                <View style={styles.emptyBox}>
-                  <Text style={styles.emptyEmoji}>📈</Text>
-                  <Text style={styles.emptyTitle}>
-                    아직 보유 종목이 없어요{'\n'}첫 투자를 시작해보세요!
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.emptyBtn}
-                    onPress={() => navigation.getParent()?.navigate('투자Tab')}
-                  >
-                    <Text style={styles.emptyBtnText}>투자하러 가기</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.holdingList}>
-                  {displayHoldings.map((h, i) => {
-                    const hUp = h.pnlRate >= 0;
-                    const evalAmt = h.evalAmt;
-                    return (
-                      <TouchableOpacity
-                        key={h.ticker}
-                        style={[styles.holdingRow, i < displayHoldings.length - 1 && styles.holdingBorder]}
-                        onPress={() => navigation.getParent()?.navigate('투자Tab', {
-                          screen: '종목상세', params: { ticker: h.ticker }
-                        })}
-                        activeOpacity={0.7}
-                      >
-                        <StockLogo ticker={h.ticker} size={44} />
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text style={styles.holdingName}>{h.stock.name}</Text>
-                          <Text style={styles.holdingQty}>
-                            {h.qty}주 · 평균 {h.stock.krw ? `${Math.round(h.avgPrice).toLocaleString()}원` : `$${h.avgPrice.toFixed(2)}`}
-                          </Text>
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={styles.holdingEval}>
-                            {h.stock.krw ? `${Math.round(evalAmt).toLocaleString()}원` : `$${evalAmt.toFixed(2)}`}
-                          </Text>
-                          <Text style={[styles.holdingPnl, { color: hUp ? '#FF3B30' : '#0066FF' }]}>
-                            {hUp ? '+' : ''}{h.stock.krw ? `${Math.round(h.pnlAmt).toLocaleString()}원` : `$${h.pnlAmt.toFixed(2)}`}
-                            {' '}({hUp ? '+' : ''}{h.pnlRate.toFixed(2)}%)
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-            </>
-          ) : (
-            /* 국내/해외 Tab - Stock List */
-            <>
-              <View style={styles.marketListHeader}>
-                <Text style={styles.marketListTitle}>
-                  {topTab === '국내' ? '국내 주식' : '해외 주식'} {displayMarketStocks.length}종목
+            {/* ── 보유 종목 리스트 ── */}
+            {sortedHoldings.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyEmoji}>📈</Text>
+                <Text style={styles.emptyTitle}>
+                  보유 종목이 없어요{'\n'}첫 투자를 시작해보세요!
                 </Text>
+                <TouchableOpacity
+                  style={styles.emptyBtn}
+                  onPress={() => navigation.getParent()?.navigate('투자Tab')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.emptyBtnText}>첫 투자하러 가기</Text>
+                </TouchableOpacity>
               </View>
-              <View style={styles.holdingList}>
-                {displayMarketStocks.map((s, i) => {
-                  const sUp = s.change >= 0;
-                  const holding = safeHoldings.find(h => h.ticker === s.ticker);
+            ) : (
+              <View style={styles.holdingCard}>
+                {sortedHoldings.map((h, i) => {
+                  const hUp = h.pnlRate >= 0;
                   return (
                     <TouchableOpacity
-                      key={s.ticker}
-                      style={[styles.holdingRow, i < displayMarketStocks.length - 1 && styles.holdingBorder]}
-                      onPress={() => navigation.getParent()?.navigate('투자Tab', {
-                        screen: '종목상세', params: { ticker: s.ticker }
-                      })}
+                      key={h.ticker}
+                      style={[
+                        styles.holdingRow,
+                        i < sortedHoldings.length - 1 && styles.holdingBorder,
+                      ]}
+                      onPress={() =>
+                        navigation.getParent()?.navigate('투자Tab', {
+                          screen: '종목상세', params: { ticker: h.ticker },
+                        })
+                      }
                       activeOpacity={0.7}
                     >
-                      <StockLogo ticker={s.ticker} size={44} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.holdingName}>{s.name}</Text>
-                        <Text style={styles.holdingQty}>{s.ticker}{holding ? ` · ${holding.qty}주 보유` : ''}</Text>
+                      <StockLogo ticker={h.ticker} size={44} />
+                      <View style={styles.holdingMeta}>
+                        <Text style={styles.holdingName}>{h.stock.name}</Text>
+                        <Text style={styles.holdingQty}>{h.qty.toLocaleString()}주</Text>
                       </View>
-                      <View style={{ alignItems: 'flex-end' }}>
+                      <View style={styles.holdingAmts}>
                         <Text style={styles.holdingEval}>
-                          {s.krw ? `₩${s.price.toLocaleString()}` : `$${s.price.toFixed(2)}`}
+                          {h.stock.krw
+                            ? `${Math.round(h.evalAmt).toLocaleString()}원`
+                            : `$${h.evalAmt.toFixed(2)}`}
                         </Text>
-                        <Text style={[styles.holdingPnl, { color: sUp ? '#FF3B30' : '#3182F6' }]}>
-                          {sUp ? '+' : ''}{s.change.toFixed(2)}%
+                        <Text style={[styles.holdingPnl, { color: hUp ? Colors.green : Colors.red }]}>
+                          {hUp ? '+' : ''}
+                          {h.stock.krw
+                            ? `${Math.round(h.pnlAmt).toLocaleString()}원`
+                            : `$${h.pnlAmt.toFixed(2)}`}
+                          {'  '}{hUp ? '+' : ''}{h.pnlRate.toFixed(2)}%
                         </Text>
                       </View>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-            </>
-          )}
-        </ScrollView>
-      </View>
+            )}
+
+            {/* ── AI 포트폴리오 분석 버튼 ── */}
+            <TouchableOpacity
+              style={styles.aiAnalyzeBtn}
+              onPress={() => navigation.navigate('AI분석')}
+              activeOpacity={0.85}
+            >
+              <Text style={{ fontSize: 20, marginRight: 8 }}>🤖</Text>
+              <Text style={styles.aiAnalyzeBtnText}>AI 포트폴리오 분석받기</Text>
+            </TouchableOpacity>
+
+            {/* ── 데일리 미션 배너 ── */}
+            {missionData.total > 0 && (
+              <TouchableOpacity
+                style={styles.missionBanner}
+                onPress={() => navigation.navigate('데일리미션')}
+                activeOpacity={0.85}
+              >
+                <View style={styles.missionBannerTop}>
+                  <Text style={styles.missionBannerTitle}>오늘의 미션</Text>
+                  <Text style={styles.missionBannerLink}>자세히 보기</Text>
+                </View>
+                <View style={styles.missionBarBg}>
+                  <View style={[
+                    styles.missionBarFill,
+                    { width: `${missionData.total > 0 ? (missionData.completed / missionData.total) * 100 : 0}%` },
+                  ]} />
+                </View>
+                <Text style={styles.missionBannerSub}>
+                  {missionData.completed}/{missionData.total} 완료 · 최대 +{missionData.maxReward.toLocaleString()}원
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {renderNoticeBanner()}
+            {renderLearnBanner()}
+            {renderEventBanner()}
+
+            {/* ── 오늘의 뉴스 ── */}
+            <View style={styles.newsSectionHeader}>
+              <Text style={styles.newsSectionTitle}>오늘의 뉴스</Text>
+            </View>
+            {newsLoading ? (
+              <View style={{ alignItems: 'center', marginTop: 12 }}>
+                <ActivityIndicator color={Colors.primary} />
+                <Text style={{ fontSize: 13, color: Colors.textSub, marginTop: 8 }}>뉴스를 불러오는 중...</Text>
+              </View>
+            ) : news.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+                <Text style={{ fontSize: 36 }}>📰</Text>
+                <Text style={{ fontSize: 14, color: Colors.textSub, marginTop: 8 }}>뉴스를 불러올 수 없어요</Text>
+              </View>
+            ) : (
+              <View style={styles.newsCard}>
+                {news.map((item, i) => (
+                  <React.Fragment key={item.id}>
+                    <NewsCard item={item} />
+                    {i < news.length - 1 && <View style={styles.newsDivider} />}
+                  </React.Fragment>
+                ))}
+              </View>
+            )}
+          </>
+        ) : (
+          /* ── 관심 탭 ── */
+          <>
+            <View style={styles.watchlistHeader}>
+              <Text style={styles.watchlistTitle}>관심 종목 {watchlistStocks.length}</Text>
+            </View>
+            <View style={styles.holdingCard}>
+              {watchlistStocks.map((s, i) => {
+                const sUp = s.change >= 0;
+                const holding = safeHoldings.find(h => h.ticker === s.ticker);
+                return (
+                  <TouchableOpacity
+                    key={s.ticker}
+                    style={[
+                      styles.holdingRow,
+                      i < watchlistStocks.length - 1 && styles.holdingBorder,
+                    ]}
+                    onPress={() =>
+                      navigation.getParent()?.navigate('투자Tab', {
+                        screen: '종목상세', params: { ticker: s.ticker },
+                      })
+                    }
+                    activeOpacity={0.7}
+                  >
+                    <StockLogo ticker={s.ticker} size={44} />
+                    <View style={styles.holdingMeta}>
+                      <Text style={styles.holdingName}>{s.name}</Text>
+                      <Text style={styles.holdingQty}>
+                        {s.ticker}{holding ? ` · ${holding.qty}주 보유` : ''}
+                      </Text>
+                    </View>
+                    <View style={styles.holdingAmts}>
+                      <Text style={styles.holdingEval}>
+                        {s.krw ? `₩${s.price.toLocaleString()}` : `$${s.price.toFixed(2)}`}
+                      </Text>
+                      <Text style={[styles.holdingPnl, { color: sUp ? Colors.green : Colors.red }]}>
+                        {sUp ? '+' : ''}{s.change.toFixed(2)}%
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {renderNoticeBanner()}
+            {renderLearnBanner()}
+            {renderEventBanner()}
+          </>
+        )}
+      </ScrollView>
+
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  topHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 10,
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.bg,
   },
-  logoText: { fontSize: 20, fontWeight: '800', color: '#0066FF', letterSpacing: -0.5 },
-  topIcons: { flexDirection: 'row', gap: 4 },
-  iconBtn: { padding: 8 },
 
-  topTabs: {
-    flexDirection: 'row', paddingHorizontal: 16, gap: 0,
-    borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
+  // ── Header ──
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.bg,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
-  topTabBtn: {
-    paddingVertical: 12, paddingHorizontal: 16,
-    borderBottomWidth: 2, borderBottomColor: 'transparent',
+  headerTabs: {
+    flexDirection: 'row',
   },
-  topTabBtnActive: { borderBottomColor: '#191919' },
-  topTabText: { fontSize: 15, color: '#8E8E93', fontWeight: '500' },
-  topTabTextActive: { color: '#191919', fontWeight: '700' },
+  headerTabBtn: {
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    marginRight: 20,
+    position: 'relative',
+  },
+  headerTabText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: Colors.inactive,
+  },
+  headerTabTextActive: {
+    color: Colors.text,
+    fontWeight: '700',
+  },
+  headerTabUnderline: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: Colors.primary,
+    borderRadius: 1,
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    paddingBottom: 8,
+  },
+  iconBtn: {
+    padding: 6,
+    marginLeft: 4,
+  },
 
-  assetCard: {
-    backgroundColor: '#0066FF', margin: 16, borderRadius: 20, padding: 20,
-    shadowColor: '#0066FF', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
+  // ── Scroll ──
+  scroll: {
+    flex: 1,
   },
-  assetCardTitle: { fontSize: 13, color: '#FFFFFF80', marginBottom: 4 },
-  assetMainValue: {
-    fontSize: 32, fontWeight: '700', color: '#FFFFFF',
-    fontFamily: 'Courier', letterSpacing: -1,
+  scrollContent: {
+    paddingBottom: 40,
   },
-  assetProfitText: { fontSize: 16, fontWeight: '600', marginTop: 4 },
-  cashCard: {
-    backgroundColor: '#FF6B35', borderRadius: 16, padding: 16,
-    marginHorizontal: 16, marginTop: 8,
-  },
-  cashLabel: { color: '#FFFFFF80', fontSize: 12 },
-  cashValue: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginTop: 4, fontFamily: 'Courier' },
-  cashPercent: { color: '#FFFFFF80', fontSize: 12, marginTop: 4 },
-  assetSubRow: { flexDirection: 'row', marginTop: 16, gap: 12 },
-  assetSubCard: {
-    flex: 1, backgroundColor: '#FFFFFF20', borderRadius: 12, padding: 12,
-  },
-  assetSubLabel: { fontSize: 12, color: '#FFFFFF80' },
-  assetSubValue: {
-    fontSize: 16, fontWeight: '700', color: '#FFFFFF', marginTop: 4,
-  },
-  searchRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#F8F9FA', marginHorizontal: 16, marginTop: 12,
-    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, gap: 8,
-  },
-  searchInput: { flex: 1, fontSize: 14, color: '#191919' },
 
-  actionRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginTop: 12 },
+  // ── Account Card ──
+  accountCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginTop: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  accountTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  accountNickname: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSub,
+  },
+  investTypeBadge: {
+    backgroundColor: '#EBF2FF',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  investTypeBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  totalAssetLabel: {
+    fontSize: 13,
+    color: Colors.textSub,
+    marginBottom: 4,
+  },
+  totalAssetValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: Colors.text,
+    letterSpacing: -0.8,
+    marginBottom: 8,
+  },
+  profitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
+  },
+  profitAmt: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  profitRateBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  profitRateText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: 16,
+  },
   actionBtn: {
-    flex: 1, backgroundColor: '#F8F9FA', borderRadius: 10,
-    paddingVertical: 10, alignItems: 'center',
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
   },
-  actionBtnPrimary: { backgroundColor: '#0066FF' },
-  actionBtnText: { fontSize: 13, fontWeight: '600', color: '#191919' },
-  actionBtnTextPrimary: { fontSize: 13, fontWeight: '600', color: '#FFFFFF' },
+  actionBtnDivider: {
+    width: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 2,
+  },
+  actionBtnEmoji: {
+    fontSize: 20,
+  },
+  actionBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.text,
+  },
 
-  marketFilter: {
-    flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginTop: 16,
+  // ── Balance Card ──
+  balanceCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginTop: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  marketBtn: {
-    paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16,
-    backgroundColor: '#F8F9FA',
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  marketBtnActive: { backgroundColor: '#191919' },
-  marketText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
-  marketTextActive: { color: '#FFFFFF', fontWeight: '600' },
+  balanceItem: {
+    flex: 1,
+  },
+  balanceDivider: {
+    width: 1,
+    backgroundColor: Colors.border,
+    height: 40,
+    marginHorizontal: 16,
+  },
+  balanceLabel: {
+    fontSize: 12,
+    color: Colors.textSub,
+    marginBottom: 4,
+  },
+  balancePrimaryValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.primary,
+    letterSpacing: -0.4,
+  },
+  balanceValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+    letterSpacing: -0.4,
+  },
 
+  // ── Pill Tabs ──
+  pillTabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginTop: 16,
+    gap: 8,
+  },
+  pillTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pillTabActive: {
+    backgroundColor: Colors.text,
+    borderColor: Colors.text,
+  },
+  pillTabText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: Colors.textSub,
+  },
+  pillTabTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+
+  // ── Summary Row ──
+  summaryRow: {
+    flexDirection: 'row',
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginTop: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryDivider: {
+    width: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 2,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    color: Colors.textSub,
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+    letterSpacing: -0.3,
+  },
+
+  // ── Sort Row ──
   sortRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, marginTop: 16, marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 4,
   },
-  sortLabel: { fontSize: 13, fontWeight: '600', color: '#191919' },
-  sortBtns: { flexDirection: 'row', gap: 4 },
-  sortBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  sortBtnActive: { backgroundColor: '#F2F2F7' },
-  sortBtnText: { fontSize: 12, color: '#B0B8C1' },
-  sortBtnTextActive: { color: '#191919', fontWeight: '600' },
+  sortCount: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  sortBtns: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  sortBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  sortBtnActive: {
+    backgroundColor: Colors.border,
+  },
+  sortBtnText: {
+    fontSize: 12,
+    color: Colors.inactive,
+  },
+  sortBtnTextActive: {
+    color: Colors.text,
+    fontWeight: '600',
+  },
 
-  holdingList: {
-    marginHorizontal: 16, backgroundColor: '#FFFFFF',
-    borderRadius: 12, overflow: 'hidden',
+  // ── Holding Card ──
+  holdingCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginTop: 4,
+    overflow: 'hidden',
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
   },
   holdingRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 14, paddingHorizontal: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    height: 64,
   },
-  holdingBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
-  holdingName: { fontSize: 15, fontWeight: '700', color: '#191919' },
-  holdingQty: { fontSize: 13, color: '#8E8E93', marginTop: 2 },
-  holdingEval: { fontSize: 15, fontWeight: '700', color: '#191919' },
-  holdingPnl: { fontSize: 13, fontWeight: '600', marginTop: 2 },
+  holdingBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  holdingMeta: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  holdingName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text,
+    letterSpacing: -0.2,
+  },
+  holdingQty: {
+    fontSize: 12,
+    color: Colors.textSub,
+    marginTop: 2,
+  },
+  holdingAmts: {
+    alignItems: 'flex-end',
+  },
+  holdingEval: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+    letterSpacing: -0.3,
+  },
+  holdingPnl: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
 
+  // ── Empty State ──
   emptyBox: {
-    alignItems: 'center', marginHorizontal: 16, marginTop: 24,
-    backgroundColor: '#F8F9FA', borderRadius: 16, padding: 24,
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 4,
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    paddingVertical: 36,
+    paddingHorizontal: 24,
   },
-  emptyEmoji: { fontSize: 40, marginBottom: 12 },
-  emptyTitle: { fontSize: 14, color: '#8E8E93', textAlign: 'center', lineHeight: 20 },
+  emptyEmoji: {
+    fontSize: 40,
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    color: Colors.textSub,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
   emptyBtn: {
-    marginTop: 16, backgroundColor: '#0066FF', borderRadius: 12,
-    paddingHorizontal: 24, height: 44, justifyContent: 'center',
+    marginTop: 20,
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 28,
+    height: 44,
+    justifyContent: 'center',
   },
-  emptyBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+  emptyBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
 
-  marketListHeader: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  marketListTitle: { fontSize: 15, fontWeight: '700', color: '#191919' },
+  // ── Notice Banner ──
+  noticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginTop: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 8,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.textSub,
+  },
+
+  // ── Learn Banner ──
+  learnBanner: {
+    backgroundColor: Colors.primary,
+    borderRadius: 16,
+    marginHorizontal: 20,
+    marginTop: 8,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  learnBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  learnBannerEmoji: {
+    fontSize: 28,
+  },
+  learnBannerTexts: {
+    gap: 2,
+  },
+  learnBannerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  learnBannerSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+  },
+
+  // ── Watchlist ──
+  watchlistHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  watchlistTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+
+  // ── News Section ──
+  newsSectionHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 4,
+  },
+  newsSectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  newsCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginTop: 8,
+    overflow: 'hidden',
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  newsDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginHorizontal: 16,
+  },
+
+  // ── AI Analyze Button ──
+  aiAnalyzeBtn: {
+    backgroundColor: '#191F28',
+    borderRadius: 16,
+    marginHorizontal: 20,
+    marginTop: 8,
+    height: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  aiAnalyzeBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+
+  // ── Mission Banner ──
+  missionBanner: {
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    marginHorizontal: 20,
+    marginTop: 8,
+    padding: 16,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  missionBannerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  missionBannerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  missionBannerLink: {
+    color: Colors.primary,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  missionBarBg: {
+    height: 8,
+    backgroundColor: Colors.border,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  missionBarFill: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.primary,
+  },
+  missionBannerSub: {
+    color: Colors.textSub,
+    fontSize: 13,
+  },
+
+  // ── Reward Hint ──
+  rewardHint: {
+    fontSize: 12,
+    color: Colors.textSub,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+    paddingHorizontal: 20,
+  },
+  eventBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 8,
+    backgroundColor: '#FF9500',
+    borderRadius: 16,
+    padding: 16,
+  },
+  eventBannerEmoji: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  eventBannerTitle: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  eventBannerSub: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
+    marginTop: 2,
+  },
+
+  // ── Market Status ──
+  marketStatusRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    gap: 10,
+    backgroundColor: Colors.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  marketStatusCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  marketStatusFlag: {
+    fontSize: 20,
+  },
+  marketStatusInfo: {
+    flex: 1,
+  },
+  marketStatusName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  marketStatusHours: {
+    fontSize: 10,
+    color: Colors.textSub,
+    marginTop: 1,
+  },
+  marketStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  marketStatusLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });

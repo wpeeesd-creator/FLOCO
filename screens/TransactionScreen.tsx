@@ -1,210 +1,427 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * TransactionScreen — 거래내역 (매수/매도/보상 통합)
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator,
+  View, Text, ScrollView, StyleSheet, TouchableOpacity,
+  ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { useAuth } from '../context/AuthContext';
 import { useAppStore, STOCKS } from '../store/appStore';
+import { Colors } from '../components/ui';
 import StockLogo from '../components/StockLogo';
 
-type CurrencyTab = '원화' | '달러';
+export interface UnifiedTransaction {
+  id: string;
+  type: 'buy' | 'sell' | 'reward';
+  ticker?: string;
+  stockName?: string;
+  qty?: number;
+  price?: number;
+  fee?: number;
+  lessonTitle?: string;
+  reward?: number;
+  correctCount?: number;
+  totalCount?: number;
+  timestamp: number;
+}
+
+type FilterTab = '전체' | '매수' | '매도' | '보상';
+
+const FILTER_TABS: FilterTab[] = ['전체', '매수', '매도', '보상'];
+
+function formatDateGroup(timestamp: number): string {
+  return new Date(timestamp).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function formatTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatKRW(amount: number): string {
+  return `₩${Math.round(amount).toLocaleString()}`;
+}
+
+const EMPTY_MESSAGES: Record<FilterTab, { emoji: string; title: string; desc: string }> = {
+  '전체': { emoji: '📋', title: '아직 거래 내역이 없어요', desc: '투자나 학습을 시작하면 여기에 표시돼요' },
+  '매수': { emoji: '📈', title: '매수 내역이 없어요', desc: '종목을 매수하면 여기에 표시돼요' },
+  '매도': { emoji: '📉', title: '매도 내역이 없어요', desc: '종목을 매도하면 여기에 표시돼요' },
+  '보상': { emoji: '🎓', title: '학습 보상 내역이 없어요', desc: '퀴즈를 완료하면 보상을 받을 수 있어요' },
+};
 
 export default function TransactionScreen() {
   const navigation = useNavigation<any>();
-  const { trades, cash } = useAppStore();
-  const [currTab, setCurrTab] = useState<CurrencyTab>('원화');
-  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
+  const { trades } = useAppStore();
+  const [activeTab, setActiveTab] = useState<FilterTab>('전체');
+  const [unified, setUnified] = useState<UnifiedTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadData = useCallback(async () => {
+    const tradeTxs: UnifiedTransaction[] = (trades ?? []).map(t => {
+      const stock = STOCKS.find(s => s.ticker === t.ticker);
+      return {
+        id: t.id,
+        type: t.type as 'buy' | 'sell',
+        ticker: t.ticker,
+        stockName: stock?.name ?? t.ticker,
+        qty: t.qty,
+        price: t.price,
+        fee: t.fee,
+        timestamp: t.timestamp,
+      };
+    });
+
+    let rewardTxs: UnifiedTransaction[] = [];
+    if (user?.id) {
+      try {
+        const snap = await getDoc(doc(db, 'users', user.id, 'learning', 'data'));
+        if (snap.exists()) {
+          const data = snap.data();
+          const history: any[] = data?.rewardHistory ?? [];
+          rewardTxs = history.map((r, idx) => ({
+            id: r.id ?? `reward_${idx}`,
+            type: 'reward' as const,
+            lessonTitle: r.lessonTitle ?? r.title ?? '학습 완료',
+            reward: r.reward ?? r.amount ?? 0,
+            correctCount: r.correctCount,
+            totalCount: r.totalCount,
+            timestamp: r.timestamp ?? Date.now(),
+          }));
+        }
+      } catch {
+        // Firestore fetch failed silently
+      }
+    }
+
+    const merged = [...tradeTxs, ...rewardTxs].sort((a, b) => b.timestamp - a.timestamp);
+    setUnified(merged);
+  }, [trades, user?.id]);
 
   useEffect(() => {
-    console.log('TransactionScreen 마운트');
-    try {
-      console.log('trades:', trades);
-      console.log('cash:', cash);
-      setIsLoading(false);
-    } catch (error) {
-      console.error('TransactionScreen 초기화 오류:', error);
-      setIsLoading(false);
+    setLoading(true);
+    loadData().finally(() => setLoading(false));
+  }, [loadData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
+
+  const filtered = unified.filter(tx => {
+    if (activeTab === '전체') return true;
+    if (activeTab === '매수') return tx.type === 'buy';
+    if (activeTab === '매도') return tx.type === 'sell';
+    if (activeTab === '보상') return tx.type === 'reward';
+    return true;
+  });
+
+  // Summary calculations
+  const totalCount = unified.length;
+  const totalBuy = unified.filter(t => t.type === 'buy').reduce((s, t) => s + (t.price ?? 0) * (t.qty ?? 0), 0);
+  const totalSell = unified.filter(t => t.type === 'sell').reduce((s, t) => s + (t.price ?? 0) * (t.qty ?? 0), 0);
+  const totalReward = unified.filter(t => t.type === 'reward').reduce((s, t) => s + (t.reward ?? 0), 0);
+
+  // Group by date
+  const grouped: { date: string; items: UnifiedTransaction[] }[] = [];
+  filtered.forEach(tx => {
+    const dateLabel = formatDateGroup(tx.timestamp);
+    const existing = grouped.find(g => g.date === dateLabel);
+    if (existing) {
+      existing.items.push(tx);
+    } else {
+      grouped.push({ date: dateLabel, items: [tx] });
     }
-  }, []);
-
-  if (isLoading) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#0066FF" />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  console.log('TransactionScreen 렌더링 시작');
-
-  const safeTrades = trades ?? [];
-  const sortedTrades = [...safeTrades].reverse();
-
-  // Filter by currency
-  const filteredTrades = sortedTrades.filter(t => {
-    const stock = STOCKS.find(s => s.ticker === t.ticker);
-    if (currTab === '원화') return stock?.krw ?? true;
-    return !(stock?.krw ?? true);
   });
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backText}>←</Text>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="chevron-back" size={24} color={Colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>거래내역</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Filter Tabs */}
+      <View style={styles.tabBar}>
+        {FILTER_TABS.map(tab => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tab, activeTab === tab && styles.tabActive]}
+            onPress={() => setActiveTab(tab)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+              {tab}
+            </Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>거래내역</Text>
-          <View style={{ width: 30 }} />
-        </View>
+        ))}
+      </View>
 
-        {/* Currency Tabs */}
-        <View style={styles.currTabs}>
-          {(['원화', '달러'] as CurrencyTab[]).map(t => (
-            <TouchableOpacity
-              key={t}
-              style={[styles.currTab, currTab === t && styles.currTabActive]}
-              onPress={() => setCurrTab(t)}
-            >
-              <Text style={[styles.currTabText, currTab === t && styles.currTabTextActive]}>{t}</Text>
-            </TouchableOpacity>
-          ))}
+      {loading ? (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color={Colors.primary} />
         </View>
-
-        {/* Balance Info */}
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>주식 구매 가능 금액</Text>
-          <Text style={styles.balanceValue}>
-            {currTab === '원화' ? `₩${Math.round(cash).toLocaleString()}` : '$0.00'}
-          </Text>
-          <View style={styles.balanceBtns}>
-            <TouchableOpacity style={styles.balanceBtn}>
-              <Text style={styles.balanceBtnText}>원화로 바꾸기</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.balanceBtn, styles.balanceBtnPrimary]}>
-              <Text style={styles.balanceBtnTextPrimary}>달러 채우기</Text>
-            </TouchableOpacity>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+        >
+          {/* Summary Card */}
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryBox}>
+                <Text style={styles.summaryLabel}>총 거래</Text>
+                <Text style={[styles.summaryValue, { color: Colors.primary }]}>{totalCount}건</Text>
+              </View>
+              <View style={styles.summaryBox}>
+                <Text style={styles.summaryLabel}>총 매수</Text>
+                <Text style={[styles.summaryValue, { color: '#F04452' }]}>{formatKRW(totalBuy)}</Text>
+              </View>
+              <View style={styles.summaryBox}>
+                <Text style={styles.summaryLabel}>총 매도</Text>
+                <Text style={[styles.summaryValue, { color: '#2175F3' }]}>{formatKRW(totalSell)}</Text>
+              </View>
+              <View style={styles.summaryBox}>
+                <Text style={styles.summaryLabel}>학습 보상</Text>
+                <Text style={[styles.summaryValue, { color: '#34C759' }]}>{formatKRW(totalReward)}</Text>
+              </View>
+            </View>
           </View>
-        </View>
 
-        {/* Fee Banner */}
-        <View style={styles.feeBanner}>
-          <Text style={styles.feeText}>💡 환전 수수료 0.1% · 거래 수수료 0.1%</Text>
-        </View>
-
-        {/* Transaction List */}
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-          {filteredTrades.length === 0 ? (
-            <View style={styles.emptyBox}>
-              <Text style={{ fontSize: 40, marginBottom: 8 }}>📋</Text>
-              <Text style={styles.emptyTitle}>거래 내역이 없어요</Text>
-              <Text style={styles.emptyDesc}>투자를 시작하면 여기에 표시돼요</Text>
+          {/* Date-grouped list */}
+          {filtered.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyEmoji}>{EMPTY_MESSAGES[activeTab].emoji}</Text>
+              <Text style={styles.emptyTitle}>{EMPTY_MESSAGES[activeTab].title}</Text>
+              <Text style={styles.emptyDesc}>{EMPTY_MESSAGES[activeTab].desc}</Text>
             </View>
           ) : (
-            <View style={styles.tradeList}>
-              {filteredTrades.map((t, i) => {
-                const stock = STOCKS.find(s => s.ticker === t.ticker);
-                const isBuy = t.type === 'buy';
-                const total = t.price * t.qty;
-                const date = new Date(t.timestamp);
-                const dateStr = `${date.getMonth()+1}.${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
-
-                return (
-                  <View
-                    key={t.id}
-                    style={[styles.tradeRow, i < filteredTrades.length - 1 && styles.tradeBorder]}
-                  >
-                    <StockLogo ticker={t.ticker} size={40} />
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.tradeName}>{stock?.name ?? t.ticker}</Text>
-                        <View style={[styles.typeBadge, { backgroundColor: isBuy ? '#FFF0F1' : '#EBF2FF' }]}>
-                          <Text style={[styles.typeText, { color: isBuy ? '#FF3B30' : '#3182F6' }]}>
-                            {isBuy ? '매수' : '매도'}
-                          </Text>
-                        </View>
+            grouped.map(group => (
+              <View key={group.date}>
+                <Text style={styles.dateHeader}>{group.date}</Text>
+                <View style={styles.groupCard}>
+                  {group.items.map((tx, idx) => (
+                    <TouchableOpacity
+                      key={tx.id}
+                      style={[
+                        styles.txRow,
+                        idx < group.items.length - 1 && styles.txRowDivider,
+                      ]}
+                      onPress={() => navigation.navigate('거래상세', { transaction: tx })}
+                      activeOpacity={0.75}
+                    >
+                      {/* Icon circle */}
+                      <View style={[
+                        styles.iconCircle,
+                        {
+                          backgroundColor:
+                            tx.type === 'buy' ? '#FFF0F0'
+                            : tx.type === 'sell' ? '#F0F4FF'
+                            : '#F0FFF4',
+                        },
+                      ]}>
+                        <Text style={styles.iconEmoji}>
+                          {tx.type === 'buy' ? '📈' : tx.type === 'sell' ? '📉' : '🎓'}
+                        </Text>
                       </View>
-                      <Text style={styles.tradeDate}>{dateStr} · {t.qty}주</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={[styles.tradeAmt, { color: isBuy ? '#FF3B30' : '#3182F6' }]}>
-                        {isBuy ? '-' : '+'}{stock?.krw ? `₩${Math.round(total).toLocaleString()}` : `$${total.toFixed(2)}`}
-                      </Text>
-                      <Text style={styles.tradeFee}>수수료 {stock?.krw ? `₩${Math.round(t.fee).toLocaleString()}` : `$${t.fee.toFixed(2)}`}</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
+
+                      {/* Middle */}
+                      <View style={styles.txMiddle}>
+                        <Text style={styles.txName} numberOfLines={1}>
+                          {tx.type === 'reward' ? tx.lessonTitle : tx.stockName}
+                        </Text>
+                        <Text style={styles.txSub}>
+                          {tx.type === 'buy'
+                            ? `매수 ${tx.qty}주`
+                            : tx.type === 'sell'
+                            ? `매도 ${tx.qty}주`
+                            : tx.totalCount != null && tx.correctCount != null
+                            ? `정답률 ${Math.round((tx.correctCount / tx.totalCount) * 100)}%`
+                            : '학습 완료'}
+                        </Text>
+                      </View>
+
+                      {/* Right */}
+                      <View style={styles.txRight}>
+                        <Text style={[
+                          styles.txAmount,
+                          {
+                            color:
+                              tx.type === 'buy' ? '#F04452'
+                              : tx.type === 'sell' ? '#2175F3'
+                              : '#34C759',
+                          },
+                        ]}>
+                          {tx.type === 'buy'
+                            ? `-${formatKRW((tx.price ?? 0) * (tx.qty ?? 0))}`
+                            : tx.type === 'sell'
+                            ? `+${formatKRW((tx.price ?? 0) * (tx.qty ?? 0))}`
+                            : `+${formatKRW(tx.reward ?? 0)}`}
+                        </Text>
+                        <Text style={styles.txTime}>{formatTime(tx.timestamp)}</Text>
+                      </View>
+
+                      <Ionicons name="chevron-forward" size={16} color={Colors.textSub} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            ))
           )}
         </ScrollView>
-      </View>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  root: { flex: 1, backgroundColor: Colors.bg },
+
+  // Header
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: Colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
   backBtn: { padding: 4 },
-  backText: { fontSize: 22, color: '#0066FF', fontWeight: '600' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#191919' },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },
 
-  currTabs: {
-    flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8,
-    borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
+  // Tabs
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: Colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingHorizontal: 16,
   },
-  currTab: {
-    paddingVertical: 12, paddingHorizontal: 20,
-    borderBottomWidth: 2, borderBottomColor: 'transparent',
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -1,
   },
-  currTabActive: { borderBottomColor: '#191919' },
-  currTabText: { fontSize: 15, color: '#8E8E93', fontWeight: '500' },
-  currTabTextActive: { color: '#191919', fontWeight: '700' },
+  tabActive: { borderBottomColor: Colors.primary },
+  tabText: { fontSize: 14, fontWeight: '500', color: Colors.textSub },
+  tabTextActive: { color: Colors.text, fontWeight: '700' },
 
-  balanceCard: {
-    marginHorizontal: 16, marginTop: 16,
-    backgroundColor: '#F8F9FA', borderRadius: 14, padding: 18,
-  },
-  balanceLabel: { fontSize: 13, color: '#8E8E93' },
-  balanceValue: { fontSize: 24, fontWeight: '700', color: '#191919', fontFamily: 'Courier', marginTop: 4 },
-  balanceBtns: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  balanceBtn: {
-    flex: 1, backgroundColor: '#FFFFFF', borderRadius: 10,
-    paddingVertical: 10, alignItems: 'center',
-    borderWidth: 1, borderColor: '#F2F2F7',
-  },
-  balanceBtnPrimary: { backgroundColor: '#0066FF', borderColor: '#0066FF' },
-  balanceBtnText: { fontSize: 13, fontWeight: '600', color: '#191919' },
-  balanceBtnTextPrimary: { fontSize: 13, fontWeight: '600', color: '#FFFFFF' },
+  scrollContent: { paddingBottom: 40 },
 
-  feeBanner: {
-    marginHorizontal: 16, marginTop: 10,
-    backgroundColor: '#FFF8E1', borderRadius: 8, padding: 10,
-  },
-  feeText: { fontSize: 12, color: '#8B6914', textAlign: 'center' },
+  loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  tradeList: { marginHorizontal: 16, marginTop: 12 },
-  tradeRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
+  // Summary Card
+  summaryCard: {
+    margin: 16,
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  summaryBox: {
+    width: '47%',
+    backgroundColor: Colors.bg,
+    borderRadius: 12,
+    padding: 12,
+  },
+  summaryLabel: { fontSize: 12, color: Colors.textSub, marginBottom: 4 },
+  summaryValue: { fontSize: 15, fontWeight: '700' },
+
+  // Date header
+  dateHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 6,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textSub,
+  },
+
+  // Group card
+  groupCard: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+
+  // Transaction row
+  txRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 12,
   },
-  tradeBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
-  tradeName: { fontSize: 14, fontWeight: '600', color: '#191919' },
-  typeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  typeText: { fontSize: 10, fontWeight: '700' },
-  tradeDate: { fontSize: 11, color: '#8E8E93', marginTop: 3 },
-  tradeAmt: { fontSize: 14, fontWeight: '700', fontFamily: 'Courier' },
-  tradeFee: { fontSize: 10, color: '#B0B8C1', marginTop: 2 },
+  txRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconEmoji: { fontSize: 20 },
+  txMiddle: { flex: 1 },
+  txName: { fontSize: 14, fontWeight: '600', color: Colors.text, marginBottom: 3 },
+  txSub: { fontSize: 12, color: Colors.textSub },
+  txRight: { alignItems: 'flex-end', marginRight: 4 },
+  txAmount: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  txTime: { fontSize: 11, color: Colors.textSub },
 
-  emptyBox: { alignItems: 'center', paddingVertical: 60 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#191919' },
-  emptyDesc: { fontSize: 13, color: '#8E8E93', marginTop: 4 },
+  // Empty state
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 64,
+  },
+  emptyEmoji: { fontSize: 44, marginBottom: 12 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  emptyDesc: { fontSize: 13, color: Colors.textSub, marginTop: 4 },
 });

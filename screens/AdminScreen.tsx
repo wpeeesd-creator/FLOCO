@@ -1,375 +1,305 @@
 /**
- * 관리자 화면 — Firestore 기반 유저 관리 · 거래로그 · 데이터 수정
+ * 관리자 대시보드 — 실시간 통계 + 퀵메뉴 + 최근 활동
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  TextInput, Alert, Modal, ActivityIndicator, RefreshControl,
+  RefreshControl, ActivityIndicator, Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  getAllUserProfiles, getAllPortfolios, resetPortfolio,
-  updatePortfolioBalance, deleteUserProfile,
-  type UserProfile, type PortfolioSnapshot,
-} from '../lib/firestoreService';
-import { STOCKS } from '../store/appStore';
-import { Colors, Typography, Badge, Card } from '../components/ui';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, Typography } from '../components/ui';
+import { subscribeGlobalStats, type GlobalStats } from '../lib/adminService';
+import { getAllUserProfiles, getAllPortfolios } from '../lib/firestoreService';
+import { seedCommunityPosts } from '../lib/seedCommunity';
+import { useAuth } from '../context/AuthContext';
 
-type AdminTab = 'users' | 'trades' | 'data';
+// ── 더미 최근 활동 ─────────────────────────────
+const RECENT_ACTIVITIES = [
+  { id: '1', icon: 'person-add', color: '#34C759', text: '새 가입: 홍길동님이 가입했어요', time: '방금 전' },
+  { id: '2', icon: 'trending-up', color: '#FF9500', text: '큰 거래: 김투자님 NVDA 50주 매수', time: '3분 전' },
+  { id: '3', icon: 'warning', color: '#FF3B30', text: '신고 접수: 게시물 신고 1건', time: '12분 전' },
+];
 
-const INITIAL_FUND = 1_000_000;
-
-function calcTotal(snap: PortfolioSnapshot): number {
-  const safeHoldings = snap.holdings ?? [];
-  return safeHoldings.reduce((sum, h) => {
-    const s = STOCKS.find(st => st.ticker === h.ticker);
-    return sum + (s ? (s.price ?? 0) * (h.qty ?? 0) : 0);
-  }, snap.cash ?? 0);
-}
-
-interface UserWithPortfolio {
-  profile: UserProfile;
-  portfolio: PortfolioSnapshot | null;
-}
+// ── 퀵메뉴 항목 ────────────────────────────────
+const QUICK_MENUS = [
+  { emoji: '📊', label: '유저 관리', route: '관리자통계' },
+  { emoji: '📋', label: '거래 로그', route: '거래로그' },
+  { emoji: '📚', label: '학습 통계', route: '학습통계' },
+  { emoji: '🔥', label: '인기 종목', route: '인기종목' },
+  { emoji: '🎉', label: '이벤트 관리', route: '이벤트관리' },
+  { emoji: '🚨', label: '신고 관리', route: '신고관리' },
+] as const;
 
 export default function AdminScreen() {
-  const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState<AdminTab>('users');
-  const [data, setData] = useState<UserWithPortfolio[]>([]);
-  const [loading, setLoading] = useState(true);
+  const navigation = useNavigation<any>();
+  const { user } = useAuth();
+  const [stats, setStats] = useState<GlobalStats | null>(null);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [userCount, setUserCount] = useState(0);
+  const [tradeCount, setTradeCount] = useState(0);
+  const [tradeAmount, setTradeAmount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [editItem, setEditItem] = useState<UserWithPortfolio | null>(null);
-  const [editCash, setEditCash] = useState('');
-  const [tradeFilter, setTradeFilter] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
-      const [profiles, portfolios] = await Promise.all([
+      const [users, portfolios] = await Promise.all([
         getAllUserProfiles(),
         getAllPortfolios(),
       ]);
-      const merged: UserWithPortfolio[] = profiles.map(p => ({
-        profile: p,
-        portfolio: portfolios.find(pf => pf.uid === p.uid) ?? null,
-      }));
-      setData(merged);
+      setUserCount(users.length);
+      const allTrades = portfolios.flatMap(p => p.trades ?? []);
+      setTradeCount(allTrades.length);
+      setTradeAmount(allTrades.reduce((sum, t) => sum + (t.price * t.qty), 0));
     } catch {
-      setData([]);
+      // silent
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const unsub = subscribeGlobalStats(setStats);
+    loadData();
+    return () => unsub();
+  }, []);
 
-  const onRefresh = () => { setRefreshing(true); load(); };
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
 
-  // 모든 거래 합산
-  const allTrades = data.flatMap(d =>
-    (d.portfolio?.trades ?? []).map(t => ({
-      ...t,
-      userName: d.profile.name,
-      userEmail: d.profile.email,
-    }))
-  ).sort((a, b) => b.timestamp - a.timestamp);
-
-  const filteredTrades = tradeFilter
-    ? allTrades.filter(t =>
-        t.userName.includes(tradeFilter) ||
-        t.ticker.toUpperCase().includes(tradeFilter.toUpperCase()) ||
-        t.userEmail.includes(tradeFilter)
-      )
-    : allTrades;
-
-  async function handleSaveBalance() {
-    if (!editItem) return;
-    const val = parseFloat(editCash.replace(/,/g, ''));
-    if (isNaN(val) || val < 0) { Alert.alert('오류', '올바른 금액을 입력해주세요.'); return; }
-    await updatePortfolioBalance(editItem.profile.uid, val);
-    setEditItem(null);
-    Alert.alert('완료', '잔고가 수정되었어요.');
-    load();
-  }
-
-  async function handleReset(item: UserWithPortfolio) {
+  const seedSamplePosts = async () => {
     Alert.alert(
-      '데이터 초기화',
-      `${item.profile.name}님의 데이터를 초기화할까요?\n(초기자금 100만원으로 리셋)`,
+      '샘플 글 생성',
+      '커뮤니티 샘플 글 8개를 생성할까요?\n(1회만 실행하세요)',
       [
         { text: '취소', style: 'cancel' },
         {
-          text: '초기화', style: 'destructive',
+          text: '생성',
           onPress: async () => {
-            await resetPortfolio(item.profile.uid, item.profile.name, item.profile.email);
-            Alert.alert('완료', '초기화되었어요.');
-            load();
-          }
+            try {
+              setIsSeeding(true);
+              await seedCommunityPosts(user!.id);
+              Alert.alert('완료', '샘플 글 생성 완료!');
+            } catch (error) {
+              Alert.alert('오류', '생성 중 오류 발생');
+            } finally {
+              setIsSeeding(false);
+            }
+          },
         },
       ]
     );
-  }
+  };
 
-  async function handleDelete(item: UserWithPortfolio) {
-    Alert.alert(
-      '계정 삭제',
-      `${item.profile.name}님의 계정을 삭제할까요? 되돌릴 수 없어요.`,
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '삭제', style: 'destructive',
-          onPress: async () => {
-            await deleteUserProfile(item.profile.uid);
-            Alert.alert('완료', '삭제되었어요.');
-            load();
-          }
-        },
-      ]
-    );
-  }
+  const statCards = [
+    { emoji: '👥', label: '전체 유저 수', value: `${userCount}명`, color: '#0066FF' },
+    { emoji: '🟢', label: '현재 접속자', value: `${stats?.activeToday ?? 0}명`, color: '#34C759' },
+    { emoji: '📈', label: '오늘 거래 횟수', value: `${stats?.totalTrades ?? tradeCount}건`, color: '#FF9500' },
+    { emoji: '💰', label: '오늘 총 거래금액', value: `₩${Math.round(stats?.totalTradeAmount ?? tradeAmount).toLocaleString()}`, color: '#FF9500' },
+    { emoji: '📚', label: '오늘 학습 완료', value: `${stats?.totalLessonsCompleted ?? 0}건`, color: '#5856D6' },
+    { emoji: '🚨', label: '미처리 신고', value: `${stats?.pendingReports ?? 0}건`, color: '#FF3B30' },
+  ];
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
       {/* 헤더 */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={styles.headerTitle}>관리자 🛡️</Text>
-        <Text style={styles.headerSub}>{data.length}명 등록</Text>
-      </View>
-
-      {/* 탭 */}
-      <View style={styles.tabBar}>
-        {(['users', 'trades', 'data'] as AdminTab[]).map(t => (
-          <TouchableOpacity key={t} style={[styles.tabBtn, tab === t && styles.tabBtnActive]} onPress={() => setTab(t)}>
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'users' ? '사용자' : t === 'trades' ? '거래로그' : '데이터수정'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>관리자 대시보드</Text>
+        <View style={styles.headerBadge}>
+          <Text style={styles.headerBadgeText}>🛡️ Admin</Text>
+        </View>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+        }
       >
-        {/* ── 사용자 탭 ── */}
-        {tab === 'users' && (
-          <View style={styles.section}>
-            {data.map(item => {
-              const snap = item.portfolio;
-              const total = snap ? calcTotal(snap) : INITIAL_FUND;
-              const returnRate = ((total - INITIAL_FUND) / INITIAL_FUND) * 100;
-              return (
-                <Card key={item.profile.uid} style={styles.userCard}>
-                  <View style={styles.userTop}>
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>{item.profile.name[0]?.toUpperCase() ?? '?'}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                        <Text style={[Typography.body1, { fontWeight: '700' }]}>{item.profile.name}</Text>
-                        <Badge
-                          label={item.profile.role === 'admin' ? '관리자' : '일반'}
-                          type={item.profile.role === 'admin' ? 'warning' : 'default'}
-                          size="sm"
-                        />
-                      </View>
-                      <Text style={Typography.caption}>{item.profile.email}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.statRow}>
-                    <Stat label="총 자산" value={`₩${Math.round(total).toLocaleString()}`} />
-                    <Stat label="수익률" value={`${returnRate >= 0 ? '+' : ''}${returnRate.toFixed(2)}%`} color={returnRate >= 0 ? Colors.green : Colors.red} />
-                    <Stat label="거래" value={`${snap?.trades.length ?? 0}건`} />
-                  </View>
-                  <View style={styles.actions}>
-                    <TouchableOpacity style={styles.actionBtn} onPress={() => { setEditItem(item); setEditCash(String(Math.round(snap?.cash ?? INITIAL_FUND))); }}>
-                      <Text style={styles.actionBtnText}>💰 잔고</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FFF3E0' }]} onPress={() => handleReset(item)}>
-                      <Text style={[styles.actionBtnText, { color: Colors.gold }]}>🔄 초기화</Text>
-                    </TouchableOpacity>
-                    {item.profile.role !== 'admin' && (
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FFF0F0' }]} onPress={() => handleDelete(item)}>
-                        <Text style={[styles.actionBtnText, { color: Colors.red }]}>🗑️ 삭제</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </Card>
-              );
-            })}
-            {data.length === 0 && <EmptyState icon="👥" text="등록된 사용자가 없어요" />}
-          </View>
-        )}
-
-        {/* ── 거래로그 탭 ── */}
-        {tab === 'trades' && (
-          <View style={styles.section}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="이름 · 티커 · 이메일 검색"
-              value={tradeFilter}
-              onChangeText={setTradeFilter}
-            />
-            {filteredTrades.map((t, i) => {
-              const stock = STOCKS.find(s => s.ticker === t.ticker);
-              const total = t.price * t.qty;
-              return (
-                <Card key={`${t.id}-${i}`} style={{ padding: 12 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[Typography.body2, { fontWeight: '700' }]}>{t.userName} · {t.ticker}</Text>
-                      <Text style={Typography.caption}>{new Date(t.timestamp).toLocaleString('ko-KR')}</Text>
-                    </View>
-                    <Badge label={t.type === 'buy' ? '매수' : '매도'} type={t.type === 'buy' ? 'success' : 'danger'} size="sm" />
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={Typography.caption}>{t.qty}주 × {stock?.krw ? `₩${t.price.toLocaleString()}` : `$${t.price.toFixed(2)}`}</Text>
-                    <Text style={[Typography.body2, { fontWeight: '700', color: t.type === 'buy' ? Colors.red : Colors.green }]}>
-                      {t.type === 'buy' ? '-' : '+'}{stock?.krw ? `₩${Math.round(total).toLocaleString()}` : `$${total.toFixed(2)}`}
-                    </Text>
-                  </View>
-                </Card>
-              );
-            })}
-            {filteredTrades.length === 0 && <EmptyState icon="📋" text="거래 내역이 없어요" />}
-          </View>
-        )}
-
-        {/* ── 데이터수정 탭 ── */}
-        {tab === 'data' && (
-          <View style={styles.section}>
-            <Card style={{ padding: 16, gap: 12 }}>
-              <Text style={Typography.h3}>전체 통계</Text>
-              <View style={styles.statGrid}>
-                <Stat label="총 참가자" value={`${data.length}명`} />
-                <Stat label="총 거래" value={`${allTrades.length}건`} />
-                <Stat label="매수" value={`${allTrades.filter(t => t.type === 'buy').length}건`} />
-                <Stat label="매도" value={`${allTrades.filter(t => t.type === 'sell').length}건`} />
-              </View>
-            </Card>
-
-            <Card style={{ padding: 16, borderWidth: 1.5, borderColor: Colors.red }}>
-              <Text style={[Typography.h3, { color: Colors.red, marginBottom: 4 }]}>⚠️ 전체 데이터 초기화</Text>
-              <Text style={[Typography.caption, { marginBottom: 12 }]}>모든 참가자를 초기자금 100만원으로 리셋합니다.</Text>
-              <TouchableOpacity
-                style={{ backgroundColor: Colors.red, borderRadius: 10, paddingVertical: 12, alignItems: 'center' }}
-                onPress={() =>
-                  Alert.alert('전체 초기화', '모든 참가자 데이터를 초기화할까요?', [
-                    { text: '취소', style: 'cancel' },
-                    {
-                      text: '전체 초기화', style: 'destructive',
-                      onPress: async () => {
-                        await Promise.all(data.map(d => resetPortfolio(d.profile.uid, d.profile.name, d.profile.email)));
-                        Alert.alert('완료', '전체 데이터가 초기화되었어요.');
-                        load();
-                      }
-                    },
-                  ])
-                }
-              >
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>전체 초기화</Text>
-              </TouchableOpacity>
-            </Card>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* 잔고 수정 모달 */}
-      <Modal visible={!!editItem} transparent animationType="slide" onRequestClose={() => setEditItem(null)}>
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setEditItem(null)}>
-          <View style={styles.sheet} onStartShouldSetResponder={() => true}>
-            <Text style={[Typography.h3, { marginBottom: 6 }]}>잔고 수정</Text>
-            <Text style={[Typography.caption, { marginBottom: 14 }]}>{editItem?.profile.name}</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={editCash}
-              onChangeText={setEditCash}
-              keyboardType="numeric"
-              placeholder="금액 입력 (원)"
-            />
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#EEF2F7' }]} onPress={() => setEditItem(null)}>
-                <Text style={{ fontWeight: '700', color: Colors.textSub }}>취소</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: Colors.primary, flex: 2 }]} onPress={handleSaveBalance}>
-                <Text style={{ fontWeight: '700', color: '#fff' }}>저장</Text>
-              </TouchableOpacity>
+        {/* 통계 그리드 */}
+        <Text style={styles.sectionTitle}>실시간 통계</Text>
+        <View style={styles.statsGrid}>
+          {statCards.map((card) => (
+            <View key={card.label} style={[styles.statCard, { borderLeftColor: card.color }]}>
+              <Text style={styles.statEmoji}>{card.emoji}</Text>
+              <Text style={[styles.statValue, { color: card.color }]}>{card.value}</Text>
+              <Text style={styles.statLabel}>{card.label}</Text>
             </View>
-          </View>
+          ))}
+        </View>
+
+        {/* 퀵 메뉴 */}
+        <Text style={styles.sectionTitle}>빠른 메뉴</Text>
+        <View style={styles.quickGrid}>
+          {QUICK_MENUS.map((menu) => (
+            <TouchableOpacity
+              key={menu.route}
+              style={styles.quickCard}
+              onPress={() => navigation.navigate(menu.route)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.quickEmoji}>{menu.emoji}</Text>
+              <Text style={styles.quickLabel}>{menu.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* 최근 활동 피드 */}
+        <Text style={styles.sectionTitle}>최근 활동</Text>
+        <View style={styles.activityCard}>
+          {RECENT_ACTIVITIES.map((item, index) => (
+            <View key={item.id}>
+              <View style={styles.activityRow}>
+                <View style={[styles.activityIcon, { backgroundColor: item.color + '20' }]}>
+                  <Ionicons name={item.icon as any} size={16} color={item.color} />
+                </View>
+                <Text style={styles.activityText} numberOfLines={1}>{item.text}</Text>
+                <Text style={styles.activityTime}>{item.time}</Text>
+              </View>
+              {index < RECENT_ACTIVITIES.length - 1 && <View style={styles.activityDivider} />}
+            </View>
+          ))}
+        </View>
+
+        {/* 커뮤니티 샘플 글 생성 */}
+        <TouchableOpacity
+          onPress={seedSamplePosts}
+          disabled={isSeeding}
+          style={{
+            backgroundColor: isSeeding ? '#A0D8A8' : '#34C759',
+            borderRadius: 12,
+            padding: 16,
+            marginTop: 16,
+            alignItems: 'center',
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>
+            {isSeeding ? '생성 중...' : '💬 커뮤니티 샘플 글 생성 (1회만)'}
+          </Text>
         </TouchableOpacity>
-      </Modal>
-    </View>
-  );
-}
-
-function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ fontSize: 10, color: Colors.textSub }}>{label}</Text>
-      <Text style={{ fontSize: 13, fontWeight: '700', color: color ?? Colors.text, marginTop: 2 }}>{value}</Text>
-    </View>
-  );
-}
-
-function EmptyState({ icon, text }: { icon: string; text: string }) {
-  return (
-    <View style={{ alignItems: 'center', paddingVertical: 50, gap: 8 }}>
-      <Text style={{ fontSize: 40 }}>{icon}</Text>
-      <Text style={{ fontSize: 15, color: Colors.textSub, fontWeight: '500' }}>{text}</Text>
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  safeArea: { flex: 1, backgroundColor: Colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
-    paddingHorizontal: 16, paddingBottom: 14,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: Colors.border,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
   headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.text },
-  headerSub: { fontSize: 13, color: Colors.textSub },
-  tabBar: {
-    flexDirection: 'row', backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: Colors.border, paddingHorizontal: 16,
+  headerBadge: {
+    backgroundColor: '#EAF4FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
-  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabBtnActive: { borderBottomWidth: 2.5, borderBottomColor: Colors.primary },
-  tabText: { fontSize: 13, fontWeight: '600', color: Colors.textSub },
-  tabTextActive: { color: Colors.primary },
-  section: { padding: 16, gap: 10 },
-  userCard: { padding: 14, gap: 10 },
-  userTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  statRow: { flexDirection: 'row', backgroundColor: Colors.bg, borderRadius: 8, padding: 10 },
-  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  actions: { flexDirection: 'row', gap: 8 },
-  actionBtn: { flex: 1, backgroundColor: '#EAF4FF', borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
-  actionBtnText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
-  searchInput: {
-    backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: 14, borderWidth: 1, borderColor: Colors.border,
+  headerBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
+  scrollContent: { padding: 16, paddingBottom: 40 },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 10,
+    marginTop: 8,
   },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: 24, paddingBottom: 44, gap: 12,
+  // Stats grid
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
   },
-  modalInput: {
-    backgroundColor: Colors.bg, borderRadius: 10, padding: 14,
-    fontSize: 15, borderWidth: 1, borderColor: Colors.border,
+  statCard: {
+    width: '47%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  modalBtn: { flex: 1, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  statEmoji: { fontSize: 22, marginBottom: 6 },
+  statValue: { fontSize: 20, fontWeight: '700', marginBottom: 2 },
+  statLabel: { fontSize: 11, color: Colors.textSub, fontWeight: '500' },
+  // Quick menu grid
+  quickGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+  },
+  quickCard: {
+    width: '30%',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  quickEmoji: { fontSize: 24 },
+  quickLabel: { fontSize: 11, fontWeight: '600', color: Colors.text, textAlign: 'center' },
+  // Activity feed
+  activityCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  activityIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityText: { flex: 1, fontSize: 13, color: Colors.text, fontWeight: '500' },
+  activityTime: { fontSize: 11, color: Colors.textSub },
+  activityDivider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 14 },
 });
