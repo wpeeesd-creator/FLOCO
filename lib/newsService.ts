@@ -1,14 +1,10 @@
 /**
- * 뉴스 서비스 — GNews API 기반 미국/한국 실시간 뉴스
- * - GNews API 사용 (EXPO_PUBLIC_NEWS_API_KEY)
- * - 실패 시 항상 더미 뉴스 표시 (빈 화면 방지)
- * - 타임아웃 10초 적용
+ * 뉴스 서비스 — Yahoo Finance RSS + GNews API + 더미 fallback
  */
 
-import { fetchWithTimeout } from './errorHandler';
+import { Alert } from 'react-native';
 
-const GNEWS_API_KEY = process.env.EXPO_PUBLIC_NEWS_API_KEY ?? '';
-
+// ── 타입 ──────────────────────────────────────
 export interface NewsItem {
   id: string;
   title: string;
@@ -20,151 +16,251 @@ export interface NewsItem {
   country: 'US' | 'KR';
 }
 
-// ── 한국 주식 뉴스 (GNews ko) ──────────────────
-
-export async function fetchKRNews(): Promise<NewsItem[]> {
+// ── XML 파싱 ──────────────────────────────────
+const parseXML = (xml: string, country: 'KR' | 'US'): NewsItem[] => {
   try {
-    if (!GNEWS_API_KEY || GNEWS_API_KEY === 'dummy') {
-      return KR_DUMMY_NEWS;
-    }
+    const items = xml.match(/<item>([\s\S]*?)<\/item>/g) ?? [];
+    return items.map((item, i) => {
+      const title = (
+        item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] ??
+        item.match(/<title>(.*?)<\/title>/)?.[1] ?? ''
+      ).replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
 
-    const res = await fetchWithTimeout(
-      `https://gnews.io/api/v4/search?q=${encodeURIComponent('주식 증권 경제')}&lang=ko&max=10&apikey=${GNEWS_API_KEY}`,
-      undefined,
-      10000,
-    );
-    const data = await res.json();
+      const link = (
+        item.match(/<link>(.*?)<\/link>/)?.[1] ??
+        item.match(/<guid[^>]*>(.*?)<\/guid>/)?.[1] ?? ''
+      ).trim();
 
-    const articles = (data.articles ?? []).map((a: any) => ({
-      id: a.url,
-      title: a.title ?? '',
-      description: (a.description ?? '').slice(0, 100),
-      source: a.source?.name ?? '국내 뉴스',
-      publishedAt: a.publishedAt,
-      url: a.url,
-      imageUrl: a.image ?? null,
-      country: 'KR' as const,
-    }));
+      const description = (
+        item.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/)?.[1] ??
+        item.match(/<description>(.*?)<\/description>/)?.[1] ?? ''
+      ).replace(/<[^>]+>/g, '').slice(0, 120).trim();
 
-    return articles.length > 0 ? articles : KR_DUMMY_NEWS;
-  } catch (error) {
-    console.error('한국 뉴스 fetch 오류:', error);
-    return KR_DUMMY_NEWS;
-  }
-}
+      const pubDate = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] ?? '';
 
-// ── 미국 주식 뉴스 (GNews en) ──────────────────
-
-export async function fetchUSNews(keyword?: string): Promise<NewsItem[]> {
-  try {
-    if (!GNEWS_API_KEY || GNEWS_API_KEY === 'dummy') {
-      return US_DUMMY_NEWS;
-    }
-
-    const query = keyword ?? 'stock market nasdaq';
-    const res = await fetchWithTimeout(
-      `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&max=10&apikey=${GNEWS_API_KEY}`,
-      undefined,
-      10000,
-    );
-    const data = await res.json();
-
-    const articles = (data.articles ?? []).map((a: any) => ({
-      id: a.url,
-      title: a.title ?? '',
-      description: (a.description ?? '').slice(0, 100),
-      source: a.source?.name ?? 'US News',
-      publishedAt: a.publishedAt,
-      url: a.url,
-      imageUrl: a.image ?? null,
-      country: 'US' as const,
-    }));
-
-    return articles.length > 0 ? articles : US_DUMMY_NEWS;
-  } catch (error) {
-    console.error('미국 뉴스 fetch 오류:', error);
-    return US_DUMMY_NEWS;
-  }
-}
-
-// ── 종목별 뉴스 검색 ──────────────────────────
-
-export async function fetchStockNews(ticker: string, name: string): Promise<NewsItem[]> {
-  try {
-    const [byTicker, byName] = await Promise.all([
-      fetchUSNews(ticker),
-      fetchUSNews(name),
-    ]);
-
-    const combined = [...byTicker, ...byName];
-    const unique = combined.filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i);
-
-    return unique
-      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-      .slice(0, 20);
+      return {
+        id: `yahoo-${country}-${i}-${Date.now()}`,
+        title,
+        description,
+        source: country === 'KR' ? '야후 파이낸스' : 'Yahoo Finance',
+        publishedAt: pubDate
+          ? new Date(pubDate).toISOString()
+          : new Date().toISOString(),
+        url: link || null,
+        imageUrl: null,
+        country,
+      };
+    }).filter(n => n.title && n.title.length > 5);
   } catch {
     return [];
   }
+};
+
+// ── 더미 뉴스 (모든 소스 실패 시) ──────────────
+const DUMMY_NEWS: NewsItem[] = [
+  { id: '1', title: '코스피 외국인 순매수 지속... 반등 기대', description: '외국인 투자자 매수세 유입으로 지수 반등', source: 'FLOCO 뉴스', publishedAt: new Date().toISOString(), url: null, imageUrl: null, country: 'KR' },
+  { id: '2', title: '삼성전자, AI 반도체 수요 급증으로 실적 개선', description: '2분기 영업이익 컨센서스 상향 조정', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 3600000).toISOString(), url: null, imageUrl: null, country: 'KR' },
+  { id: '3', title: 'NVIDIA, 데이터센터 매출 분기 최대 경신', description: 'AI 인프라 투자 확대로 수요 지속', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 7200000).toISOString(), url: null, imageUrl: null, country: 'US' },
+  { id: '4', title: '미국 연준 금리 동결... 연내 인하 기대', description: '인플레이션 둔화 확인 후 검토', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 10800000).toISOString(), url: null, imageUrl: null, country: 'US' },
+  { id: '5', title: 'SK하이닉스, HBM 수요 폭발로 최대 실적', description: 'AI 메모리 시장 선점으로 수익성 개선', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 14400000).toISOString(), url: null, imageUrl: null, country: 'KR' },
+];
+
+// ── 한국 뉴스 ──────────────────────────────────
+export async function fetchKRNews(): Promise<NewsItem[]> {
+  try {
+    const xml = await fetch(
+      'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^KS11,^KQ11&region=KR&lang=ko-KR',
+      { headers: { 'User-Agent': 'Mozilla/5.0' } },
+    ).then(r => r.text());
+    const items = parseXML(xml, 'KR');
+    if (items.length > 0) return items;
+  } catch {}
+  return DUMMY_NEWS.filter(n => n.country === 'KR');
 }
 
-// ── 통합 뉴스 (미국 + 한국) ──────────────────
+// ── 미국 뉴스 ──────────────────────────────────
+export async function fetchUSNews(): Promise<NewsItem[]> {
+  try {
+    const xml = await fetch(
+      'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC,^IXIC&region=US&lang=en-US',
+      { headers: { 'User-Agent': 'Mozilla/5.0' } },
+    ).then(r => r.text());
+    const items = parseXML(xml, 'US');
+    if (items.length > 0) return items;
+  } catch {}
+  return DUMMY_NEWS.filter(n => n.country === 'US');
+}
 
+// ── 종목별 뉴스 ────────────────────────────────
+export async function fetchStockNews(ticker: string, name: string): Promise<NewsItem[]> {
+  // Yahoo Finance RSS (종목)
+  try {
+    const yahooTicker = ticker.length === 6 && /^\d+$/.test(ticker)
+      ? `${ticker}.KS`
+      : ticker;
+    const xml = await fetch(
+      `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${yahooTicker}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' } },
+    ).then(r => r.text());
+    const country = ticker.length === 6 && /^\d+$/.test(ticker) ? 'KR' : 'US';
+    const items = parseXML(xml, country);
+    if (items.length > 0) return items;
+  } catch {}
+
+  // GNews fallback
+  try {
+    const GNEWS_KEY = process.env.EXPO_PUBLIC_NEWS_API_KEY;
+    if (GNEWS_KEY && GNEWS_KEY !== 'dummy' && GNEWS_KEY !== '') {
+      const res = await fetch(
+        `https://gnews.io/api/v4/search?q=${encodeURIComponent(name)}&lang=ko&max=5&apikey=${GNEWS_KEY}`,
+        { signal: AbortSignal.timeout(5000) },
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const articles = (data.articles ?? [])
+          .map((a: any, i: number) => ({
+            id: `stock-${ticker}-${i}`,
+            title: a.title ?? '',
+            description: (a.description ?? '').slice(0, 120),
+            source: a.source?.name ?? '뉴스',
+            publishedAt: a.publishedAt,
+            url: a.url,
+            imageUrl: a.image ?? null,
+            country: 'KR' as const,
+          }))
+          .filter((n: any) => n.title && n.url);
+        if (articles.length > 0) return articles;
+      }
+    }
+  } catch {}
+
+  return [];
+}
+
+// ── 통합 뉴스 (Yahoo RSS → GNews → 더미 fallback) ──
 export async function fetchAllNews(): Promise<NewsItem[]> {
   try {
-    if (!GNEWS_API_KEY || GNEWS_API_KEY === 'dummy') {
-      return DUMMY_NEWS;
-    }
+    const results = await Promise.allSettled([
+      // Yahoo Finance 한국 시장
+      fetch(
+        'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^KS11,^KQ11&region=KR&lang=ko-KR',
+        { headers: { 'User-Agent': 'Mozilla/5.0' } },
+      ).then(r => r.text()).then(xml => parseXML(xml, 'KR')).catch(() => []),
 
-    const [krRes, usRes] = await Promise.all([
-      fetchWithTimeout(
-        `https://gnews.io/api/v4/search?q=${encodeURIComponent('주식 증권 경제')}&lang=ko&max=10&apikey=${GNEWS_API_KEY}`,
-        undefined,
-        10000,
-      ),
-      fetchWithTimeout(
-        `https://gnews.io/api/v4/search?q=${encodeURIComponent('stock market nasdaq')}&lang=en&max=10&apikey=${GNEWS_API_KEY}`,
-        undefined,
-        10000,
-      ),
+      // Yahoo Finance 미국 시장
+      fetch(
+        'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC,^IXIC&region=US&lang=en-US',
+        { headers: { 'User-Agent': 'Mozilla/5.0' } },
+      ).then(r => r.text()).then(xml => parseXML(xml, 'US')).catch(() => []),
+
+      // Yahoo Finance 삼성전자
+      fetch(
+        'https://feeds.finance.yahoo.com/rss/2.0/headline?s=005930.KS',
+        { headers: { 'User-Agent': 'Mozilla/5.0' } },
+      ).then(r => r.text()).then(xml => parseXML(xml, 'KR')).catch(() => []),
+
+      // Yahoo Finance 주요 미국 종목
+      fetch(
+        'https://feeds.finance.yahoo.com/rss/2.0/headline?s=NVDA,AAPL,TSLA',
+        { headers: { 'User-Agent': 'Mozilla/5.0' } },
+      ).then(r => r.text()).then(xml => parseXML(xml, 'US')).catch(() => []),
     ]);
 
-    const [krData, usData] = await Promise.all([krRes.json(), usRes.json()]);
+    const allNews: NewsItem[] = [];
+    results.forEach(r => {
+      if (r.status === 'fulfilled') {
+        allNews.push(...r.value);
+      }
+    });
 
-    const krNews: NewsItem[] = (krData.articles ?? []).map((a: any) => ({
-      id: a.url,
-      title: a.title ?? '',
-      description: (a.description ?? '').slice(0, 100),
-      source: a.source?.name ?? '국내 뉴스',
-      publishedAt: a.publishedAt,
-      url: a.url,
-      imageUrl: a.image ?? null,
-      country: 'KR' as const,
-    }));
+    // GNews도 시도
+    const GNEWS_KEY = process.env.EXPO_PUBLIC_NEWS_API_KEY;
+    if (GNEWS_KEY && GNEWS_KEY !== 'dummy' && GNEWS_KEY !== '') {
+      try {
+        const [kr, us] = await Promise.allSettled([
+          fetch(
+            `https://gnews.io/api/v4/search?q=주식+코스피+증권&lang=ko&max=10&apikey=${GNEWS_KEY}`,
+            { signal: AbortSignal.timeout(5000) },
+          ).then(r => r.json()),
+          fetch(
+            `https://gnews.io/api/v4/search?q=stock+market+nasdaq+nyse&lang=en&max=10&apikey=${GNEWS_KEY}`,
+            { signal: AbortSignal.timeout(5000) },
+          ).then(r => r.json()),
+        ]);
 
-    const usNews: NewsItem[] = (usData.articles ?? []).map((a: any) => ({
-      id: a.url,
-      title: a.title ?? '',
-      description: (a.description ?? '').slice(0, 100),
-      source: a.source?.name ?? 'US News',
-      publishedAt: a.publishedAt,
-      url: a.url,
-      imageUrl: a.image ?? null,
-      country: 'US' as const,
-    }));
+        if (kr.status === 'fulfilled') {
+          allNews.push(
+            ...(kr.value.articles ?? []).map((a: any) => ({
+              id: a.url,
+              title: a.title ?? '',
+              description: (a.description ?? '').slice(0, 120),
+              source: a.source?.name ?? '뉴스',
+              publishedAt: a.publishedAt,
+              url: a.url,
+              imageUrl: a.image ?? null,
+              country: 'KR' as const,
+            })).filter((n: any) => n.title && n.url),
+          );
+        }
 
-    const combined = [...krNews, ...usNews].sort(
-      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+        if (us.status === 'fulfilled') {
+          allNews.push(
+            ...(us.value.articles ?? []).map((a: any) => ({
+              id: a.url,
+              title: a.title ?? '',
+              description: (a.description ?? '').slice(0, 120),
+              source: a.source?.name ?? 'News',
+              publishedAt: a.publishedAt,
+              url: a.url,
+              imageUrl: a.image ?? null,
+              country: 'US' as const,
+            })).filter((n: any) => n.title && n.url),
+          );
+        }
+      } catch {}
+    }
+
+    // 중복 제거
+    const unique = Array.from(
+      new Map(allNews.map(n => [n.title, n])).values(),
     );
 
-    return combined.length > 0 ? combined : DUMMY_NEWS;
-  } catch (error) {
-    console.error('뉴스 로드 오류:', error);
+    // 국내+해외 번갈아 섞기
+    const kr = unique.filter(n => n.country === 'KR').sort((a, b) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+    );
+    const us = unique.filter(n => n.country === 'US').sort((a, b) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+    );
+    const interleaved: NewsItem[] = [];
+    const maxLen = Math.max(kr.length, us.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (i < kr.length) interleaved.push(kr[i]);
+      if (i < us.length) interleaved.push(us[i]);
+    }
+
+    console.log(`✅ 뉴스 로드: ${interleaved.length}개`);
+    return interleaved.length > 0 ? interleaved : DUMMY_NEWS;
+
+  } catch (e) {
+    console.error('뉴스 오류:', e);
     return DUMMY_NEWS;
   }
 }
 
-// ── 시간 포맷 ──────────────────────────────
+// ── 뉴스 클릭 핸들러 (WebView로 열기) ──────────
+export function handleNewsPress(news: NewsItem, navigation: any): void {
+  if (!news.url) {
+    Alert.alert(news.title, news.description || '내용 없음', [{ text: '확인' }]);
+    return;
+  }
+  navigation.navigate('WebView', {
+    url: news.url,
+    title: news.title,
+  });
+}
 
+// ── 시간 포맷 ──────────────────────────────────
 export function formatNewsTime(dateString: string): string {
   try {
     const date = new Date(dateString);
@@ -181,23 +277,3 @@ export function formatNewsTime(dateString: string): string {
     return dateString;
   }
 }
-
-// ── 더미 데이터 (API 실패/키 없을 때 항상 표시) ──
-
-const KR_DUMMY_NEWS: NewsItem[] = [
-  { id: 'kr1', title: '삼성전자, 3분기 영업이익 9조원 달성', description: '반도체 업황 개선으로 실적 회복세', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 3600000).toISOString(), url: null, imageUrl: null, country: 'KR' },
-  { id: 'kr2', title: 'SK하이닉스, HBM 수주 확대로 목표가 상향', description: '글로벌 AI 수요 증가로 고대역폭메모리 주문 급증', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 7200000).toISOString(), url: null, imageUrl: null, country: 'KR' },
-  { id: 'kr3', title: '코스피, 2,600선 회복 시도…외국인 매수세 유입', description: '미국 증시 강세 영향으로 국내 증시도 상승 출발', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 10800000).toISOString(), url: null, imageUrl: null, country: 'KR' },
-  { id: 'kr4', title: '카카오, 플랫폼 사업 정상화 본격화', description: '규제 리스크 완화로 주가 반등 기대', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 14400000).toISOString(), url: null, imageUrl: null, country: 'KR' },
-  { id: 'kr5', title: '현대차, 전기차 라인업 확대로 글로벌 경쟁력 강화', description: '2025년 신규 전기차 5개 모델 출시 계획', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 18000000).toISOString(), url: null, imageUrl: null, country: 'KR' },
-];
-
-const US_DUMMY_NEWS: NewsItem[] = [
-  { id: 'us1', title: 'NVIDIA, AI 칩 수요 급증으로 주가 신고가', description: '데이터센터 수요 확대로 실적 전망 밝아', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 3600000).toISOString(), url: null, imageUrl: null, country: 'US' },
-  { id: 'us2', title: 'Apple, 새로운 AI 기능 아이폰에 탑재', description: 'Apple Intelligence로 생성형 AI를 모든 아이폰 사용자에게 제공', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 7200000).toISOString(), url: null, imageUrl: null, country: 'US' },
-  { id: 'us3', title: '미국 연준 금리 동결... 시장 반응은?', description: '인플레이션 둔화로 연내 인하 기대감', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 10800000).toISOString(), url: null, imageUrl: null, country: 'US' },
-  { id: 'us4', title: '테슬라, 신형 모델 출시로 판매량 급증', description: '전기차 시장 회복세 속 점유율 확대', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 14400000).toISOString(), url: null, imageUrl: null, country: 'US' },
-  { id: 'us5', title: 'Microsoft, OpenAI와 파트너십 확대', description: 'Azure 클라우드 인프라에 대규모 투자 발표', source: 'FLOCO 뉴스', publishedAt: new Date(Date.now() - 18000000).toISOString(), url: null, imageUrl: null, country: 'US' },
-];
-
-const DUMMY_NEWS: NewsItem[] = [...KR_DUMMY_NEWS, ...US_DUMMY_NEWS];

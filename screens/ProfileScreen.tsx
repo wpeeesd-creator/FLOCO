@@ -16,8 +16,10 @@ import * as SecureStore from 'expo-secure-store';
 import { db } from '../lib/firebase';
 import { useAppStore } from '../store/appStore';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../components/ui';
 import { BADGE_DEFINITIONS } from './BadgeScreen';
+import { fetchMultiplePrices, calculateProfit } from '../utils/priceService';
 
 // Inline type — do NOT import from lib/investmentAnalysis
 interface InvestmentType {
@@ -53,6 +55,8 @@ export default function ProfileScreen() {
   const [schoolInfo, setSchoolInfo] = useState<{ name: string; grade: string; classNum: string } | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [realNameVerified, setRealNameVerified] = useState(false);
+  const [portfolioPrices, setPortfolioPrices] = useState<Record<string, any>>({});
+  const { theme, isDark, toggleTheme } = useTheme();
 
   // ── Firestore: user profile + investment type (realtime) ──────────────
   useEffect(() => {
@@ -95,13 +99,28 @@ export default function ProfileScreen() {
       .catch(() => {});
   }, [currentUser?.id, isFocused]);
 
+  // ── 보유 종목 실시간 가격 ─────────────────────────────────────────────
+  useEffect(() => {
+    const safeH = holdings ?? [];
+    if (safeH.length === 0) return;
+    const stocks = safeH.map(h => ({
+      ticker: h.ticker,
+      isKR: h.ticker.length === 6 && /^\d+$/.test(h.ticker),
+    }));
+    fetchMultiplePrices(stocks).then(setPortfolioPrices).catch(() => {});
+  }, [(holdings ?? []).length, isFocused]);
+
   // ── Computed values ───────────────────────────────────────────────────
-  const totalValue = getTotalValue?.() ?? 1_000_000;
   const balance = cash ?? 1_000_000;
-  const returnRate = getReturnRate?.() ?? 0;
-  const profit = totalValue - 1_000_000;
+  const safeHoldingsForCalc = holdings ?? [];
+  const portfolioValue = safeHoldingsForCalc.reduce((sum, h) => {
+    const livePrice = portfolioPrices[h.ticker]?.price;
+    const fallbackPrice = h.avgPrice ?? 0;
+    return sum + (livePrice ?? fallbackPrice) * (h.qty ?? 0);
+  }, 0);
+  const totalValue = balance + portfolioValue;
+  const { profit, profitRate: returnRate } = calculateProfit(totalValue, 1_000_000);
   const isUp = profit >= 0;
-  const portfolioValue = totalValue - balance;
   const safeTrades = trades ?? [];
   const buyCount = safeTrades.filter((t) => t.type === 'buy').length;
   const sellCount = safeTrades.filter((t) => t.type === 'sell').length;
@@ -315,6 +334,41 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* ── 다크모드 토글 ──────────────────────────────── */}
+        <TouchableOpacity
+          onPress={toggleTheme}
+          style={[styles.card, { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 }]}
+          activeOpacity={0.7}
+        >
+          <View style={{
+            width: 40, height: 40, borderRadius: 12,
+            backgroundColor: isDark ? '#1A1A3A' : '#FFF9E6',
+            justifyContent: 'center', alignItems: 'center', marginRight: 12,
+          }}>
+            <Text style={{ fontSize: 20 }}>{isDark ? '🌙' : '☀️'}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.text }}>
+              {isDark ? '다크 모드' : '라이트 모드'}
+            </Text>
+            <Text style={{ fontSize: 12, color: Colors.textSub, marginTop: 2 }}>
+              {isDark ? '밝은 화면으로 전환' : '어두운 화면으로 전환'}
+            </Text>
+          </View>
+          <View style={{
+            width: 51, height: 31, borderRadius: 15.5,
+            backgroundColor: isDark ? Colors.primary : Colors.border,
+            justifyContent: 'center', paddingHorizontal: 2,
+          }}>
+            <View style={{
+              width: 27, height: 27, borderRadius: 13.5,
+              backgroundColor: '#FFFFFF',
+              alignSelf: isDark ? 'flex-end' : 'flex-start',
+              elevation: 3,
+            }} />
+          </View>
+        </TouchableOpacity>
 
         {/* ── 자산 현황 카드 ───────────────────────────── */}
         <View style={styles.card}>

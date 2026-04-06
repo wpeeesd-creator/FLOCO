@@ -87,14 +87,7 @@ const STREAK_MILESTONE = 7;
 
 // ── 데이터 ──────────────────────────────
 
-function applyRandomVariation(price: number): number {
-  const variation = (Math.random() - 0.48) * 0.06; // -3% ~ +3%
-  return Math.round(price * (1 + variation));
-}
-
-function applyRandomChange(): number {
-  return parseFloat(((Math.random() - 0.48) * 6).toFixed(2));
-}
+// 참고: STOCKS의 가격은 초기 fallback용 (Yahoo Finance 실시간 가격 로드 전까지만 표시)
 
 export const STOCKS: Stock[] = [
   // ── 미국 기술 ──
@@ -253,11 +246,7 @@ export const STOCKS: Stock[] = [
   { ticker: 'VZ',    name: '버라이즌',         market: '미국', price: 42.30,  change: -0.3,  logo: '📶', krw: false, sector: '통신' },
 ];
 
-// Apply random price variation on each app start
-STOCKS.forEach(s => {
-  s.price = s.krw ? applyRandomVariation(s.price) : parseFloat((s.price * (1 + (Math.random() - 0.48) * 0.06)).toFixed(2));
-  s.change = applyRandomChange();
-});
+// STOCKS 가격은 Yahoo Finance 실시간 가격 로드 전 fallback으로만 사용됩니다.
 
 export const LESSONS: Lesson[] = [
   {

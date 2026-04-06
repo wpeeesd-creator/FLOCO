@@ -48,14 +48,49 @@ async function fetchOrCreateUser(uid: string, email: string, name: string): Prom
     };
   }
 
-  // 문서 없으면 기본값(role: 'user')으로 생성 + 초대 코드
+  // 문서 없으면 전체 초기 데이터로 생성
   const newUser: User = { id: uid, email, name, role: 'user' };
   await setDoc(ref, {
-    uid, email, name, role: 'user', createdAt: Date.now(),
+    uid,
+    email,
+    name,
+    nickname: name,
+    role: 'user',
+    // 초기 자산 100만원
+    balance: 1_000_000,
+    totalAsset: 1_000_000,
+    initialBalance: 1_000_000,
+    // 빈 배열
+    portfolio: [],
+    transactions: [],
+    wishlist: [],
+    // 학습
+    learning: {
+      completedLessons: [],
+      wrongAnswers: [],
+      streak: 0,
+      totalPoints: 0,
+      lastStudyDate: null,
+      rewardHistory: [],
+    },
+    // 기타
+    subscribedTags: [],
+    notificationsEnabled: false,
+    tutorialCompleted: false,
+    surveyCompleted: false,
+    investmentType: null,
+    school: null,
     inviteCode: uid.slice(0, 6).toUpperCase(),
     invitedBy: null,
     invitedFriends: [],
     inviteReward: 0,
+    profileImage: null,
+    pushToken: null,
+    realNameVerified: false,
+    dailyMissions: {},
+    postCount: 0,
+    totalLikes: 0,
+    createdAt: new Date().toISOString(),
   });
   return newUser;
 }

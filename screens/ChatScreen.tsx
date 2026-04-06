@@ -14,7 +14,7 @@ interface Message {
   content: string;
 }
 
-const SUGGESTED_QUESTIONS = [
+const DEFAULT_QUESTIONS = [
   '이 종목 어때요?',
   'PER이 뭔가요?',
   '차트 어떻게 읽어요?',
@@ -25,7 +25,12 @@ export default function ChatScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const ticker = route.params?.ticker ?? '';
-  const stock = STOCKS.find(s => s.ticker === ticker);
+  const passedStock = route.params?.stock ?? null;
+  const baseStock = STOCKS.find(s => s.ticker === ticker);
+  // 전달받은 stock 객체 우선 사용 (실시간 가격 포함), 없으면 STOCKS에서 조회
+  const stock = passedStock
+    ? { ...baseStock, ...passedStock }
+    : baseStock;
   const stockName = stock?.name ?? ticker;
 
   const { holdings, cash, getTotalValue, getReturnRate } = useAppStore();
@@ -33,10 +38,22 @@ export default function ChatScreen() {
   const ownedQty = holding?.qty ?? 0;
   const avgPrice = holding?.avgPrice ?? 0;
   const evalProfit = ownedQty > 0 && stock ? (stock.price - avgPrice) * ownedQty : 0;
+  const evalProfitRate = ownedQty > 0 && avgPrice > 0
+    ? ((stock?.price ?? 0) - avgPrice) / avgPrice * 100 : 0;
   const totalAsset = getTotalValue?.() ?? 1_000_000;
   const profitRate = getReturnRate?.() ?? 0;
 
   const { isConnected } = useNetworkStatus();
+
+  // 종목별 맞춤 추천 질문
+  const suggestedQuestions = stock
+    ? [
+        `${stock.name} 지금 사도 될까?`,
+        `${stock.name} 어떤 회사야?`,
+        `${stock.name} 목표주가는?`,
+        ownedQty > 0 ? '지금 팔아야 해?' : '이 섹터 전망은?',
+      ]
+    : DEFAULT_QUESTIONS;
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -91,32 +108,34 @@ export default function ChatScreen() {
           system: `당신은 FLOCO 앱의 AI 투자 어시스턴트 "머니몽"입니다.
 청소년 모의투자 앱에서 사용자의 투자를 도와주는 친근한 AI예요.
 
-${stock ? `현재 앱에서 보고 있는 종목 정보 (실시간):
-- 종목명: ${stock.name}
-- 티커: ${ticker}
-- 현재가: ${stock.krw ? `₩${stock.price.toLocaleString()}` : `$${stock.price.toFixed(2)}`}
-- 등락률: ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
-- 섹터: ${stock.sector ?? '기타'}
-- 시장: ${stock.market}
+${stock ? `=== 현재 보고 있는 종목 (실시간 데이터) ===
+종목명: ${stock.name}
+티커: ${ticker}
+현재가: ${stock.krw ? `₩${stock.price.toLocaleString()}` : `$${stock.price.toFixed(2)}`}
+등락률: ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
+섹터: ${stock.sector ?? '기타'}
+시장: ${stock.market}
 
-유저 보유 현황:
-- 보유수량: ${ownedQty}주
-- 평균매수가: ${ownedQty > 0 ? `${Math.round(avgPrice).toLocaleString()}원` : '미보유'}
-- 평가손익: ${ownedQty > 0 ? `${Math.round(evalProfit).toLocaleString()}원` : '해당없음'}` : '종목 미선택 상태'}
+=== 유저 보유 현황 ===
+보유수량: ${ownedQty}주
+${ownedQty > 0 ? `평균매수가: ${Math.round(avgPrice).toLocaleString()}원
+현재 평가손익: ${evalProfit >= 0 ? '+' : ''}${Math.round(evalProfit).toLocaleString()}원 (${evalProfitRate >= 0 ? '+' : ''}${evalProfitRate.toFixed(2)}%)` : '현재 미보유 종목'}` : '종목 미선택 상태'}
 
-유저 투자 현황:
-- 총 자산: ${Math.round(totalAsset).toLocaleString()}원
-- 보유 현금: ${Math.round(cash ?? 1_000_000).toLocaleString()}원
-- 수익률: ${profitRate.toFixed(2)}%
+=== 유저 투자 현황 ===
+총 자산: ${Math.round(totalAsset).toLocaleString()}원
+보유 현금: ${Math.round(cash ?? 1_000_000).toLocaleString()}원
+수익률: ${profitRate.toFixed(2)}%
 
-중요 규칙:
+=== 중요 규칙 ===
 1. 위의 실시간 데이터를 기반으로 답변하세요
-2. 절대 실제 투자를 권유하지 마세요 — "모의투자 앱"임을 인식하세요
-3. 청소년 눈높이에 맞게 쉽고 친근하게 설명해주세요
-4. 답변은 짧고 명확하게 (300자 이내)
-5. 이모지를 적절히 사용해주세요
-6. 주가는 반드시 위에 제공된 현재가를 사용하세요`,
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+2. 주가는 반드시 위에 제공된 현재가를 사용하세요
+3. 절대로 실제 투자를 권유하지 마세요 — "모의투자 앱"임을 항상 인식하세요
+4. 청소년 눈높이에 맞게 쉽고 친근하게 설명해주세요
+5. 답변은 짧고 명확하게 (200자 이내)
+6. 이모지를 적절히 사용해주세요`,
+          messages: newMessages
+            .map(m => ({ role: m.role, content: m.content }))
+            .slice(-10),
         }),
       });
 
@@ -212,10 +231,26 @@ ${stock ? `현재 앱에서 보고 있는 종목 정보 (실시간):
                       {stock.name} 현재가: {stock.krw ? `₩${stock.price.toLocaleString()}` : `$${stock.price.toFixed(2)}`} ({stock.change >= 0 ? '▲' : '▼'}{Math.abs(stock.change).toFixed(2)}%)
                     </Text>
                     <Text style={styles.welcomeDesc}>
-                      {ownedQty > 0
-                        ? `${ownedQty}주 보유 중 · 평균 ${Math.round(avgPrice).toLocaleString()}원`
-                        : '아직 보유하지 않은 종목이에요'}
+                      섹터: {stock.sector ?? '기타'}
                     </Text>
+                    {ownedQty > 0 ? (
+                      <View style={styles.holdingInfoBox}>
+                        <Text style={styles.holdingInfoTitle}>보유 현황</Text>
+                        <Text style={styles.holdingInfoText}>
+                          {ownedQty}주 · 평균 {Math.round(avgPrice).toLocaleString()}원
+                        </Text>
+                        <Text style={[styles.holdingInfoText, {
+                          color: evalProfit >= 0 ? '#F04452' : '#2175F3',
+                          fontWeight: '700',
+                        }]}>
+                          평가손익: {evalProfit >= 0 ? '+' : ''}{Math.round(evalProfit).toLocaleString()}원 ({evalProfitRate >= 0 ? '+' : ''}{evalProfitRate.toFixed(2)}%)
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.welcomeDesc}>
+                        아직 보유하지 않은 종목이에요
+                      </Text>
+                    )}
                   </>
                 ) : (
                   <Text style={styles.welcomeDesc}>
@@ -228,7 +263,7 @@ ${stock ? `현재 앱에서 보고 있는 종목 정보 (실시간):
             {/* Suggested Questions */}
             {showSuggestions && (
               <View style={styles.suggestionsWrap}>
-                {SUGGESTED_QUESTIONS.map((q, i) => (
+                {suggestedQuestions.map((q, i) => (
                   <TouchableOpacity
                     key={i}
                     style={styles.suggestBtn}
@@ -326,6 +361,17 @@ const styles = StyleSheet.create({
   welcomeEmoji: { fontSize: 48, marginBottom: 8 },
   welcomeTitle: { fontSize: 18, fontWeight: '700', color: '#191919', marginBottom: 4 },
   welcomeDesc: { fontSize: 14, color: '#8E8E93', textAlign: 'center' },
+
+  holdingInfoBox: {
+    marginTop: 8, backgroundColor: '#F8F9FA', borderRadius: 10,
+    padding: 10, width: '100%',
+  },
+  holdingInfoTitle: {
+    fontSize: 12, fontWeight: '700', color: '#8E8E93', marginBottom: 4,
+  },
+  holdingInfoText: {
+    fontSize: 13, color: '#191919', lineHeight: 20,
+  },
 
   suggestionsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   suggestBtn: {

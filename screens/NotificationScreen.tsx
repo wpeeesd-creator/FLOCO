@@ -1,206 +1,181 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
-
-interface NotificationItem {
-  id: string;
-  type: 'trade' | 'learning' | 'ranking' | 'event' | 'community';
-  title: string;
-  body: string;
-  time: string;
-  read: boolean;
-  emoji: string;
-}
-
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  { id: '1', type: 'trade', title: '매수 완료', body: '삼성전자 5주 매수 완료!', time: '10분 전', read: false, emoji: '📈' },
-  { id: '2', type: 'learning', title: '학습 보상', body: '캔들차트 읽기 완료! +70,000원 지급', time: '1시간 전', read: false, emoji: '🎓' },
-  { id: '3', type: 'ranking', title: '순위 변동', body: '현재 랭킹 5위예요!', time: '3시간 전', read: true, emoji: '🏆' },
-  { id: '4', type: 'event', title: '이벤트 마감 임박', body: '3월 수익률 챌린지 마감 1일 전!', time: '5시간 전', read: true, emoji: '⏰' },
-  { id: '5', type: 'community', title: '새 댓글', body: '내 게시물에 댓글이 달렸어요', time: '어제', read: true, emoji: '💬' },
-];
 
 export default function NotificationScreen() {
   const navigation = useNavigation<any>();
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState<any[]>([]);
 
-  const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
+  // Firestore 실시간 알림 구독
+  useEffect(() => {
+    if (!user?.id) return;
+    const unsubscribe = onSnapshot(doc(db, 'users', user.id), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        const notifs = Array.isArray(data.notifications)
+          ? [...data.notifications].sort((a: any, b: any) =>
+              new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
+            )
+          : [];
+        setNotifications(notifs);
+      }
+    });
+    return () => unsubscribe();
+  }, [user?.id]);
 
-  const markRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
-  };
+  // 전체 읽음 처리
+  useEffect(() => {
+    if (!user?.id || notifications.length === 0) return;
+    const hasUnread = notifications.some(n => !n.read);
+    if (hasUnread) {
+      const updated = notifications.map(n => ({ ...n, read: true }));
+      updateDoc(doc(db, 'users', user.id), { notifications: updated }).catch(console.error);
+    }
+  }, [notifications.length]);
 
-  const renderItem = ({ item }: { item: NotificationItem }) => (
-    <TouchableOpacity
-      style={[styles.item, { backgroundColor: item.read ? '#FFFFFF' : '#EBF2FF' }]}
-      onPress={() => markRead(item.id)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.avatar}>
-        <Text style={styles.avatarEmoji}>{item.emoji}</Text>
-      </View>
-      <View style={styles.itemCenter}>
-        <Text style={styles.itemTitle}>{item.title}</Text>
-        <Text style={styles.itemBody} numberOfLines={2}>{item.body}</Text>
-        <Text style={styles.itemTime}>{item.time}</Text>
-      </View>
-      {!item.read && <View style={styles.unreadDot} />}
-    </TouchableOpacity>
-  );
-
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyEmoji}>🔔</Text>
-      <Text style={styles.emptyText}>알림이 없어요</Text>
-    </View>
-  );
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
+    <SafeAreaView style={s.safe} edges={['top']}>
+      {/* 헤더 */}
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>알림</Text>
-        <TouchableOpacity
-          style={styles.markAllBtn}
-          onPress={markAllRead}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.markAllText}>모두 읽음</Text>
-        </TouchableOpacity>
+        <Text style={s.headerTitle}>
+          알림
+          {unreadCount > 0 && (
+            <Text style={{ color: Colors.primary }}> ({unreadCount})</Text>
+          )}
+        </Text>
       </View>
 
-      <FlatList
-        data={notifications}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
-        ListEmptyComponent={renderEmpty}
-        contentContainerStyle={notifications.length === 0 ? styles.emptyList : undefined}
-        showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-      />
+      {notifications.length === 0 ? (
+        <View style={s.emptyWrap}>
+          <Text style={{ fontSize: 48 }}>🔔</Text>
+          <Text style={{ color: Colors.textSub, marginTop: 12 }}>
+            알림이 없어요
+          </Text>
+          <Text style={{ color: Colors.textSub, fontSize: 13, marginTop: 8 }}>
+            매수/매도 후 알림이 표시돼요
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={notifications}
+          keyExtractor={(item, i) => item.id ?? i.toString()}
+          renderItem={({ item }) => {
+            const isKR = item.ticker?.length === 6 && /^\d+$/.test(item.ticker);
+            const isBuy = item.tradeType === 'buy';
+
+            return (
+              <TouchableOpacity
+                onPress={() => {
+                  if (item.ticker) {
+                    navigation.navigate('종목상세' as never, { ticker: item.ticker } as never);
+                  }
+                }}
+                style={[s.row, !item.read && s.rowUnread]}
+                activeOpacity={0.7}
+              >
+                {/* 아이콘 */}
+                <View style={[s.iconWrap, {
+                  backgroundColor: item.type === 'trade'
+                    ? (isBuy ? Colors.greenBg : Colors.redBg)
+                    : Colors.goldBg,
+                }]}>
+                  <Text style={{ fontSize: 22 }}>
+                    {item.type === 'trade'
+                      ? (isBuy ? '📈' : '📉')
+                      : item.type === 'reward' ? '🎓' : '🔔'}
+                  </Text>
+                </View>
+
+                {/* 내용 */}
+                <View style={{ flex: 1 }}>
+                  <Text style={s.rowTitle}>{item.title}</Text>
+                  <Text style={s.rowBody}>{item.body}</Text>
+
+                  {/* 거래 상세 */}
+                  {item.type === 'trade' && item.quantity != null && (
+                    <View style={s.tagRow}>
+                      <View style={[s.tag, { backgroundColor: isBuy ? Colors.greenBg : Colors.redBg }]}>
+                        <Text style={[s.tagText, { color: isBuy ? Colors.green : Colors.red }]}>
+                          {isKR ? `${item.quantity}주` : `${item.quantity?.toFixed(4)}주`}
+                        </Text>
+                      </View>
+                      {item.total != null && (
+                        <View style={[s.tag, { backgroundColor: Colors.bg }]}>
+                          <Text style={[s.tagText, { color: Colors.textSub }]}>
+                            {isKR
+                              ? `${Math.round(item.total).toLocaleString()}원`
+                              : `$${item.total.toFixed(2)}`}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  <Text style={s.rowTime}>
+                    {new Date(item.createdAt).toLocaleString('ko-KR', {
+                      month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                    })}
+                  </Text>
+                </View>
+
+                {/* 읽지 않음 표시 */}
+                {!item.read && <View style={s.unreadDot} />}
+              </TouchableOpacity>
+            );
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
-
-  // Header
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: Colors.bg },
   header: {
+    backgroundColor: Colors.card,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.bg,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  backBtn: {
-    padding: 4,
-    marginRight: 4,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  markAllBtn: {
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-  },
-  markAllText: {
-    fontSize: 14,
-    color: Colors.primary,
-    fontWeight: '500',
-  },
-
-  // List item
-  item: {
+  backBtn: { padding: 4, marginRight: 4 },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text, flex: 1 },
+  emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { color: Colors.textSub, marginTop: 12, fontSize: 15 },
+  row: {
+    backgroundColor: Colors.card,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    alignItems: 'flex-start',
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F2F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+  rowUnread: { backgroundColor: '#EBF2FF' },
+  iconWrap: {
+    width: 44, height: 44, borderRadius: 22,
+    justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
-  avatarEmoji: {
-    fontSize: 22,
-  },
-  itemCenter: {
-    flex: 1,
-    marginRight: 8,
-  },
-  itemTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 2,
-  },
-  itemBody: {
-    fontSize: 13,
-    color: Colors.textSub,
-    lineHeight: 18,
-    marginBottom: 4,
-  },
-  itemTime: {
-    fontSize: 12,
-    color: Colors.inactive,
-  },
+  rowTitle: { fontWeight: 'bold', fontSize: 15, color: Colors.text },
+  rowBody: { color: Colors.textSub, fontSize: 13, marginTop: 4, lineHeight: 18 },
+  tagRow: { flexDirection: 'row', marginTop: 8, gap: 8 },
+  tag: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  tagText: { fontSize: 12, fontWeight: 'bold' },
+  rowTime: { color: Colors.inactive, fontSize: 11, marginTop: 6 },
   unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.primary,
-  },
-
-  // Separator
-  separator: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginHorizontal: 20,
-  },
-
-  // Empty state
-  emptyList: {
-    flex: 1,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 80,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 15,
-    color: Colors.textSub,
-    fontWeight: '500',
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: Colors.primary, marginTop: 4,
   },
 });

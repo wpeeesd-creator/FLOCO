@@ -131,9 +131,11 @@ export default function LessonPlayerScreen() {
           const userData = userSnap.data();
           const currentBalance = userData.balance ?? 1_000_000;
           const currentTotalAsset = userData.totalAsset ?? 1_000_000;
+          const currentInitialBalance = userData.initialBalance ?? 1_000_000;
           await updateDoc(userRef, {
             balance: currentBalance + reward,
             totalAsset: currentTotalAsset + reward,
+            initialBalance: currentInitialBalance + reward,
           });
           // Zustand 로컬 상태도 즉시 반영
           useAppStore.setState({ cash: appStoreCash + reward });

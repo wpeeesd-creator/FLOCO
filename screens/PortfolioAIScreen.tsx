@@ -3,7 +3,7 @@
  * 보유 종목 기반 섹터/국가 분석 + Claude API AI 분석
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   ActivityIndicator, Alert,
@@ -11,10 +11,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { useAuth } from '../context/AuthContext';
 import { useAppStore, STOCKS } from '../store/appStore';
 import { Colors } from '../components/ui';
 import { fetchWithTimeout, classifyError } from '../lib/errorHandler';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { fetchMultiplePrices } from '../utils/priceService';
 
 const API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
 
@@ -39,23 +43,49 @@ interface AnalysisData {
 
 export default function PortfolioAIScreen() {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
   const { holdings, cash } = useAppStore();
 
   const { isConnected } = useNetworkStatus();
   const [analysis, setAnalysis] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
+  const [portfolioPrices, setPortfolioPrices] = useState<Record<string, any>>({});
+  const [userData, setUserData] = useState<any>(null);
 
   const pct = (v: string) => `${v}%` as unknown as number; // DimensionValue cast for RN
 
-  const safeHoldings = holdings ?? [];
-  const balance = cash ?? 1_000_000;
-  const initialBalance = 1_000_000;
+  // Firestore 사용자 데이터
+  useEffect(() => {
+    if (!user?.id) return;
+    const unsubscribe = onSnapshot(doc(db, 'users', user.id), (snap) => {
+      if (snap.exists()) setUserData(snap.data());
+    });
+    return () => unsubscribe();
+  }, [user?.id]);
 
-  // 포트폴리오 평가액 계산
+  const portfolio = userData?.portfolio ?? [];
+
+  // 보유 종목 실시간 가격
+  useEffect(() => {
+    if (portfolio.length === 0) return;
+    const tickers = portfolio.map((s: any) => ({
+      ticker: s.ticker,
+      isKR: s.ticker.length === 6 && /^\d+$/.test(s.ticker),
+    }));
+    fetchMultiplePrices(tickers).then(setPortfolioPrices).catch(() => {});
+  }, [portfolio.length]);
+
+  const safeHoldings = holdings ?? [];
+  const balance = userData?.balance ?? cash ?? 1_000_000;
+  const initialBalance = userData?.initialBalance ?? 1_000_000;
+
+  // 포트폴리오 평가액 계산 (실시간 가격 우선)
   const holdingsWithStock = safeHoldings.map((h) => {
     const stock = STOCKS.find((s) => s.ticker === h.ticker);
-    return stock ? { ...h, stock } : null;
+    if (!stock) return null;
+    const livePrice = portfolioPrices[h.ticker]?.price ?? stock.price ?? 0;
+    return { ...h, stock: { ...stock, price: livePrice } };
   }).filter(Boolean) as Array<{ ticker: string; qty: number; avgPrice: number; stock: typeof STOCKS[0] }>;
 
   const totalPortfolioValue = holdingsWithStock.reduce((sum, h) => sum + (h.stock.price ?? 0) * (h.qty ?? 0), 0);
