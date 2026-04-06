@@ -1,0 +1,144 @@
+pipeline:
+  name: FLOCO iOS Build
+  identifier: floco_ios_build
+  projectIdentifier: FLOCO
+  orgIdentifier: default
+  tags: {}
+
+  properties:
+    ci:
+      codebase:
+        connectorRef: github_floco
+        repoName: FLOCO
+        build:
+          type: branch
+          spec:
+            branch: main
+
+  stages:
+    - stage:
+        name: iOS Build
+        identifier: ios_build
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: MacOS
+            arch: Arm64
+          runtime:
+            type: Cloud
+            spec: {}
+
+          execution:
+            steps:
+              - step:
+                  name: Install Dependencies
+                  identifier: install_deps
+                  type: Run
+                  spec:
+                    shell: Sh
+                    command: |
+                      echo "=== Node & npm 버전 확인 ==="
+                      node -v
+                      npm -v
+
+                      echo "=== 의존성 설치 ==="
+                      npm ci
+
+              - step:
+                  name: TypeScript Check
+                  identifier: tsc_check
+                  type: Run
+                  spec:
+                    shell: Sh
+                    command: |
+                      echo "=== TypeScript 검사 ==="
+                      npx tsc --noEmit
+
+              - step:
+                  name: Expo iOS Build
+                  identifier: expo_ios_build
+                  type: Run
+                  spec:
+                    shell: Sh
+                    command: |
+                      echo "=== Expo iOS 빌드 시작 ==="
+                      BUILD_START=$(date +%s)
+
+                      npx expo prebuild --platform ios --clean 2>&1 | tee /tmp/expo_build.log
+
+                      cd ios
+                      xcodebuild \
+                        -workspace floco.xcworkspace \
+                        -scheme floco \
+                        -configuration Release \
+                        -sdk iphoneos \
+                        -destination "generic/platform=iOS" \
+                        CODE_SIGNING_ALLOWED=NO \
+                        2>&1 | tee -a /tmp/expo_build.log
+
+                      BUILD_END=$(date +%s)
+                      echo "빌드 소요 시간: $((BUILD_END - BUILD_START))초"
+                    envVariables:
+                      EXPO_NO_TELEMETRY: "1"
+
+              - step:
+                  name: Save Failure Log
+                  identifier: save_failure_log
+                  type: Run
+                  when:
+                    stageStatus: Failure
+                  spec:
+                    shell: Sh
+                    command: |
+                      echo "=== 빌드 실패 — evaluator_gap.log 생성 ==="
+
+                      cat > evaluator_gap.log <<LOGEOF
+                      ============================================
+                      FLOCO iOS Build Failure Report
+                      ============================================
+                      Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+                      Pipeline: <+pipeline.name>
+                      Stage: <+stage.name>
+                      Execution ID: <+pipeline.executionId>
+                      Branch: <+codebase.branch>
+                      Commit: <+codebase.commitSha>
+                      Trigger: <+pipeline.triggerType>
+                      --------------------------------------------
+                      STAGE STATUS: FAILED
+                      --------------------------------------------
+
+                      === Build Log (last 200 lines) ===
+                      $(tail -200 /tmp/expo_build.log 2>/dev/null || echo "빌드 로그 없음")
+
+                      === Error Summary ===
+                      $(grep -iE "error|fatal|failed|exception" /tmp/expo_build.log 2>/dev/null | tail -50 || echo "에러 패턴 없음")
+
+                      === Environment ===
+                      Node: $(node -v 2>/dev/null || echo "N/A")
+                      npm: $(npm -v 2>/dev/null || echo "N/A")
+                      Xcode: $(xcodebuild -version 2>/dev/null | head -1 || echo "N/A")
+
+                      ============================================
+                      이 로그는 Evaluator 에이전트가 Planner 계약과
+                      비교 분석하는 데 사용됩니다.
+                      ============================================
+                      LOGEOF
+
+                      echo "evaluator_gap.log 저장 완료 ($(wc -l < evaluator_gap.log)줄)"
+                      cat evaluator_gap.log
+
+              - step:
+                  name: Upload Failure Artifact
+                  identifier: upload_failure_artifact
+                  type: Run
+                  when:
+                    stageStatus: Failure
+                  spec:
+                    shell: Sh
+                    command: |
+                      if [ -f evaluator_gap.log ]; then
+                        echo "evaluator_gap.log 아티팩트 업로드 준비"
+                        cp evaluator_gap.log <+pipeline.executionId>_evaluator_gap.log
+                        echo "파일 크기: $(wc -c < evaluator_gap.log) bytes"
+                      fi
