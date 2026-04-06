@@ -1,40 +1,56 @@
 /**
- * 종목 상세 화면 — 토스증권 디자인 시스템
- * 실시간 가격 조회 + 매수/매도 Bottom Sheet
+ * 종목 상세 화면 — 다크/라이트 테마
+ * Yahoo Finance 실시간 연동 + 캔들/라인 차트 + 매수/매도 시트
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, ActivityIndicator, Alert, Linking, Modal,
+  View, Text, ScrollView, StyleSheet, TextInput,
+  TouchableOpacity, ActivityIndicator, Alert, Modal,
+  Dimensions, Platform, StatusBar, Keyboard,
+  TouchableWithoutFeedback, KeyboardAvoidingView, BackHandler,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
+import { LineChart } from 'react-native-chart-kit';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { doc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { useAppStore, STOCKS } from '../store/appStore';
-import { Colors, Typography, Button, Badge, ReturnBadge, Card } from '../components/ui';
-import { getCacheAge } from '../lib/priceService';
-import { useStockPrice } from '../hooks/useStockPrice';
-import { TERM_TO_COURSE } from '../data/learningContent';
-import { StockChart } from '../components/StockChart';
+import { fetchStockNews } from '../lib/newsService';
 import StockLogo from '../components/StockLogo';
-import { fetchStockNews, formatNewsTime, type NewsItem } from '../lib/newsService';
+import Svg, { Line as SvgLine, Rect, Path, Text as SvgText, G } from 'react-native-svg';
+import {
+  fetchSinglePrice, fetchChartData,
+  CHART_PERIODS,
+  type CandleData, type ChartPeriod, type PriceData,
+} from '../utils/priceService';
+import { saveNotif } from '../utils/notificationService';
 
-// ── 디자인 토큰 ──────────────────────────────────
-const DS = {
-  bg: '#F2F4F6',
-  card: '#FFFFFF',
-  primary: '#0066FF',
-  rise: '#F04452',   // 상승 = 빨강
-  fall: '#2175F3',   // 하락 = 파랑
-  text: '#191F28',
-  textSub: '#8B95A1',
-  border: '#E5E8EB',
-  radius: 12,
-};
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ── 디자인 토큰 (테마 적응형) ──────────────────────────
+function useDS() {
+  const { theme } = useTheme();
+  return useMemo(() => ({
+    bg: theme.stockBg,
+    card: theme.stockCard,
+    cardAlt: theme.bgInput,
+    rise: theme.red,
+    fall: theme.blue,
+    text: theme.stockText,
+    textSub: theme.textSecondary,
+    textMuted: theme.textTertiary,
+    textDim: theme.mode === 'dark' ? '#444444' : '#B0B8C1',
+    border: theme.stockBorder,
+    borderLight: theme.borderStrong,
+    radius: 12,
+  }), [theme]);
+}
+
 
 // ── userData 타입 ──────────────────────────────────
 interface UserData {
@@ -52,14 +68,151 @@ interface UserData {
     logo?: string;
   }>;
   transactions?: Array<Record<string, any>>;
+  notifications?: Array<Record<string, any>>;
 }
 
+type TabName = '차트' | '호가' | '내 주식' | '종목정보';
+
+// ══════════════════════════════════════════════════
+//  KISChart (캔들 + 라인) — react-native-svg
+// ══════════════════════════════════════════════════
+const CHART_PAD = { top: 16, bottom: 28, left: 56, right: 12 };
+
+interface KISChartProps {
+  data: CandleData[];
+  width: number;
+  height: number;
+  type: 'candle' | 'line';
+  period: ChartPeriod;
+  isKR: boolean;
+  riseColor: string;
+  fallColor: string;
+}
+
+function KISChart({ data, width, height, type, period, isKR, riseColor, fallColor }: KISChartProps) {
+  if (data.length === 0) return null;
+
+  const drawW = width - CHART_PAD.left - CHART_PAD.right;
+  const drawH = height - CHART_PAD.top - CHART_PAD.bottom;
+
+  const allHigh = Math.max(...data.map(d => d.high));
+  const allLow = Math.min(...data.map(d => d.low));
+  const range = allHigh - allLow || 1;
+
+  const toY = (v: number) => CHART_PAD.top + drawH * (1 - (v - allLow) / range);
+  const toX = (i: number) => CHART_PAD.left + (drawW / Math.max(data.length - 1, 1)) * i;
+  const barW = Math.max(1, Math.min(8, drawW / data.length * 0.6));
+
+  // Y축 눈금 (5개)
+  const yTicks: number[] = [];
+  for (let i = 0; i < 5; i++) {
+    yTicks.push(allLow + (range * i) / 4);
+  }
+
+  // X축 라벨 (5개)
+  const xStep = Math.max(1, Math.floor(data.length / 4));
+  const xTicks: { idx: number; label: string }[] = [];
+  for (let i = 0; i < data.length; i += xStep) {
+    const d = data[i].date;
+    const dateStr = d.length === 8
+      ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
+      : d;
+    const dt = new Date(dateStr);
+    let label: string;
+    if (period === '1d' || period === '5d') label = `${dt.getMonth() + 1}/${dt.getDate()}`;
+    else if (period === '1mo' || period === '3mo') label = `${dt.getMonth() + 1}/${dt.getDate()}`;
+    else label = `${dt.getFullYear()}.${dt.getMonth() + 1}`;
+    xTicks.push({ idx: i, label });
+  }
+
+  // 라인 path
+  const linePath = data
+    .map((d, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(d.close).toFixed(1)}`)
+    .join(' ');
+
+  const lastClose = data[data.length - 1]?.close ?? 0;
+  const firstClose = data[0]?.close ?? 0;
+  const lineColor = lastClose >= firstClose ? riseColor : fallColor;
+
+  const fmtTick = (v: number) => {
+    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+    if (v >= 1000) return isKR ? `${(v / 1000).toFixed(0)}K` : v.toFixed(2);
+    return isKR ? Math.round(v).toString() : v.toFixed(2);
+  };
+
+  return (
+    <Svg width={width} height={height}>
+      {/* 그리드 + Y축 */}
+      {yTicks.map((v, i) => (
+        <G key={`y-${i}`}>
+          <SvgLine
+            x1={CHART_PAD.left} y1={toY(v)}
+            x2={width - CHART_PAD.right} y2={toY(v)}
+            stroke="#222" strokeWidth={1}
+          />
+          <SvgText
+            x={CHART_PAD.left - 6} y={toY(v) + 4}
+            fill="#666" fontSize={10} textAnchor="end"
+          >
+            {fmtTick(v)}
+          </SvgText>
+        </G>
+      ))}
+
+      {/* X축 */}
+      {xTicks.map(({ idx, label }) => (
+        <SvgText
+          key={`x-${idx}`}
+          x={toX(idx)} y={height - 6}
+          fill="#666" fontSize={10} textAnchor="middle"
+        >
+          {label}
+        </SvgText>
+      ))}
+
+      {/* 캔들 or 라인 */}
+      {type === 'candle'
+        ? data.map((d, i) => {
+            const x = toX(i);
+            const color = d.close >= d.open ? riseColor : fallColor;
+            const bodyTop = toY(Math.max(d.open, d.close));
+            const bodyBot = toY(Math.min(d.open, d.close));
+            const bodyH = Math.max(1, bodyBot - bodyTop);
+            return (
+              <G key={`c-${i}`}>
+                {/* 꼬리 (wick) */}
+                <SvgLine
+                  x1={x} y1={toY(d.high)}
+                  x2={x} y2={toY(d.low)}
+                  stroke={color} strokeWidth={1}
+                />
+                {/* 몸통 */}
+                <Rect
+                  x={x - barW / 2} y={bodyTop}
+                  width={barW} height={bodyH}
+                  fill={color}
+                />
+              </G>
+            );
+          })
+        : (
+          <Path d={linePath} stroke={lineColor} strokeWidth={2} fill="none" />
+        )}
+    </Svg>
+  );
+}
+
+// ══════════════════════════════════════════════════
+//  StockDetailScreen
+// ══════════════════════════════════════════════════
 export default function StockDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user } = useAuth();
   const ticker = route.params?.ticker ?? 'AAPL';
-  const { cash, holdings, trades } = useAppStore();
+  const { cash, holdings } = useAppStore();
+  const DS = useDS();
+  const s = useMemo(() => createMainStyles(DS), [DS]);
 
   const stock = STOCKS.find(s => s.ticker === ticker);
 
@@ -69,34 +222,19 @@ export default function StockDetailScreen() {
         <Text style={{ fontSize: 48, marginBottom: 12 }}>😢</Text>
         <Text style={{ fontSize: 16, fontWeight: '700', color: DS.text }}>종목 정보를 불러올 수 없어요</Text>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 16 }}>
-          <Text style={{ color: DS.primary, fontSize: 15, fontWeight: '600' }}>돌아가기</Text>
+          <Text style={{ color: DS.fall, fontSize: 15, fontWeight: '600' }}>돌아가기</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
-  const safeHoldings = holdings ?? [];
-  const safeTrades = trades ?? [];
-  const holding = safeHoldings.find(h => h.ticker === ticker);
-  const recentTrades = safeTrades.filter(t => t.ticker === ticker).slice(-5).reverse();
 
-  // ── 실시간 가격 (TanStack Query — 10분 캐시) ──
-  const { data: priceData, isLoading: priceLoading, refetch: loadPrice } =
-    useStockPrice(ticker, stock?.krw ?? false);
+  const isKR = stock.krw;
+  const holding = (holdings ?? []).find(h => h.ticker === ticker);
 
-  // ── 주문 상태 ──────────────────────────────────
-  const [sheetTicker, setSheetTicker] = useState<string | null>(null);
-  const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
-  const [qty, setQty] = useState(1);
-  const [toast, setToast] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'error'>('success');
-  const [toastMessage, setToastMessage] = useState('');
-  const [showToast, setShowToast] = useState(false);
-  const [screenLoading, setScreenLoading] = useState(true);
-  const [stockNews, setStockNews] = useState<NewsItem[]>([]);
-  const [isFavorite, setIsFavorite] = useState(false);
+  // ── Firestore 사용자 데이터 ──────────────────────
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [wishlist, setWishlist] = useState<any[]>([]);
 
-  // ── Firestore users/{uid} 실시간 리스너 ──────────
   useEffect(() => {
     if (!user?.id) return;
     const unsubscribe = onSnapshot(doc(db, 'users', user.id), (snap) => {
@@ -108,892 +246,1694 @@ export default function StockDetailScreen() {
           portfolio: Array.isArray(data.portfolio) ? data.portfolio : [],
           transactions: Array.isArray(data.transactions) ? data.transactions : [],
         });
+        if (Array.isArray(data.wishlist)) setWishlist(data.wishlist);
       }
     });
     return () => unsubscribe();
   }, [user?.id]);
 
   useEffect(() => {
-    try {
-      setScreenLoading(false);
-    } catch (error) {
-      setScreenLoading(false);
-    }
+    const back = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => { navigation.goBack(); return true; }
+    );
+    return () => back.remove();
   }, []);
 
-  useEffect(() => {
-    if (stock) {
-      fetchStockNews(ticker, stock.name)
-        .then(news => setStockNews(news.slice(0, 3)))
-        .catch(() => setStockNews([]));
+  // ── 전달받은 가격으로 초기값 설정 ──────────────────
+  const passedPrice = route.params?.price;
+  const initialQuote = passedPrice ? {
+    price: passedPrice,
+    change: route.params?.change ?? 0,
+    changeAmount: route.params?.changeAmount ?? 0,
+    high: route.params?.high ?? 0,
+    low: route.params?.low ?? 0,
+    open: route.params?.open ?? 0,
+    volume: route.params?.volume ?? 0,
+    previousClose: route.params?.previousClose ?? 0,
+    week52High: route.params?.week52High ?? 0,
+    week52Low: route.params?.week52Low ?? 0,
+    per: route.params?.per ?? '-',
+    pbr: route.params?.pbr ?? '-',
+    marketState: route.params?.marketState ?? 'CLOSED',
+    isKR,
+  } : null;
+
+  const [quote, setQuote] = useState<any>(initialQuote);
+  const [priceLoading, setPriceLoading] = useState(!passedPrice);
+  const [priceError, setPriceError] = useState<string | null>(null);
+  const [selectedTab, setSelectedTab] = useState<TabName>('차트');
+  const [chartData, setChartData] = useState<CandleData[]>([]);
+  const [financialData, setFinancialData] = useState<any>(null);
+  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('3mo');
+  const [chartType, setChartType] = useState<'line' | 'candle'>('candle');
+  const [chartLoading, setChartLoading] = useState(false);
+  const [chartError, setChartError] = useState<string | null>(null);
+  const [showTradeSheet, setShowTradeSheet] = useState(false);
+  const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
+  const isFavorite = wishlist.some((w: any) => w.ticker === ticker);
+  const [showChartModal, setShowChartModal] = useState(false);
+
+  // 현재가 (Yahoo Finance)
+  const livePrice = quote?.price ?? 0;
+  const liveChange = quote?.change ?? 0;
+  const liveChangeAmount = quote?.changeAmount ?? 0;
+  const isPositive = liveChange >= 0;
+  const changeColor = isPositive ? DS.rise : DS.fall;
+  const hasPrice = quote !== null && livePrice > 0;
+
+  const fmt = (n: number) => isKR
+    ? `${Math.round(n).toLocaleString()}원`
+    : `$${n.toFixed(2)}`;
+  const fmtOrDash = (n: number | undefined | null) =>
+    n != null && n > 0 ? (isKR ? n.toLocaleString() : n.toFixed(2)) : '-';
+
+  // ── Yahoo Finance 주가 로드 (v7 quote API — priceService 통일) ──
+  const loadStockData = useCallback(async () => {
+    try {
+      setPriceLoading(true);
+      setPriceError(null);
+      const data = await fetchSinglePrice(ticker, isKR);
+      if (data) {
+        setQuote(data);
+        console.log(`✅ 상세화면 가격 (${ticker}): ${data.price}`);
+      } else {
+        setPriceError('주가 데이터 없음');
+      }
+    } catch (error: any) {
+      console.error('Yahoo 주가 로드 오류:', error);
+      setPriceError(error.message ?? '주가 로드 실패');
+    } finally {
+      setPriceLoading(false);
     }
-  }, [ticker]);
+  }, [ticker, isKR]);
 
-  if (screenLoading) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: DS.bg }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={DS.primary} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  useEffect(() => {
+    loadStockData();
+    const interval = setInterval(loadStockData, 30000);
+    return () => clearInterval(interval);
+  }, [loadStockData]);
 
-  if (!stock) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: DS.bg }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 }}>
-          <Text style={Typography.h2}>종목을 찾을 수 없어요</Text>
-          <Button title="돌아가기" onPress={() => navigation.goBack()} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // ── 차트 로드 ──────────────────────────────────
+  const loadChartData = useCallback(async () => {
+    setChartLoading(true);
+    setChartError(null);
+    try {
+      const data = await fetchChartData(ticker, stock.krw, chartPeriod);
+      setChartData(data);
+    } catch (error: any) {
+      console.error('차트 로드 오류:', error);
+      setChartError(error.message ?? '차트 로드 실패');
+      setChartData([]);
+    } finally {
+      setChartLoading(false);
+    }
+  }, [ticker, chartPeriod]);
 
-  const livePrice = priceData?.price ?? stock?.price ?? 0;
-  const liveChange = priceData?.change ?? stock?.change ?? 0;
+  useEffect(() => {
+    loadChartData();
+  }, [loadChartData]);
 
-  const sheetStock = sheetTicker ? STOCKS.find(s => s.ticker === sheetTicker) ?? null : null;
-  const price = livePrice || (sheetStock?.price ?? 0);
-  const totalAmt = price * qty;
-  const fee = Math.round(totalAmt * 0.001);
-  const remainingBalance = cash - (totalAmt + fee);
-  const holdingQty = holding?.qty ?? 0;
+  // ── 재무 데이터 로드 ──────────────────────────────
+  useEffect(() => {
+    const loadFinancial = async () => {
+      try {
+        const yt = isKR ? `${ticker}.KS` : ticker;
+        const res = await fetch(
+          `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${yt}&fields=trailingPE,forwardPE,priceToBook,priceToSalesTrailing12Months,trailingEps,bookValue,marketCap,dividendYield,beta,averageVolume`,
+          { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', Accept: 'application/json' } },
+        );
+        const data = await res.json();
+        const item = data.quoteResponse?.result?.[0];
+        if (item) {
+          setFinancialData({
+            per: item.trailingPE?.toFixed(2) ?? '-',
+            forwardPER: item.forwardPE?.toFixed(2) ?? '-',
+            pbr: item.priceToBook?.toFixed(2) ?? '-',
+            psr: item.priceToSalesTrailing12Months?.toFixed(2) ?? '-',
+            eps: item.trailingEps ? (isKR ? `${Math.round(item.trailingEps).toLocaleString()}원` : `$${item.trailingEps.toFixed(2)}`) : '-',
+            bps: item.bookValue ? (isKR ? `${Math.round(item.bookValue).toLocaleString()}원` : `$${item.bookValue.toFixed(2)}`) : '-',
+            marketCap: item.marketCap ? (isKR ? `${(item.marketCap / 1e12).toFixed(2)}조원` : `$${(item.marketCap / 1e9).toFixed(2)}B`) : '-',
+            dividendYield: item.dividendYield ? `${(item.dividendYield * 100).toFixed(2)}%` : '-',
+            beta: item.beta?.toFixed(2) ?? '-',
+            avgVolume: item.averageVolume?.toLocaleString() ?? '-',
+          });
+        }
+      } catch (e) {
+        console.error('재무 데이터 오류:', e);
+      }
+    };
+    loadFinancial();
+  }, [ticker, isKR]);
 
-  const subtotal = livePrice * qty;
-  const totalBuy = subtotal + fee;
-  const totalSell = subtotal - fee;
+  // ── 보유 주식 정보 ──────────────────────────────
+  const ownedStock = userData?.portfolio?.find(p => p.ticker === ticker);
 
-  const gainRate = holding ? ((livePrice - holding.avgPrice) / holding.avgPrice * 100) : 0;
-  const gainAmt = holding ? (livePrice - holding.avgPrice) * holding.qty : 0;
-  const fmt = (n: number) => stock.krw ? `₩${Math.round(n).toLocaleString()}` : `$${n.toFixed(2)}`;
-  const fmtPrice = (n: number) => stock.krw ? `₩${Math.round(n).toLocaleString()}` : `$${n.toFixed(2)}`;
-
-  const isRise = liveChange >= 0;
-  const changeColor = isRise ? DS.rise : DS.fall;
-
-  function showErrorToast(msg: string) {
-    setToast(msg);
-    setToastType('error');
-    setTimeout(() => setToast(''), 2500);
-  }
-
+  // ── 매수/매도 핸들러 ──────────────────────────────
   function openSheet(type: 'buy' | 'sell') {
-    if (type === 'sell' && (!holding || holding.qty === 0)) {
-      showErrorToast('보유 수량이 없어요. 공매도는 불가합니다.');
+    if (!hasPrice) {
+      Alert.alert('알림', '실시간 가격을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+    if (type === 'sell' && !ownedStock) {
+      Alert.alert('알림', '보유 수량이 없어요.');
       return;
     }
     setTradeType(type);
-    setQty(1);
-    setSheetTicker(ticker);
+    setShowTradeSheet(true);
   }
 
-  async function handleBuy() {
-    if (!user?.id) return;
-    try {
-      const currentPrice = livePrice;
-      const quantity = qty;
-      const totalCost = Math.floor(currentPrice * quantity * 1.001);
-
-      if ((userData?.balance ?? 0) < totalCost) {
-        Alert.alert(
-          '잔액 부족',
-          `필요 금액: ${totalCost.toLocaleString()}원\n보유 현금: ${(userData?.balance ?? 0).toLocaleString()}원\n\n학습을 완료하고 자산을 늘려보세요!`
-        );
-        return;
-      }
-
-      const existingStock = userData?.portfolio?.find(
-        p => p.ticker === stock.ticker
-      );
-
-      const newPortfolio = existingStock
-        ? (userData?.portfolio ?? []).map(p =>
-            p.ticker === stock.ticker
-              ? {
-                  ...p,
-                  quantity: p.quantity + quantity,
-                  avgPrice: Math.floor(
-                    (p.avgPrice * p.quantity + currentPrice * quantity) /
-                    (p.quantity + quantity)
-                  ),
-                  price: currentPrice,
-                }
-              : p
-          )
-        : [
-            ...(userData?.portfolio ?? []),
-            {
-              ticker: stock.ticker,
-              name: stock.name,
-              quantity,
-              avgPrice: currentPrice,
-              price: currentPrice,
-              sector: stock.sector ?? '기타',
-              change: stock.change ?? 0,
-              bg: '#8E8E93',
-              logo: stock.logo ?? '',
-            },
-          ];
-
-      const newBalance = (userData?.balance ?? 0) - totalCost;
-      const portfolioValue = newPortfolio.reduce(
-        (sum, p) => sum + (p.price ?? p.avgPrice) * p.quantity, 0
-      );
-      const newTotalAsset = newBalance + portfolioValue;
-
-      // Firestore users/{uid} 직접 업데이트 → HomeScreen onSnapshot 자동 반영
-      await updateDoc(doc(db, 'users', user.id), {
-        balance: newBalance,
-        totalAsset: newTotalAsset,
-        portfolio: newPortfolio,
-        transactions: arrayUnion({
-          type: 'buy',
-          ticker: stock.ticker,
-          stockName: stock.name,
-          quantity,
-          price: currentPrice,
-          total: totalCost,
-          fee: Math.floor(currentPrice * quantity * 0.001),
-          createdAt: new Date().toISOString(),
-        }),
-      });
-
-      // appStore 동기화 (Zustand 상태도 최신으로 유지)
-      const newHoldings = newPortfolio.map(p => ({
-        ticker: p.ticker,
-        qty: p.quantity,
-        avgPrice: p.avgPrice,
-      }));
-      useAppStore.setState({ cash: newBalance, holdings: newHoldings });
-
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setSheetTicker(null);
-      setQty(1);
-      setToastMessage(`${stock.name} ${quantity}주 매수 완료!`);
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 2500);
-    } catch (error) {
-      console.error('매수 오류:', error);
-      Alert.alert('오류', '매수 중 오류가 발생했어요');
-    }
-  }
-
-  async function handleSell() {
-    if (!user?.id) return;
-    try {
-      const currentPrice = livePrice;
-      const quantity = qty;
-
-      const ownedStock = userData?.portfolio?.find(
-        p => p.ticker === stock.ticker
-      );
-
-      if (!ownedStock || ownedStock.quantity < quantity) {
-        Alert.alert(
-          '보유 수량 부족',
-          `보유 수량: ${ownedStock?.quantity ?? 0}주\n매도 요청: ${quantity}주`
-        );
-        return;
-      }
-
-      const sellAmount = Math.floor(currentPrice * quantity * 0.999);
-      const profit = Math.floor(
-        (currentPrice - ownedStock.avgPrice) * quantity
-      );
-
-      const newPortfolio = ownedStock.quantity === quantity
-        ? (userData?.portfolio ?? []).filter(
-            p => p.ticker !== stock.ticker
-          )
-        : (userData?.portfolio ?? []).map(p =>
-            p.ticker === stock.ticker
-              ? { ...p, quantity: p.quantity - quantity }
-              : p
-          );
-
-      const newBalance = (userData?.balance ?? 0) + sellAmount;
-      const portfolioValue = newPortfolio.reduce(
-        (sum, p) => sum + (p.price ?? p.avgPrice) * p.quantity, 0
-      );
-      const newTotalAsset = newBalance + portfolioValue;
-
-      await updateDoc(doc(db, 'users', user.id), {
-        balance: newBalance,
-        totalAsset: newTotalAsset,
-        portfolio: newPortfolio,
-        transactions: arrayUnion({
-          type: 'sell',
-          ticker: stock.ticker,
-          stockName: stock.name,
-          quantity,
-          price: currentPrice,
-          avgPrice: ownedStock.avgPrice,
-          total: sellAmount,
-          profit,
-          fee: Math.floor(currentPrice * quantity * 0.001),
-          createdAt: new Date().toISOString(),
-        }),
-      });
-
-      // appStore 동기화
-      const newHoldings = newPortfolio.map(p => ({
-        ticker: p.ticker,
-        qty: p.quantity,
-        avgPrice: p.avgPrice,
-      }));
-      useAppStore.setState({ cash: newBalance, holdings: newHoldings });
-
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setSheetTicker(null);
-      setQty(1);
-      setToastMessage(
-        `${stock.name} ${quantity}주 매도 완료!\n${profit >= 0 ? '▲' : '▼'} ${Math.abs(profit).toLocaleString()}원`
-      );
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 2500);
-    } catch (error) {
-      console.error('매도 오류:', error);
-      Alert.alert('오류', '매도 중 오류가 발생했어요');
-    }
-  }
-
-  // 투자자 의견 (더미 데이터)
-  const opinion = { buy: 62, hold: 25, sell: 13 };
-
+  // ──────────────────────────────────────────────
+  //  RENDER
+  // ──────────────────────────────────────────────
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: DS.bg }}>
-      <View style={styles.container}>
+      {/* ── 상단 헤더 ── */}
+      <View style={s.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={{ fontSize: 22, color: DS.text }}>←</Text>
+        </TouchableOpacity>
 
-        {/* ── 헤더 ── */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={styles.backArrow}>←</Text>
-          </TouchableOpacity>
-
-          <View style={styles.headerCenter}>
-            <Text style={styles.headerName}>{stock.name}</Text>
-            <Text style={styles.headerSub}>{stock.ticker} · {stock.market}</Text>
-          </View>
-
-          <TouchableOpacity
-            onPress={() => setIsFavorite(v => !v)}
-            style={styles.favoriteBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={{ fontSize: 22, color: isFavorite ? '#F04452' : DS.border }}>
-              {isFavorite ? '❤️' : '🤍'}
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={s.headerName}>{stock.name}</Text>
+          {priceLoading ? (
+            <ActivityIndicator size="small" color={DS.textSub} style={{ marginTop: 4 }} />
+          ) : hasPrice ? (
+            <Text style={{ color: changeColor, fontSize: 13, marginTop: 2 }}>
+              {fmt(livePrice)}{' '}
+              {isPositive ? '+' : ''}{liveChange.toFixed(2)}%
             </Text>
-          </TouchableOpacity>
+          ) : (
+            <Text style={{ color: DS.textMuted, fontSize: 13, marginTop: 2 }}>데이터 없음</Text>
+          )}
         </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+        <TouchableOpacity
+          onPress={async () => {
+            if (!user?.id) return;
+            if (isFavorite) {
+              const existing = wishlist.find((w: any) => w.ticker === ticker);
+              if (existing) {
+                await updateDoc(doc(db, 'users', user.id), {
+                  wishlist: arrayRemove(existing),
+                });
+              }
+            } else {
+              await updateDoc(doc(db, 'users', user.id), {
+                wishlist: arrayUnion({
+                  ticker: stock.ticker,
+                  name: stock.name,
+                  sector: stock.sector ?? '',
+                  bg: (stock as any).bg ?? '#8E8E93',
+                  logo: stock.logo ?? '',
+                  isKR,
+                }),
+              });
+            }
+          }}
+          style={{ marginRight: 12 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          {/* ── 현재가 카드 ── */}
-          <View style={styles.priceCard}>
-            <View style={styles.priceCardTop}>
-              <View style={styles.priceLogoRow}>
-                <StockLogo ticker={ticker} size={40} />
-                <View style={{ gap: 2 }}>
-                  <Text style={styles.priceCardName}>{stock.name}</Text>
-                  <Text style={styles.priceCardSub}>{stock.ticker}</Text>
-                </View>
-              </View>
+          <Text style={{ fontSize: 22, color: isFavorite ? DS.rise : DS.text }}>
+            {isFavorite ? '❤️' : '🤍'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => navigation.navigate('알림')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={{ fontSize: 20, color: DS.text }}>🔔</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── 탭 메뉴 ── */}
+      <View style={s.tabBar}>
+        {(['차트', '호가', '내 주식', '종목정보'] as TabName[]).map(tab => (
+          <TouchableOpacity
+            key={tab}
+            onPress={() => setSelectedTab(tab)}
+            style={[s.tabItem, selectedTab === tab && s.tabItemActive]}
+          >
+            <Text style={[
+              s.tabText,
+              selectedTab === tab && s.tabTextActive,
+            ]}>
+              {tab}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+
+        {/* ════════════════ 차트 탭 ════════════════ */}
+        {selectedTab === '차트' && (
+          <View>
+            {/* 현재가 */}
+            <View style={{ padding: 16 }}>
               {priceLoading ? (
-                <ActivityIndicator size="small" color={DS.textSub} />
-              ) : (
-                <TouchableOpacity onPress={() => loadPrice()} style={styles.refreshBtn}>
-                  <Text style={styles.refreshText}>
-                    {priceData ? `${getCacheAge(priceData.updatedAt)} 갱신` : '새로고침'} ↺
+                <ActivityIndicator color={DS.text} size="large" />
+              ) : priceError ? (
+                <View>
+                  <Text style={{ color: DS.rise, fontSize: 14 }}>가격 로드 실패</Text>
+                  <Text style={{ color: DS.textMuted, fontSize: 12, marginTop: 4 }}>{priceError}</Text>
+                  <TouchableOpacity onPress={loadStockData} style={{ marginTop: 8 }}>
+                    <Text style={{ color: DS.fall, fontSize: 13, fontWeight: 'bold' }}>다시 시도</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : hasPrice ? (
+                <>
+                  <Text style={{ color: changeColor, fontSize: 32, fontWeight: 'bold' }}>
+                    {fmt(livePrice)}
                   </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                    <Text style={{ color: changeColor, fontSize: 16 }}>
+                      {isPositive ? '▲' : '▼'}{' '}
+                      {Math.abs(liveChangeAmount).toLocaleString()}
+                      {'  '}{isPositive ? '+' : ''}{liveChange.toFixed(2)}%
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <Text style={{ color: DS.textMuted, fontSize: 18 }}>데이터 없음</Text>
+              )}
+            </View>
+
+            {/* 차트 타입 + 기간 선택 */}
+            <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 8 }}>
+              {[
+                { key: 'candle' as const, label: '봉' },
+                { key: 'line' as const, label: '라인' },
+              ].map(t => (
+                <TouchableOpacity
+                  key={t.key}
+                  onPress={() => setChartType(t.key)}
+                  style={[s.chipBtn, chartType === t.key && s.chipBtnActive]}
+                >
+                  <Text style={[s.chipText, chartType === t.key && s.chipTextActive]}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 16 }}>
+              {CHART_PERIODS.map(p => (
+                <TouchableOpacity
+                  key={p.key}
+                  onPress={() => setChartPeriod(p.key)}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 6,
+                    backgroundColor: chartPeriod === p.key ? DS.text : 'transparent',
+                  }}
+                >
+                  <Text style={{
+                    color: chartPeriod === p.key ? '#000000' : DS.textMuted,
+                    fontWeight: chartPeriod === p.key ? 'bold' : 'normal',
+                    fontSize: 14,
+                  }}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* SVG 차트 */}
+            <View style={{ position: 'relative' }}>
+              {chartLoading ? (
+                <View style={{ height: 300, justifyContent: 'center', alignItems: 'center' }}>
+                  <ActivityIndicator color={DS.text} />
+                </View>
+              ) : chartError ? (
+                <View style={{ height: 300, justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ color: DS.textMuted, marginBottom: 8 }}>차트 로드 실패</Text>
+                  <TouchableOpacity onPress={loadChartData}>
+                    <Text style={{ color: DS.fall, fontSize: 13, fontWeight: 'bold' }}>다시 시도</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : chartData.length > 0 ? (
+                <KISChart
+                  data={chartData}
+                  width={SCREEN_WIDTH}
+                  height={300}
+                  type={chartType}
+                  period={chartPeriod}
+                  isKR={isKR}
+                  riseColor={DS.rise}
+                  fallColor={DS.fall}
+                />
+              ) : (
+                <View style={{ height: 300, justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ color: DS.textMuted }}>차트 데이터 없음</Text>
+                </View>
+              )}
+
+              {/* 차트 확대 버튼 */}
+              {chartData.length > 0 && !chartLoading && (
+                <TouchableOpacity
+                  onPress={() => setShowChartModal(true)}
+                  style={{
+                    position: 'absolute', right: 16, bottom: 8,
+                    backgroundColor: DS.cardAlt, borderRadius: 8, padding: 6,
+                    borderWidth: 1, borderColor: DS.borderLight,
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ color: DS.text, fontSize: 16 }}>⛶</Text>
                 </TouchableOpacity>
               )}
             </View>
 
-            <Text style={styles.priceValue}>{fmt(livePrice)}</Text>
-
-            <View style={styles.priceRow}>
-              <View style={[styles.changeBadge, { backgroundColor: isRise ? '#FFF0F1' : '#EBF2FF' }]}>
-                <Text style={[styles.changeBadgeText, { color: changeColor }]}>
-                  {isRise ? '▲' : '▼'} {Math.abs(liveChange).toFixed(2)}%
-                </Text>
-              </View>
-              {priceData && !priceData.fromCache && (
-                <Text style={styles.delayText}>5~15분 지연</Text>
-              )}
-            </View>
-          </View>
-
-          {/* ── 차트 ── */}
-          {livePrice > 0 && (
-            <View style={styles.chartWrapper}>
-              <StockChart basePrice={livePrice} isKrw={stock.krw} />
-            </View>
-          )}
-
-          {/* ── AI 분석 버튼 (머니몽) ── */}
-          <View style={[styles.section, { paddingBottom: 0 }]}>
+            {/* 머니몽 AI 버튼 — 차트 바로 아래 */}
             <TouchableOpacity
-              style={styles.aiBtn}
-              onPress={() => navigation.navigate('AI분석', { ticker })}
+              onPress={() => navigation.navigate('AI분석', {
+                ticker,
+                stock: { ...stock, price: livePrice, change: liveChange },
+              })}
+              style={{
+                marginHorizontal: 16, marginTop: 12, marginBottom: 4,
+                backgroundColor: DS.cardAlt, borderRadius: 14, height: 52,
+                justifyContent: 'center', alignItems: 'center', flexDirection: 'row',
+                borderWidth: 1, borderColor: DS.borderLight,
+              }}
               activeOpacity={0.8}
             >
-              <Text style={styles.aiBtnIcon}>🐾</Text>
+              <Text style={{ fontSize: 20, marginRight: 8 }}>🤖</Text>
               <View>
-                <Text style={styles.aiBtnTitle}>AI 종목 분석</Text>
-                <Text style={styles.aiBtnSub}>머니몽에게 이 종목 물어보기</Text>
+                <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 14 }}>
+                  머니몽에게 물어보기
+                </Text>
+                <Text style={{ color: DS.textMuted, fontSize: 11 }}>
+                  {stock.name} 실시간 분석
+                </Text>
               </View>
-              <Text style={styles.aiBtnChevron}>›</Text>
             </TouchableOpacity>
-          </View>
 
-          {/* ── 보유 현황 ── */}
-          {holding && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>내 보유 현황</Text>
-              <View style={styles.card}>
-                <View style={styles.holdingGrid}>
-                  {[
-                    { label: '보유 수량', value: `${holding.qty}주` },
-                    { label: '평균 단가', value: fmt(holding.avgPrice) },
-                    { label: '평가 수익', value: `${gainAmt >= 0 ? '+' : ''}${fmt(gainAmt)}`, color: gainAmt >= 0 ? DS.rise : DS.fall },
-                    { label: '수익률', value: `${gainRate >= 0 ? '+' : ''}${gainRate.toFixed(2)}%`, color: gainRate >= 0 ? DS.rise : DS.fall },
-                  ].map(item => (
-                    <View key={item.label} style={styles.holdingItem}>
-                      <Text style={styles.holdingLabel}>{item.label}</Text>
-                      <Text style={[styles.holdingValue, item.color ? { color: item.color } : {}]}>
-                        {item.value}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* ── 투자 정보 ── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>투자 정보</Text>
-            <View style={styles.card}>
+            {/* 시세 정보 */}
+            <View style={s.infoCard}>
               {[
-                { label: '시가총액', value: 'N/A' },
-                { label: 'PER (주가수익비율)', value: 'N/A', term: 'PER' },
-                { label: 'PBR (주가순자산비율)', value: 'N/A', term: 'PBR' },
-                { label: 'ROE (자기자본이익률)', value: 'N/A', term: 'ROE' },
-                { label: '등락률', value: `${isRise ? '+' : ''}${liveChange.toFixed(2)}%`, valueColor: changeColor },
-                { label: '수수료', value: '0.1% (시장가)' },
-              ].map((item, idx, arr) => (
-                <View
-                  key={item.label}
-                  style={[styles.infoRow, idx < arr.length - 1 && styles.infoRowBorder]}
-                >
-                  <View style={styles.infoLabelRow}>
-                    <Text style={styles.infoLabel}>{item.label}</Text>
-                    {item.term && (
-                      <TouchableOpacity
-                        style={styles.helpBtn}
-                        onPress={() => navigation.navigate('홈Tab', {
-                          screen: '레슨',
-                          params: { courseId: TERM_TO_COURSE[item.term!] },
-                        })}
-                      >
-                        <Text style={styles.helpBtnText}>?</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  <Text style={[styles.infoValue, item.valueColor ? { color: item.valueColor } : {}]}>
+                { label: '시가', value: fmtOrDash(quote?.open) },
+                { label: '고가', value: fmtOrDash(quote?.high), color: DS.rise },
+                { label: '저가', value: fmtOrDash(quote?.low), color: DS.fall },
+                { label: '전일 종가', value: fmtOrDash(quote?.previousClose) },
+                { label: '거래량', value: quote?.volume ? quote.volume.toLocaleString() : '-' },
+                { label: '52주 최고', value: fmtOrDash(quote?.week52High), color: DS.rise },
+                { label: '52주 최저', value: fmtOrDash(quote?.week52Low), color: DS.fall },
+                { label: 'PER', value: quote?.per && quote.per !== '-' ? `${quote.per}배` : '-' },
+                { label: 'PBR', value: quote?.pbr && quote.pbr !== '-' ? `${quote.pbr}배` : '-' },
+              ].map((item, i, arr) => (
+                <View key={i} style={[s.infoRow, i < arr.length - 1 && s.infoRowBorder]}>
+                  <Text style={s.infoLabel}>{item.label}</Text>
+                  <Text style={[s.infoValue, item.color ? { color: item.color } : {}]}>
                     {item.value}
                   </Text>
                 </View>
               ))}
             </View>
           </View>
+        )}
 
-          {/* ── 투자자 의견 ── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>투자자 의견</Text>
-            <View style={styles.card}>
-              {/* 비율 바 */}
-              <View style={styles.opinionBarRow}>
-                <View style={[styles.opinionBar, { flex: opinion.buy, backgroundColor: DS.rise, borderTopLeftRadius: 4, borderBottomLeftRadius: 4 }]} />
-                <View style={[styles.opinionBar, { flex: opinion.hold, backgroundColor: '#E5E8EB' }]} />
-                <View style={[styles.opinionBar, { flex: opinion.sell, backgroundColor: DS.fall, borderTopRightRadius: 4, borderBottomRightRadius: 4 }]} />
-              </View>
-              <View style={styles.opinionLabels}>
-                <View style={styles.opinionLabelItem}>
-                  <View style={[styles.opinionDot, { backgroundColor: DS.rise }]} />
-                  <Text style={styles.opinionLabel}>매수 {opinion.buy}%</Text>
-                </View>
-                <View style={styles.opinionLabelItem}>
-                  <View style={[styles.opinionDot, { backgroundColor: '#E5E8EB' }]} />
-                  <Text style={styles.opinionLabel}>보유 {opinion.hold}%</Text>
-                </View>
-                <View style={styles.opinionLabelItem}>
-                  <View style={[styles.opinionDot, { backgroundColor: DS.fall }]} />
-                  <Text style={styles.opinionLabel}>매도 {opinion.sell}%</Text>
-                </View>
-              </View>
-            </View>
-          </View>
+        {/* ════════════════ 호가 탭 ════════════════ */}
+        {selectedTab === '호가' && (
+          <OrderbookTab
+            ticker={ticker}
+            isKR={isKR}
+            livePrice={livePrice}
+            isPositive={isPositive}
+            changeColor={changeColor}
+            liveChange={liveChange}
+            fmt={fmt}
+            hasPrice={hasPrice}
+            onBuy={() => openSheet('buy')}
+            onSell={() => openSheet('sell')}
+          />
+        )}
 
-          {/* ── 관련 뉴스 ── */}
-          {stockNews.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>관련 뉴스</Text>
-              <View style={styles.card}>
-                {stockNews.map((news, idx) => (
-                  <TouchableOpacity
-                    key={news.id + idx}
-                    onPress={() => news.url ? Linking.openURL(news.url) : null}
-                    style={[styles.newsRow, idx < stockNews.length - 1 && styles.newsRowBorder]}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.newsTitle} numberOfLines={2}>{news.title}</Text>
-                    <Text style={styles.newsMeta}>{news.source} · {formatNewsTime(news.publishedAt)}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* ── 최근 거래 내역 ── */}
-          {recentTrades.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>내 거래 내역</Text>
-              <View style={styles.card}>
-                {recentTrades.map((t, idx) => (
-                  <View
-                    key={t.id}
-                    style={[styles.tradeRow, idx < recentTrades.length - 1 && styles.infoRowBorder]}
-                  >
-                    <View style={[
-                      styles.tradeBadge,
-                      { backgroundColor: t.type === 'buy' ? '#FFF0F1' : '#EBF2FF' },
-                    ]}>
-                      <Text style={[
-                        styles.tradeBadgeText,
-                        { color: t.type === 'buy' ? DS.rise : DS.fall },
-                      ]}>
-                        {t.type === 'buy' ? '매수' : '매도'}
+        {/* ════════════════ 내 주식 탭 ════════════════ */}
+        {selectedTab === '내 주식' && (
+          <View style={{ padding: 16 }}>
+            {ownedStock ? (
+              <View>
+                <View style={[s.infoCard, { padding: 20, marginHorizontal: 0 }]}>
+                  <Text style={{ color: DS.textSub, fontSize: 13 }}>내 주식</Text>
+                  <Text style={{ color: DS.text, fontSize: 28, fontWeight: 'bold', marginTop: 4 }}>
+                    {hasPrice ? fmt(livePrice * ownedStock.quantity) : '-'}
+                  </Text>
+                  {(() => {
+                    if (!hasPrice) return <Text style={{ color: DS.textMuted, fontSize: 16, marginTop: 4 }}>가격 로딩 중...</Text>;
+                    const profitAmt = (livePrice - ownedStock.avgPrice) * ownedStock.quantity;
+                    const profitRate = ((livePrice - ownedStock.avgPrice) / ownedStock.avgPrice * 100);
+                    const profitColor = profitAmt >= 0 ? DS.rise : DS.fall;
+                    return (
+                      <Text style={{ color: profitColor, fontSize: 16, marginTop: 4 }}>
+                        {profitAmt >= 0 ? '+' : ''}{Math.round(profitAmt).toLocaleString()}원
+                        {' '}({profitRate.toFixed(2)}%)
                       </Text>
+                    );
+                  })()}
+                </View>
+
+                <View style={{ marginTop: 16 }}>
+                  {[
+                    { label: '보유수량', value: `${ownedStock.quantity}주` },
+                    { label: '평균매수가', value: fmt(ownedStock.avgPrice) },
+                    { label: '현재가', value: hasPrice ? fmt(livePrice) : '-' },
+                    { label: '평가금액', value: hasPrice ? fmt(livePrice * ownedStock.quantity) : '-' },
+                    { label: '매입금액', value: fmt(ownedStock.avgPrice * ownedStock.quantity) },
+                  ].map((item, i) => (
+                    <View key={i} style={[s.infoRow, { borderBottomWidth: 1, borderBottomColor: DS.border }]}>
+                      <Text style={s.infoLabel}>{item.label}</Text>
+                      <Text style={s.infoValue}>{item.value}</Text>
                     </View>
-                    <Text style={styles.tradeDetail}>{t.qty}주 · {fmt(t.price)}</Text>
-                    <Text style={styles.tradeDate}>
-                      {new Date(t.timestamp).toLocaleDateString('ko-KR')}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-        </ScrollView>
-
-        {/* ── 하단 고정 버튼 ── */}
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={[styles.bottomBtn, { backgroundColor: DS.rise }]}
-            onPress={() => openSheet('buy')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.bottomBtnText}>매수</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.bottomBtn, { backgroundColor: DS.fall }]}
-            onPress={() => openSheet('sell')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.bottomBtnText}>매도</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ── 오류 토스트 ── */}
-        {toast !== '' && (
-          <View style={[styles.errorToast, { backgroundColor: toastType === 'error' ? DS.fall : DS.rise }]}>
-            <Text style={styles.toastText}>{toast}</Text>
-          </View>
-        )}
-
-        {/* ── 거래 완료 토스트 ── */}
-        {showToast && (
-          <View style={styles.toast}>
-            <Text style={styles.toastText}>{toastMessage}</Text>
-          </View>
-        )}
-
-        {/* ── 매수/매도 Modal ── */}
-        <Modal visible={!!sheetTicker} transparent animationType="slide" onRequestClose={() => setSheetTicker(null)}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSheetTicker(null)} />
-          <View style={styles.modalSheet}>
-            {/* Handle bar */}
-            <View style={styles.modalHandle} />
-
-            {sheetStock && (
-              <View style={{ gap: 16 }}>
-                {/* Stock info row */}
-                <View style={styles.sheetStockRow}>
-                  <StockLogo ticker={sheetTicker!} size={44} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.sheetStockName}>{sheetStock.name}</Text>
-                    <Text style={styles.sheetStockTicker}>{sheetTicker}</Text>
-                  </View>
-                  <Text style={styles.sheetStockPrice}>{fmtPrice(livePrice || sheetStock.price)}</Text>
-                </View>
-
-                {/* Buy/Sell toggle */}
-                <View style={styles.tradeToggle}>
-                  {(['buy', 'sell'] as const).map(t => (
-                    <TouchableOpacity
-                      key={t}
-                      style={[styles.toggleBtn, tradeType === t && { backgroundColor: t === 'buy' ? '#F04452' : '#2175F3' }]}
-                      onPress={() => setTradeType(t)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.toggleText, tradeType === t && { color: '#fff' }]}>
-                        {t === 'buy' ? '매수' : '매도'}
-                      </Text>
-                    </TouchableOpacity>
                   ))}
                 </View>
-
-                {/* Quantity input - circular buttons */}
-                <View style={styles.qtySection}>
-                  <Text style={styles.qtyLabel}>수량</Text>
-                  <View style={styles.qtyRow}>
-                    <TouchableOpacity style={styles.qtyCircleBtn} onPress={() => setQty(q => Math.max(1, q - 1))} activeOpacity={0.8}>
-                      <Text style={styles.qtyCircleBtnText}>−</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.qtyValue}>{qty}주</Text>
-                    <TouchableOpacity style={styles.qtyCircleBtn} onPress={() => setQty(q => q + 1)} activeOpacity={0.8}>
-                      <Text style={styles.qtyCircleBtnText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Order summary */}
-                <View style={styles.summaryBox}>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>주문금액</Text>
-                    <Text style={styles.summaryValue}>{fmtPrice(totalAmt)}</Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabelSub}>수수료 (0.1%)</Text>
-                    <Text style={styles.summaryValueSub}>{fmtPrice(fee)}</Text>
-                  </View>
-                  <View style={styles.summaryDivider} />
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryTotalLabel}>총 {tradeType === 'buy' ? '결제' : '수령'}금액</Text>
-                    <Text style={[styles.summaryTotalValue, { color: tradeType === 'buy' ? '#F04452' : '#2175F3' }]}>
-                      {fmtPrice(tradeType === 'buy' ? totalAmt + fee : totalAmt - fee)}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Remaining balance */}
-                <View style={[styles.balanceInfo, {
-                  backgroundColor: remainingBalance < 0 ? '#FFF0F0' : '#F0F8FF',
-                  borderColor: remainingBalance < 0 ? '#FF3B30' : '#0066FF',
-                }]}>
-                  <Text style={styles.balanceInfoLabel}>
-                    {tradeType === 'buy' ? '구매 후 남은 현금' : `보유: ${holdingQty}주`}
-                  </Text>
-                  <Text style={[styles.balanceInfoValue, { color: remainingBalance < 0 ? '#F04452' : '#0066FF' }]}>
-                    {tradeType === 'buy' ? `${Math.round(remainingBalance).toLocaleString()}원` : `${holdingQty}주`}
-                  </Text>
-                </View>
-
-                {/* Insufficient balance warning */}
-                {tradeType === 'buy' && remainingBalance < 0 && (
-                  <Text style={styles.warningText}>
-                    잔액이 부족해요. 학습을 완료하고 자산을 늘려보세요!
-                  </Text>
-                )}
-
-                {/* Sell insufficient warning */}
-                {tradeType === 'sell' && holdingQty < qty && (
-                  <Text style={styles.warningText}>
-                    보유 수량이 부족해요.
-                  </Text>
-                )}
-
-                {/* Buy/Sell buttons */}
-                <View style={styles.tradeBtnRow}>
-                  <TouchableOpacity
-                    style={[styles.tradeActionBtn, { backgroundColor: '#2175F3' }]}
-                    onPress={() => handleSell()}
-                    disabled={tradeType === 'sell' && holdingQty < qty}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.tradeActionBtnText}>매도</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.tradeActionBtn, {
-                      backgroundColor: (tradeType === 'buy' && remainingBalance < 0) ? '#E5E8EB' : '#F04452'
-                    }]}
-                    onPress={() => handleBuy()}
-                    disabled={tradeType === 'buy' && remainingBalance < 0}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.tradeActionBtnText,
-                      (tradeType === 'buy' && remainingBalance < 0) && { color: '#8B95A1' }
-                    ]}>매수</Text>
-                  </TouchableOpacity>
-                </View>
+              </View>
+            ) : (
+              <View style={{ alignItems: 'center', padding: 40 }}>
+                <Text style={{ fontSize: 48 }}>📭</Text>
+                <Text style={{ color: DS.textMuted, marginTop: 12, textAlign: 'center' }}>
+                  보유하지 않은 종목이에요{'\n'}매수하고 자산을 늘려보세요!
+                </Text>
               </View>
             )}
           </View>
-        </Modal>
+        )}
 
+        {/* ════════════════ 종목정보 탭 ════════════════ */}
+        {selectedTab === '종목정보' && (
+          <View style={{ padding: 16 }}>
+            {/* 기본 정보 */}
+            <View style={[s.infoCard, { marginHorizontal: 0 }]}>
+              <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>📋 기본 정보</Text>
+              {[
+                { label: '종목명', value: stock.name },
+                { label: '티커', value: stock.ticker },
+                { label: '섹터', value: stock.sector ?? '—' },
+                { label: '시장', value: isKR ? '🇰🇷 한국 코스피/코스닥' : '🇺🇸 미국 나스닥/NYSE' },
+                { label: '시가총액', value: financialData?.marketCap ?? '-' },
+              ].map((item, i, arr) => (
+                <View key={i} style={[s.infoRow, i < arr.length - 1 && s.infoRowBorder]}>
+                  <Text style={s.infoLabel}>{item.label}</Text>
+                  <Text style={s.infoValue}>{item.value}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* 밸류에이션 */}
+            <View style={[s.infoCard, { marginHorizontal: 0, marginTop: 12 }]}>
+              <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>📊 밸류에이션</Text>
+              {[
+                { label: 'PER (주가수익비율)', value: financialData?.per ? `${financialData.per}배` : '-', desc: 'PER이 낮을수록 저평가' },
+                { label: 'Forward PER', value: financialData?.forwardPER ? `${financialData.forwardPER}배` : '-', desc: '예상 실적 기준 PER' },
+                { label: 'PBR (주가순자산비율)', value: financialData?.pbr ? `${financialData.pbr}배` : '-', desc: '1 미만이면 청산가치 이하' },
+                { label: 'PSR (주가매출비율)', value: financialData?.psr ? `${financialData.psr}배` : '-', desc: '낮을수록 저평가' },
+                { label: 'EPS (주당순이익)', value: financialData?.eps ?? '-', desc: '높을수록 수익성 좋음' },
+                { label: 'BPS (주당순자산)', value: financialData?.bps ?? '-', desc: '기업의 청산 가치' },
+              ].map((item, i, arr) => (
+                <View key={i} style={{ paddingVertical: 10, borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: DS.border }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={s.infoLabel}>{item.label}</Text>
+                    <Text style={[s.infoValue, { fontWeight: 'bold' }]}>{item.value}</Text>
+                  </View>
+                  <Text style={{ color: DS.textDim, fontSize: 11, marginTop: 2 }}>{item.desc}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* 투자 지표 */}
+            <View style={[s.infoCard, { marginHorizontal: 0, marginTop: 12 }]}>
+              <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>📈 투자 지표</Text>
+              {([
+                { label: '배당수익률', value: financialData?.dividendYield ?? '-' },
+                { label: '베타 (변동성)', value: financialData?.beta ? `${financialData.beta} (${parseFloat(financialData.beta) > 1.2 ? '고위험' : parseFloat(financialData.beta) < 0.8 ? '저위험' : '중간'})` : '-' },
+                { label: '52주 최고', value: fmtOrDash(quote?.week52High), color: DS.rise },
+                { label: '52주 최저', value: fmtOrDash(quote?.week52Low), color: DS.fall },
+                { label: '평균 거래량', value: financialData?.avgVolume ?? '-' },
+              ] as Array<{ label: string; value: string; color?: string }>).map((item, i, arr) => (
+                <View key={i} style={[s.infoRow, i < arr.length - 1 && s.infoRowBorder]}>
+                  <Text style={s.infoLabel}>{item.label}</Text>
+                  <Text style={[s.infoValue, item.color ? { color: item.color } : {}]}>{item.value}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* AI 분석 버튼 */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('AI분석', {
+                ticker,
+                stock: { ...stock, price: livePrice, change: liveChange },
+              })}
+              style={[s.aiBtn, { marginTop: 12 }]}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 20, marginRight: 8 }}>🤖</Text>
+              <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15 }}>
+                AI에게 {stock.name} 분석 물어보기
+              </Text>
+            </TouchableOpacity>
+
+            {/* 관련 뉴스 */}
+            <StockNewsSection ticker={ticker} name={stock.name} isKR={isKR} />
+
+          </View>
+        )}
+
+        <View style={{ height: 120 }} />
+      </ScrollView>
+
+      {/* ── 하단 매수/매도 버튼 ── */}
+      <View style={s.bottomBar}>
+        <TouchableOpacity
+          onPress={() => openSheet('sell')}
+          style={[s.bottomBtn, { backgroundColor: '#1A3A6A' }]}
+          activeOpacity={0.85}
+        >
+          <Text style={{ color: DS.fall, fontSize: 16, fontWeight: 'bold' }}>매도</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => openSheet('buy')}
+          style={[s.bottomBtn, { backgroundColor: '#6A1A1A' }]}
+          activeOpacity={0.85}
+        >
+          <Text style={{ color: DS.rise, fontSize: 16, fontWeight: 'bold' }}>매수</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* ── 차트 확대 모달 ── */}
+      {showChartModal && (
+        <Modal
+          visible={showChartModal}
+          animationType="slide"
+          statusBarTranslucent
+          onRequestClose={() => setShowChartModal(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: DS.bg }}>
+            <SafeAreaView>
+              {/* 헤더 */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 16,
+                paddingVertical: 10
+              }}>
+                <TouchableOpacity onPress={() => setShowChartModal(false)}>
+                  <Ionicons name="chevron-back" size={24} color={DS.text} />
+                </TouchableOpacity>
+                <Text style={{
+                  flex: 1,
+                  color: DS.text,
+                  fontSize: 16,
+                  fontWeight: 'bold',
+                  marginLeft: 8
+                }}>
+                  {stock.name}
+                </Text>
+                <Text style={{
+                  color: isPositive ? DS.rise : DS.fall,
+                  fontSize: 16,
+                  fontWeight: 'bold'
+                }}>
+                  {isKR
+                    ? `${Math.round(stock.price ?? 0).toLocaleString()}원`
+                    : `$${(stock.price ?? 0).toFixed(2)}`
+                  }
+                  {'  '}
+                  {isPositive ? '+' : ''}{stock.change?.toFixed(2)}%
+                </Text>
+              </View>
+
+              {/* 시작/최고/최저/거래량 */}
+              <View style={{
+                flexDirection: 'row',
+                paddingHorizontal: 16,
+                paddingBottom: 8,
+                borderBottomWidth: 1,
+                borderBottomColor: DS.border
+              }}>
+                {[
+                  { label: '시가', value: isKR ? `${Math.round(quote?.open ?? 0).toLocaleString()}` : `$${(quote?.open ?? 0).toFixed(2)}` },
+                  { label: '최고', value: isKR ? `${Math.round(quote?.high ?? 0).toLocaleString()}` : `$${(quote?.high ?? 0).toFixed(2)}`, color: DS.rise },
+                  { label: '최저', value: isKR ? `${Math.round(quote?.low ?? 0).toLocaleString()}` : `$${(quote?.low ?? 0).toFixed(2)}`, color: DS.fall },
+                  { label: '거래량', value: quote?.volume ? `${(quote.volume/1000).toFixed(0)}K` : '-' }
+                ].map((item: any, i) => (
+                  <View key={i} style={{ flex: 1, alignItems: 'center' }}>
+                    <Text style={{ color: DS.textSub, fontSize: 11 }}>{item.label}</Text>
+                    <Text style={{ color: item.color ?? DS.text, fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
+                      {item.value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* 도구 버튼 */}
+              <View style={{
+                flexDirection: 'row',
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                gap: 8,
+                borderBottomWidth: 1,
+                borderBottomColor: DS.border
+              }}>
+                {['✏️ 선 그리기', '🔔 가격알림'].map(btn => (
+                  <TouchableOpacity
+                    key={btn}
+                    style={{
+                      backgroundColor: DS.card,
+                      borderRadius: 20,
+                      paddingHorizontal: 14,
+                      paddingVertical: 7,
+                      borderWidth: 1,
+                      borderColor: DS.border
+                    }}
+                  >
+                    <Text style={{ color: DS.text, fontSize: 12 }}>{btn}</Text>
+                  </TouchableOpacity>
+                ))}
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity
+                  onPress={() => setShowChartModal(false)}
+                  style={{
+                    backgroundColor: DS.card,
+                    borderRadius: 8,
+                    padding: 8,
+                    borderWidth: 1,
+                    borderColor: DS.border
+                  }}
+                >
+                  <Ionicons name="contract-outline" size={16} color={DS.text} />
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+
+            {/* 차트 */}
+            <View style={{ flex: 1, justifyContent: 'center' }}>
+              {chartData.length > 0 ? (
+                <LineChart
+                  data={{
+                    labels: [],
+                    datasets: [{
+                      data: chartData.map((d: any) => d.close),
+                      color: () => isPositive ? DS.rise : DS.fall,
+                      strokeWidth: 2
+                    }]
+                  }}
+                  width={Dimensions.get('window').width}
+                  height={Dimensions.get('window').height * 0.4}
+                  withDots={false}
+                  withInnerLines={true}
+                  withOuterLines={false}
+                  withVerticalLabels={false}
+                  withHorizontalLabels={true}
+                  chartConfig={{
+                    backgroundColor: DS.bg,
+                    backgroundGradientFrom: DS.bg,
+                    backgroundGradientTo: DS.bg,
+                    decimalPlaces: isKR ? 0 : 2,
+                    color: () => isPositive ? DS.rise : DS.fall,
+                    labelColor: () => DS.textMuted,
+                    propsForBackgroundLines: { stroke: DS.card }
+                  }}
+                  bezier
+                  style={{ paddingRight: 0 }}
+                />
+              ) : (
+                <View style={{ alignItems: 'center', padding: 40 }}>
+                  <ActivityIndicator color={DS.fall} size="large" />
+                  <Text style={{ color: DS.textSub, marginTop: 12 }}>차트 로딩 중...</Text>
+                </View>
+              )}
+
+              {/* 거래량 바 */}
+              {chartData.length > 0 && (
+                <View style={{ height: 60, flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, gap: 1, marginTop: 4 }}>
+                  {chartData.slice(-40).map((d: any, i: number) => {
+                    const maxV = Math.max(...chartData.slice(-40).map((x: any) => x.volume ?? 1))
+                    return (
+                      <View
+                        key={i}
+                        style={{
+                          flex: 1,
+                          height: Math.max(2, (d.volume / maxV) * 50),
+                          backgroundColor: d.close >= d.open ? `${DS.rise}60` : `${DS.fall}60`,
+                          borderRadius: 1
+                        }}
+                      />
+                    )
+                  })}
+                </View>
+              )}
+            </View>
+
+            {/* 기간 선택 + 매수매도 버튼 */}
+            <SafeAreaView style={{ borderTopWidth: 1, borderTopColor: DS.border }}>
+              <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10 }}>
+                {([
+                  { key: '1d', label: '일' },
+                  { key: '5d', label: '주' },
+                  { key: '1mo', label: '월' },
+                  { key: '1y', label: '년' }
+                ] as const).map(p => (
+                  <TouchableOpacity
+                    key={p.key}
+                    onPress={() => setChartPeriod(p.key)}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      backgroundColor: chartPeriod === p.key ? DS.border : 'transparent',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <Text style={{
+                      color: chartPeriod === p.key ? DS.text : DS.textSub,
+                      fontSize: 15,
+                      fontWeight: chartPeriod === p.key ? 'bold' : 'normal'
+                    }}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 8, gap: 12 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowChartModal(false)
+                    setTradeType('sell')
+                    setShowTradeSheet(true)
+                  }}
+                  style={{
+                    flex: 1, height: 52,
+                    borderRadius: 30,
+                    backgroundColor: '#2255CC',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{ color: '#FFF', fontSize: 17, fontWeight: 'bold' }}>
+                    판매하기
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowChartModal(false)
+                    setTradeType('buy')
+                    setShowTradeSheet(true)
+                  }}
+                  style={{
+                    flex: 1, height: 52,
+                    borderRadius: 30,
+                    backgroundColor: '#CC2222',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{ color: '#FFF', fontSize: 17, fontWeight: 'bold' }}>
+                    구매하기
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          </View>
+        </Modal>
+      )}
+
+      {/* ── 매수/매도 시트 ── */}
+      {showTradeSheet && (
+        <TradeSheet
+          stock={stock}
+          livePrice={livePrice}
+          liveChange={liveChange}
+          isKR={isKR}
+          type={tradeType}
+          userData={userData}
+          cash={cash}
+          userId={user?.id}
+          onClose={() => setShowTradeSheet(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: DS.bg },
+// ══════════════════════════════════════════════════
+//  TradeSheet (주문창)
+// ══════════════════════════════════════════════════
+interface TradeSheetProps {
+  stock: { ticker: string; name: string; price: number; change: number; sector?: string; logo: string; krw: boolean };
+  livePrice: number;
+  liveChange: number;
+  isKR: boolean;
+  type: 'buy' | 'sell';
+  userData: UserData | null;
+  cash: number;
+  userId?: string;
+  onClose: () => void;
+}
 
+function TradeSheet({
+  stock, livePrice, liveChange, isKR, type: initialType,
+  userData, cash, userId, onClose,
+}: TradeSheetProps) {
+  const DS = useDS();
+  const [tradeType, setTradeType] = useState(initialType);
+  const [fixedPrice] = useState(livePrice);
+  const [quantity, setQuantity] = useState(0);
+  const [quantityText, setQuantityText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const ownedStock = userData?.portfolio?.find(p => p.ticker === stock.ticker);
+  const balance = userData?.balance ?? cash;
+  const maxSellQty = ownedStock?.quantity ?? 0;
+  const maxBuyQty = fixedPrice > 0
+    ? (isKR ? Math.floor(balance / (fixedPrice * 1.001)) : parseFloat((balance / (fixedPrice * 1.001)).toFixed(4)))
+    : 0;
+  const maxQty = tradeType === 'buy' ? maxBuyQty : maxSellQty;
+  const totalCost = fixedPrice * quantity * 1.001;
+  const totalReceive = fixedPrice * quantity * 0.999;
+
+  const isSellDisabled = tradeType === 'sell' && (quantity <= 0 || quantity > maxSellQty || maxSellQty === 0);
+  const isBuyDisabled = tradeType === 'buy' && (quantity <= 0 || balance < fixedPrice * quantity * 1.001);
+  const isButtonDisabled = isSellDisabled || isBuyDisabled || isLoading;
+
+  const fmtP = (n: number) => {
+    if (!n) return '-';
+    return isKR ? `${Math.round(n).toLocaleString()}원` : `$${n.toFixed(2)}`;
+  };
+
+  const handleQuantityChange = (text: string) => {
+    setQuantityText(text);
+    if (isKR) {
+      const num = parseInt(text.replace(/[^0-9]/g, '')) || 0;
+      if (tradeType === 'sell' && num > maxSellQty) {
+        setQuantity(maxSellQty);
+        setQuantityText(maxSellQty.toString());
+        return;
+      }
+      if (tradeType === 'buy' && num > maxBuyQty) {
+        setQuantity(maxBuyQty);
+        setQuantityText(maxBuyQty.toString());
+        return;
+      }
+      setQuantity(Math.max(0, num));
+    } else {
+      const num = parseFloat(text.replace(/[^0-9.]/g, '')) || 0;
+      if (tradeType === 'sell' && num > maxSellQty) {
+        setQuantity(maxSellQty);
+        setQuantityText(maxSellQty.toFixed(4));
+        return;
+      }
+      if (tradeType === 'buy' && num > maxBuyQty) {
+        setQuantity(maxBuyQty);
+        setQuantityText(maxBuyQty.toFixed(4));
+        return;
+      }
+      setQuantity(Math.max(0, num));
+    }
+  };
+
+  const handleIncrease = () => {
+    const step = isKR ? 1 : 0.1;
+    const newQ = parseFloat((quantity + step).toFixed(4));
+    if (newQ > maxQty) return;
+    setQuantity(newQ);
+    setQuantityText(isKR ? newQ.toString() : newQ.toFixed(1));
+  };
+
+  const handleDecrease = () => {
+    const step = isKR ? 1 : 0.1;
+    const newQ = Math.max(0, parseFloat((quantity - step).toFixed(4)));
+    setQuantity(newQ);
+    setQuantityText(newQ > 0 ? (isKR ? newQ.toString() : newQ.toFixed(1)) : '');
+  };
+
+  const handlePercentSelect = (pct: number) => {
+    const base = tradeType === 'buy' ? maxBuyQty : maxSellQty;
+    const newQty = isKR ? Math.floor(base * pct / 100) : parseFloat((base * pct / 100).toFixed(4));
+    const safeQty = Math.max(0, newQty);
+    setQuantity(safeQty);
+    setQuantityText(safeQty > 0 ? (isKR ? safeQty.toString() : safeQty.toFixed(4)) : '');
+  };
+
+  const handleTrade = async () => {
+    console.log('handleTrade 호출:', tradeType, quantity, fixedPrice);
+    console.log('user.uid:', userId);
+    if (!userId || quantity <= 0) {
+      if (quantity <= 0) Alert.alert('알림', '수량을 입력해주세요');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const tradePrice = fixedPrice;
+
+      if (tradeType === 'buy') {
+        const cost = isKR ? Math.floor(tradePrice * quantity * 1.001) : tradePrice * quantity * 1.001;
+        if (balance < cost) {
+          Alert.alert('잔액 부족', `필요: ${fmtP(cost)}\n보유: ${fmtP(balance)}`);
+          return;
+        }
+
+        const existingStock = userData?.portfolio?.find(p => p.ticker === stock.ticker);
+        const newPortfolio = existingStock
+          ? (userData?.portfolio ?? []).map(p =>
+              p.ticker === stock.ticker
+                ? {
+                    ...p,
+                    quantity: p.quantity + quantity,
+                    avgPrice: isKR
+                      ? Math.round((p.avgPrice * p.quantity + tradePrice * quantity) / (p.quantity + quantity))
+                      : parseFloat(((p.avgPrice * p.quantity + tradePrice * quantity) / (p.quantity + quantity)).toFixed(4)),
+                    price: tradePrice,
+                  }
+                : p,
+            )
+          : [
+              ...(userData?.portfolio ?? []),
+              {
+                ticker: stock.ticker, name: stock.name, quantity,
+                avgPrice: tradePrice, price: tradePrice,
+                sector: stock.sector ?? '기타', change: stock.change ?? 0,
+                bg: '#8E8E93', logo: stock.logo ?? '',
+              },
+            ];
+
+        const newBalance = balance - cost;
+        const portfolioValue = newPortfolio.reduce((sum, p) => sum + (p.price ?? p.avgPrice) * p.quantity, 0);
+
+        await updateDoc(doc(db, 'users', userId), {
+          balance: newBalance,
+          totalAsset: newBalance + portfolioValue,
+          portfolio: newPortfolio,
+          transactions: arrayUnion({
+            type: 'buy', ticker: stock.ticker, stockName: stock.name,
+            quantity, price: tradePrice, total: cost,
+            fee: isKR ? Math.floor(tradePrice * quantity * 0.001) : tradePrice * quantity * 0.001,
+            createdAt: new Date().toISOString(),
+          }),
+        });
+        useAppStore.setState({ cash: newBalance, holdings: newPortfolio.map(p => ({ ticker: p.ticker, qty: p.quantity, avgPrice: p.avgPrice })) });
+
+        const currentNotifs = Array.isArray(userData?.notifications)
+          ? userData.notifications : [];
+
+        await saveNotif(userId!, currentNotifs, {
+          type: 'trade',
+          title: '✅ 매수 완료',
+          body: `${stock.name} ${isKR ? quantity : quantity.toFixed(4)}주 @ ${isKR ? `${Math.round(fixedPrice).toLocaleString()}원` : `$${fixedPrice.toFixed(2)}`}`,
+          ticker: stock.ticker,
+          stockName: stock.name,
+          quantity,
+          price: fixedPrice,
+          total: totalCost,
+          tradeType: 'buy'
+        });
+
+      } else {
+        if (!ownedStock || ownedStock.quantity < quantity) {
+          Alert.alert('보유 수량 부족', `보유: ${isKR ? (ownedStock?.quantity ?? 0) : (ownedStock?.quantity ?? 0).toFixed(4)}주`);
+          return;
+        }
+
+        const sellAmount = isKR ? Math.floor(tradePrice * quantity * 0.999) : tradePrice * quantity * 0.999;
+        const profit = isKR
+          ? Math.floor((tradePrice - ownedStock.avgPrice) * quantity)
+          : (tradePrice - ownedStock.avgPrice) * quantity;
+
+        const newPortfolio = Math.abs(ownedStock.quantity - quantity) < 0.0001
+          ? (userData?.portfolio ?? []).filter(p => p.ticker !== stock.ticker)
+          : (userData?.portfolio ?? []).map(p =>
+              p.ticker === stock.ticker ? { ...p, quantity: parseFloat((p.quantity - quantity).toFixed(4)) } : p,
+            );
+
+        const newBalance = balance + sellAmount;
+        const portfolioValue = newPortfolio.reduce((sum, p) => sum + (p.price ?? p.avgPrice) * p.quantity, 0);
+
+        await updateDoc(doc(db, 'users', userId), {
+          balance: newBalance,
+          totalAsset: newBalance + portfolioValue,
+          portfolio: newPortfolio,
+          transactions: arrayUnion({
+            type: 'sell', ticker: stock.ticker, stockName: stock.name,
+            quantity, price: tradePrice, avgPrice: ownedStock.avgPrice,
+            total: sellAmount, profit,
+            fee: isKR ? Math.floor(tradePrice * quantity * 0.001) : tradePrice * quantity * 0.001,
+            createdAt: new Date().toISOString(),
+          }),
+        });
+        useAppStore.setState({ cash: newBalance, holdings: newPortfolio.map(p => ({ ticker: p.ticker, qty: p.quantity, avgPrice: p.avgPrice })) });
+
+        const currentNotifs = Array.isArray(userData?.notifications)
+          ? userData.notifications : [];
+
+        await saveNotif(userId!, currentNotifs, {
+          type: 'trade',
+          title: '✅ 매도 완료',
+          body: `${stock.name} ${isKR ? quantity : quantity.toFixed(4)}주 @ ${isKR ? `${Math.round(fixedPrice).toLocaleString()}원` : `$${fixedPrice.toFixed(2)}`}`,
+          ticker: stock.ticker,
+          stockName: stock.name,
+          quantity,
+          price: fixedPrice,
+          total: totalReceive,
+          tradeType: 'sell'
+        });
+      }
+
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      onClose();
+      const qtyStr = isKR ? `${quantity}` : `${quantity.toFixed(4)}`;
+      Alert.alert(
+        tradeType === 'buy' ? '매수 완료' : '매도 완료',
+        `${stock.name} ${qtyStr}주 ${tradeType === 'buy' ? '매수' : '매도'} 완료!\n체결가: ${fmtP(tradePrice)}`,
+      );
+    } catch (e: any) {
+      console.error('거래 오류:', e);
+      Alert.alert('거래 오류', e?.message ?? '알 수 없는 오류');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity
+        style={{ flex: 1, backgroundColor: '#00000060' }}
+        activeOpacity={1}
+        onPress={onClose}
+      />
+
+        {/* 시트 본체 */}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={{
+            backgroundColor: DS.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+            maxHeight: Dimensions.get('window').height * 0.85,
+          }}>
+            {/* 핸들 */}
+            <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 4 }}>
+              <View style={{ width: 40, height: 4, backgroundColor: DS.border, borderRadius: 2 }} />
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" bounces contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+              {/* 탭: 매수/매도 */}
+              <View style={{ flexDirection: 'row', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: DS.border }}>
+                {(['매수', '매도'] as const).map(t => {
+                  const isBuy = t === '매수';
+                  const isActive = (isBuy && tradeType === 'buy') || (!isBuy && tradeType === 'sell');
+                  const activeColor = isBuy ? DS.rise : DS.fall;
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      onPress={() => { setTradeType(isBuy ? 'buy' : 'sell'); setQuantity(0); setQuantityText(''); }}
+                      style={{ flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: isActive ? activeColor : 'transparent' }}
+                    >
+                      <Text style={{ color: isActive ? activeColor : DS.textMuted, fontSize: 15, fontWeight: 'bold' }}>{t}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* 보유 현황 */}
+              <View style={{ backgroundColor: DS.cardAlt, borderRadius: 12, padding: 12, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between' }}>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ color: DS.textSub, fontSize: 12 }}>{tradeType === 'buy' ? '주문가능' : '보유수량'}</Text>
+                  <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 14, marginTop: 4 }}>
+                    {tradeType === 'buy' ? `${Math.round(balance).toLocaleString()}원` : isKR ? `${maxSellQty}주` : `${maxSellQty.toFixed(4)}주`}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ color: DS.textSub, fontSize: 12 }}>{tradeType === 'buy' ? '최대 매수' : '평균매수가'}</Text>
+                  <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 14, marginTop: 4 }}>
+                    {tradeType === 'buy' ? (isKR ? `${maxBuyQty}주` : `${maxBuyQty.toFixed(4)}주`) : fmtP(ownedStock?.avgPrice ?? 0)}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ color: DS.textSub, fontSize: 12 }}>체결가</Text>
+                  <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 14, marginTop: 4 }}>{fmtP(fixedPrice)}</Text>
+                </View>
+              </View>
+
+              {/* 수량 입력 */}
+              <View style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, paddingHorizontal: 4 }}>
+                  <Text style={{ color: DS.textSub, fontSize: 13 }}>수량{!isKR && <Text style={{ color: DS.fall, fontSize: 11 }}> (소수점 가능)</Text>}</Text>
+                  <Text style={{ color: quantity >= maxQty ? DS.rise : DS.textSub, fontSize: 12, fontWeight: quantity >= maxQty ? 'bold' : 'normal' }}>
+                    최대 {isKR ? `${maxQty}주` : `${maxQty.toFixed(4)}주`}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: DS.borderLight, borderRadius: 12, padding: 12 }}>
+                  <TouchableOpacity onPress={handleDecrease} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: DS.border, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ color: DS.text, fontSize: 22 }}>−</Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    value={quantityText}
+                    onChangeText={handleQuantityChange}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    onSubmitEditing={Keyboard.dismiss}
+                    blurOnSubmit
+                    placeholder={isKR ? '수량' : '수량 (소수점)'}
+                    placeholderTextColor={DS.textDim}
+                    style={{ flex: 1, textAlign: 'center', fontSize: 24, fontWeight: 'bold', color: quantity > maxQty ? DS.rise : DS.text }}
+                  />
+                  <TouchableOpacity onPress={handleIncrease} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: DS.border, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ color: DS.text, fontSize: 22 }}>+</Text>
+                  </TouchableOpacity>
+                </View>
+                {quantity > maxQty && (
+                  <Text style={{ color: DS.rise, fontSize: 13, textAlign: 'center', marginTop: 6, fontWeight: 'bold' }}>
+                    {tradeType === 'buy' ? '잔액이 부족해요' : '보유 수량을 초과했어요'}
+                  </Text>
+                )}
+              </View>
+
+              {/* % 버튼 */}
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                {[10, 25, 50, 100].map(pct => (
+                  <TouchableOpacity
+                    key={pct}
+                    onPress={() => handlePercentSelect(pct)}
+                    style={{ flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: DS.cardAlt, alignItems: 'center', borderWidth: 1, borderColor: DS.border }}
+                  >
+                    <Text style={{ color: DS.text, fontSize: 13, fontWeight: 'bold' }}>{pct}%</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* 주문 요약 */}
+              <View style={{ backgroundColor: DS.cardAlt, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+                {[
+                  { label: '체결 가격', value: fmtP(fixedPrice) },
+                  { label: '수량', value: isKR ? `${quantity}주` : `${quantity.toFixed(4)}주` },
+                  { label: '수수료 (0.1%)', value: fmtP(fixedPrice * quantity * 0.001) },
+                ].map((item, i, arr) => (
+                  <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: DS.border }}>
+                    <Text style={{ color: DS.textSub, fontSize: 14 }}>{item.label}</Text>
+                    <Text style={{ fontWeight: '600', fontSize: 14, color: DS.text }}>{item.value}</Text>
+                  </View>
+                ))}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: DS.borderLight }}>
+                  <Text style={{ fontWeight: 'bold', fontSize: 15, color: DS.text }}>{tradeType === 'buy' ? '총 결제금액' : '총 수령금액'}</Text>
+                  <Text style={{ fontWeight: 'bold', fontSize: 18, color: tradeType === 'buy' ? DS.rise : DS.fall }}>
+                    {tradeType === 'buy' ? fmtP(totalCost) : fmtP(totalReceive)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 매수/매도 버튼 */}
+              <TouchableOpacity
+                onPress={handleTrade}
+                disabled={isButtonDisabled}
+                style={{
+                  height: 52, borderRadius: 12, justifyContent: 'center', alignItems: 'center',
+                  backgroundColor: isButtonDisabled ? DS.borderLight : tradeType === 'buy' ? '#CC2222' : '#2255CC',
+                }}
+                activeOpacity={0.85}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={{ color: isButtonDisabled ? DS.textMuted : '#FFFFFF', fontSize: 17, fontWeight: 'bold' }}>
+                    {tradeType === 'sell' && quantity > maxSellQty
+                      ? '보유 수량 초과'
+                      : tradeType === 'buy' && balance < totalCost
+                        ? '잔액 부족'
+                        : tradeType === 'buy'
+                          ? `${isKR ? quantity : quantity.toFixed(4)}주 매수하기`
+                          : `${isKR ? quantity : quantity.toFixed(4)}주 매도하기`}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <Text style={{ color: DS.textDim, fontSize: 11, textAlign: 'center', marginTop: 12 }}>
+                실제 투자가 아닌 모의투자입니다
+              </Text>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ══════════════════════════════════════════════════
+//  OrderbookTab — 호가 데이터
+// ══════════════════════════════════════════════════
+interface OrderbookTabProps {
+  ticker: string;
+  isKR: boolean;
+  livePrice: number;
+  isPositive: boolean;
+  changeColor: string;
+  liveChange: number;
+  fmt: (n: number) => string;
+  hasPrice: boolean;
+  onBuy: () => void;
+  onSell: () => void;
+}
+
+function OrderbookTab({ ticker, isKR, livePrice, isPositive, changeColor, liveChange, fmt, hasPrice, onBuy, onSell }: OrderbookTabProps) {
+  const DS = useDS();
+  const [orderbookData, setOrderbookData] = useState<{
+    asks: { price: number; quantity: number; rate: number }[];
+    bids: { price: number; quantity: number; rate: number }[];
+    totalAskQty: number;
+    totalBidQty: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadOrderbook();
+  }, [ticker, livePrice]);
+
+  const loadOrderbook = async () => {
+    if (!livePrice || livePrice <= 0) {
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      const yahooTicker = isKR ? `${ticker}.KS` : ticker;
+      const response = await fetch(
+        `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${yahooTicker}&fields=bid,ask,bidSize,askSize,regularMarketPrice,regularMarketVolume`,
+        { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' } },
+      );
+      const data = await response.json();
+      const quote = data.quoteResponse?.result?.[0];
+
+      const currentPrice = quote?.regularMarketPrice ?? livePrice;
+      const bid = quote?.bid ?? currentPrice * 0.999;
+      const ask = quote?.ask ?? currentPrice * 1.001;
+
+      const tickSize = isKR
+        ? currentPrice >= 500000 ? 1000
+        : currentPrice >= 100000 ? 500
+        : currentPrice >= 50000 ? 100
+        : currentPrice >= 10000 ? 50
+        : currentPrice >= 5000 ? 10
+        : 5
+        : 0.01;
+
+      const asks = Array.from({ length: 10 }, (_, i) => {
+        const p = isKR
+          ? Math.round((ask + tickSize * (9 - i)) / tickSize) * tickSize
+          : parseFloat((ask + 0.01 * (9 - i)).toFixed(2));
+        return {
+          price: p,
+          quantity: Math.floor(Math.random() * 200 + 10),
+          rate: parseFloat(((p - currentPrice) / currentPrice * 100).toFixed(2)),
+        };
+      });
+
+      const bids = Array.from({ length: 10 }, (_, i) => {
+        const p = isKR
+          ? Math.round((bid - tickSize * i) / tickSize) * tickSize
+          : parseFloat((bid - 0.01 * i).toFixed(2));
+        return {
+          price: p,
+          quantity: Math.floor(Math.random() * 200 + 10),
+          rate: parseFloat(((p - currentPrice) / currentPrice * 100).toFixed(2)),
+        };
+      });
+
+      setOrderbookData({
+        asks,
+        bids,
+        totalAskQty: asks.reduce((s, a) => s + a.quantity, 0),
+        totalBidQty: bids.reduce((s, b) => s + b.quantity, 0),
+      });
+    } catch (error) {
+      console.error('호가 로드 오류:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={{ padding: 40, alignItems: 'center' }}>
+        <ActivityIndicator color={DS.text} />
+        <Text style={{ color: DS.textMuted, marginTop: 12 }}>호가 로딩 중...</Text>
+      </View>
+    );
+  }
+
+  if (!orderbookData || !hasPrice) {
+    return (
+      <View style={{ padding: 40, alignItems: 'center' }}>
+        <Text style={{ fontSize: 48, marginBottom: 12 }}>📊</Text>
+        <Text style={{ color: DS.textMuted, textAlign: 'center', lineHeight: 22 }}>
+          호가 데이터를 불러올 수 없어요
+        </Text>
+      </View>
+    );
+  }
+
+  const fmtOB = (p: number) => isKR ? Math.round(p).toLocaleString() : p.toFixed(2);
+
+  return (
+    <View>
+      {/* 체결강도 */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 16, backgroundColor: DS.card }}>
+        <Text style={{ color: DS.textSub, fontSize: 13 }}>체결강도</Text>
+        <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 13 }}>
+          {orderbookData.totalAskQty > 0
+            ? (orderbookData.totalBidQty / orderbookData.totalAskQty * 100).toFixed(2)
+            : '-'}%
+        </Text>
+      </View>
+
+      {/* 매도호가 (asks) */}
+      {orderbookData.asks.map((ask, i) => (
+        <TouchableOpacity
+          key={`ask-${i}`}
+          onPress={onBuy}
+          style={{
+            flexDirection: 'row', alignItems: 'center',
+            paddingHorizontal: 16, paddingVertical: 10,
+            borderBottomWidth: 1, borderBottomColor: DS.cardAlt,
+            backgroundColor: DS.card,
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={{ flex: 1, color: DS.textMuted, fontSize: 13, textAlign: 'right' }}>
+            {ask.quantity.toLocaleString()}
+          </Text>
+          <Text style={{ flex: 1.5, color: DS.fall, fontSize: 15, fontWeight: 'bold', textAlign: 'center' }}>
+            {fmtOB(ask.price)}
+          </Text>
+          <Text style={{ flex: 1, color: DS.fall, fontSize: 12, textAlign: 'left' }}>
+            {ask.rate > 0 ? '+' : ''}{ask.rate}%
+          </Text>
+        </TouchableOpacity>
+      ))}
+
+      {/* 현재가 */}
+      <View style={{
+        backgroundColor: DS.cardAlt, padding: 16, alignItems: 'center',
+        borderWidth: 1, borderColor: DS.borderLight,
+      }}>
+        <Text style={{ color: changeColor, fontSize: 24, fontWeight: 'bold' }}>
+          {fmt(livePrice)}
+        </Text>
+        <Text style={{ color: changeColor, fontSize: 14, marginTop: 4 }}>
+          {isPositive ? '+' : ''}{liveChange.toFixed(2)}%
+        </Text>
+      </View>
+
+      {/* 매수호가 (bids) */}
+      {orderbookData.bids.map((bid, i) => (
+        <TouchableOpacity
+          key={`bid-${i}`}
+          onPress={onSell}
+          style={{
+            flexDirection: 'row', alignItems: 'center',
+            paddingHorizontal: 16, paddingVertical: 10,
+            borderBottomWidth: 1, borderBottomColor: DS.cardAlt,
+            backgroundColor: DS.card,
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={{ flex: 1, color: DS.rise, fontSize: 12, textAlign: 'right' }}>
+            {bid.rate > 0 ? '+' : ''}{bid.rate}%
+          </Text>
+          <Text style={{ flex: 1.5, color: DS.rise, fontSize: 15, fontWeight: 'bold', textAlign: 'center' }}>
+            {fmtOB(bid.price)}
+          </Text>
+          <Text style={{ flex: 1, color: DS.textMuted, fontSize: 13, textAlign: 'left' }}>
+            {bid.quantity.toLocaleString()}
+          </Text>
+        </TouchableOpacity>
+      ))}
+
+      {/* 총 잔량 */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 16, backgroundColor: DS.card }}>
+        <Text style={{ color: DS.fall, fontWeight: 'bold', fontSize: 14 }}>
+          판매 대기 {orderbookData.totalAskQty.toLocaleString()}
+        </Text>
+        <Text style={{ color: DS.rise, fontWeight: 'bold', fontSize: 14 }}>
+          구매 대기 {orderbookData.totalBidQty.toLocaleString()}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ══════════════════════════════════════════════════
+//  StockNewsSection — 종목 관련 뉴스
+// ══════════════════════════════════════════════════
+function StockNewsSection({ ticker, name, isKR }: { ticker: string; name: string; isKR: boolean }) {
+  const DS = useDS();
+  const [news, setNews] = useState<any[]>([]);
+  const navigation = useNavigation<any>();
+
+  useEffect(() => {
+    fetchStockNews(ticker, name).then(setNews).catch(console.error);
+  }, [ticker, name]);
+
+  if (news.length === 0) return null;
+
+  return (
+    <View style={{ marginTop: 16 }}>
+      <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>
+        관련 뉴스
+      </Text>
+      {news.slice(0, 5).map((item, i) => (
+        <TouchableOpacity
+          key={i}
+          onPress={() => navigation.navigate('WebView', { url: item.url, title: item.title })}
+          style={{ backgroundColor: DS.card, borderRadius: DS.radius, padding: 14, marginBottom: 8 }}
+          activeOpacity={0.7}
+        >
+          <Text style={{ color: DS.text, fontSize: 14, lineHeight: 20 }}>{item.title}</Text>
+          <Text style={{ color: DS.textMuted, fontSize: 12, marginTop: 6 }}>
+            {item.source} · {new Date(item.publishedAt).toLocaleString('ko-KR', {
+              month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+            })}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+// ══════════════════════════════════════════════════
+//  스타일
+// ══════════════════════════════════════════════════
+function createMainStyles(DS: ReturnType<typeof useDS>) {
+  return StyleSheet.create({
   // 헤더
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: DS.card,
-    borderBottomWidth: 1, borderBottomColor: DS.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: DS.border,
   },
-  backBtn: { paddingRight: 8 },
-  backArrow: { fontSize: 22, color: DS.text, fontWeight: '600' },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerName: { fontSize: 17, fontWeight: '700', color: DS.text },
-  headerSub: { fontSize: 12, color: DS.textSub, marginTop: 1 },
-  favoriteBtn: { paddingLeft: 8 },
+  headerName: {
+    color: DS.text,
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
 
-  scrollContent: { paddingTop: 16, paddingBottom: 120, gap: 8 },
+  // 탭
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: DS.border,
+  },
+  tabItem: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabItemActive: {
+    borderBottomColor: DS.text,
+  },
+  tabText: {
+    color: DS.textMuted,
+    fontSize: 13,
+  },
+  tabTextActive: {
+    color: DS.text,
+    fontWeight: 'bold',
+  },
 
-  // 현재가 카드
-  priceCard: {
-    backgroundColor: DS.card,
-    marginHorizontal: 16,
-    borderRadius: DS.radius,
-    padding: 20,
-    gap: 12,
-  },
-  priceCardTop: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-  },
-  priceLogoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  priceCardName: { fontSize: 15, fontWeight: '600', color: DS.text },
-  priceCardSub: { fontSize: 12, color: DS.textSub },
-  refreshBtn: { paddingTop: 2 },
-  refreshText: { fontSize: 11, color: DS.textSub },
-  priceValue: {
-    fontSize: 34, fontWeight: '700', color: DS.text,
-    fontFamily: 'Courier', letterSpacing: -1,
-  },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  changeBadge: {
-    alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4,
+  // 칩 버튼
+  chipBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: DS.borderLight,
   },
-  changeBadgeText: { fontSize: 13, fontWeight: '700' },
-  delayText: { fontSize: 11, color: DS.textSub },
-
-  // 차트
-  chartWrapper: { marginHorizontal: 16 },
-
-  // 섹션
-  section: { paddingHorizontal: 16, gap: 8 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: DS.text, paddingLeft: 2 },
-  card: {
-    backgroundColor: DS.card, borderRadius: DS.radius, padding: 16,
+  chipBtnActive: {
+    backgroundColor: DS.borderLight,
+    borderColor: '#555',
+  },
+  chipText: {
+    color: DS.textMuted,
+    fontSize: 13,
+  },
+  chipTextActive: {
+    color: DS.text,
   },
 
-  // 보유 현황 그리드
-  holdingGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  holdingItem: { width: '45%', gap: 4 },
-  holdingLabel: { fontSize: 12, color: DS.textSub },
-  holdingValue: { fontSize: 15, fontWeight: '700', color: DS.text },
-
-  // 정보 행
+  // 정보 카드
+  infoCard: {
+    margin: 16,
+    backgroundColor: DS.card,
+    borderRadius: DS.radius,
+    padding: 16,
+  },
   infoRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 11,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
   },
-  infoRowBorder: { borderBottomWidth: 1, borderBottomColor: DS.border },
-  infoLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  infoLabel: { fontSize: 14, color: DS.textSub },
-  infoValue: { fontSize: 14, fontWeight: '600', color: DS.text },
-  helpBtn: {
-    width: 17, height: 17, borderRadius: 9,
-    backgroundColor: DS.primary, alignItems: 'center', justifyContent: 'center',
+  infoRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: DS.border,
   },
-  helpBtnText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-
-  // 투자자 의견
-  opinionBarRow: {
-    flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 12,
+  infoLabel: {
+    color: DS.textSub,
+    fontSize: 14,
   },
-  opinionBar: { height: 8 },
-  opinionLabels: { flexDirection: 'row', justifyContent: 'space-between' },
-  opinionLabelItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  opinionDot: { width: 8, height: 8, borderRadius: 4 },
-  opinionLabel: { fontSize: 12, color: DS.textSub, fontWeight: '600' },
-
-  // 뉴스
-  newsRow: { paddingVertical: 12 },
-  newsRowBorder: { borderBottomWidth: 1, borderBottomColor: DS.border },
-  newsTitle: { fontSize: 14, fontWeight: '600', color: DS.text, lineHeight: 20 },
-  newsMeta: { fontSize: 12, color: DS.textSub, marginTop: 4 },
-
-  // 거래 내역
-  tradeRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10,
+  infoValue: {
+    color: DS.text,
+    fontSize: 14,
+    fontWeight: '600',
   },
-  tradeBadge: {
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
-  },
-  tradeBadgeText: { fontSize: 12, fontWeight: '700' },
-  tradeDetail: { fontSize: 14, color: DS.text, flex: 1 },
-  tradeDate: { fontSize: 12, color: DS.textSub },
 
   // AI 버튼
   aiBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: DS.card, borderRadius: DS.radius,
-    padding: 16, marginBottom: 8,
-  },
-  aiBtnIcon: { fontSize: 28 },
-  aiBtnTitle: { fontSize: 15, fontWeight: '700', color: DS.text },
-  aiBtnSub: { fontSize: 12, color: DS.textSub, marginTop: 2 },
-  aiBtnChevron: { marginLeft: 'auto' as any, fontSize: 22, color: DS.textSub },
-
-  // 하단 버튼
-  bottomBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 28,
-    backgroundColor: DS.card, borderTopWidth: 1, borderTopColor: DS.border,
-  },
-  bottomBtn: {
-    flex: 1, paddingVertical: 16, borderRadius: DS.radius,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  bottomBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-
-  // 오류 토스트 (기존 에러용)
-  errorToast: {
-    position: 'absolute', bottom: 96, left: 20, right: 20,
-    borderRadius: 10, padding: 14, alignItems: 'center',
-  },
-  toastText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-
-  // 거래 완료 토스트
-  toast: {
-    position: 'absolute',
-    bottom: 100,
-    left: 20,
-    right: 20,
-    backgroundColor: '#191F28',
-    borderRadius: 12,
-    padding: 16,
+    marginTop: 16,
+    backgroundColor: DS.cardAlt,
+    borderRadius: DS.radius,
+    height: 52,
+    justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 999,
-  },
-
-  // 트레이드 Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  modalSheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#E5E8EB',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  sheetStockRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: DS.borderLight,
+  },
+
+  // 하단 바
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: DS.bg,
+    borderTopWidth: 1,
+    borderTopColor: DS.border,
     gap: 12,
   },
-  sheetStockName: { fontSize: 16, fontWeight: '700', color: '#191F28' },
-  sheetStockTicker: { fontSize: 13, color: '#8B95A1', marginTop: 2 },
-  sheetStockPrice: { fontSize: 18, fontWeight: '700', color: '#191F28', fontFamily: 'Courier' },
-  tradeToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#F2F4F6',
-    borderRadius: 12,
-    padding: 3,
-    gap: 3,
-  },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 10,
-  },
-  toggleText: { fontSize: 15, fontWeight: '600', color: '#8B95A1' },
-  qtySection: {
-    backgroundColor: '#F2F4F6',
-    borderRadius: 16,
-    padding: 20,
-  },
-  qtyLabel: { color: '#8B95A1', fontSize: 13, marginBottom: 12 },
-  qtyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  qtyCircleBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qtyCircleBtnText: { fontSize: 24, fontWeight: '700', color: '#191F28' },
-  qtyValue: { fontSize: 32, fontWeight: '700', color: '#191F28' },
-  summaryBox: {
-    backgroundColor: '#F2F4F6',
-    borderRadius: 16,
-    padding: 16,
-    gap: 8,
-  },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  summaryLabel: { fontSize: 14, color: '#8B95A1' },
-  summaryValue: { fontSize: 14, fontWeight: '600', color: '#191F28', fontFamily: 'Courier' },
-  summaryLabelSub: { fontSize: 12, color: '#ADB5BD' },
-  summaryValueSub: { fontSize: 12, color: '#ADB5BD', fontFamily: 'Courier' },
-  summaryDivider: { height: 1, backgroundColor: '#E5E8EB', marginVertical: 4 },
-  summaryTotalLabel: { fontSize: 15, fontWeight: '700', color: '#191F28' },
-  summaryTotalValue: { fontSize: 18, fontWeight: '700', fontFamily: 'Courier' },
-  balanceInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  balanceInfoLabel: { fontSize: 14, color: '#8B95A1' },
-  balanceInfoValue: { fontSize: 16, fontWeight: '700' },
-  warningText: { color: '#F04452', textAlign: 'center', fontSize: 13 },
-  tradeBtnRow: { flexDirection: 'row', gap: 12 },
-  tradeActionBtn: {
+  bottomBtn: {
     flex: 1,
     height: 52,
-    borderRadius: 12,
-    alignItems: 'center',
+    borderRadius: 8,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  tradeActionBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });
+}
+
+// TradeSheet 스타일
+function createTradeStyles(DS: ReturnType<typeof useDS>) {
+  return StyleSheet.create({
+  sheet: {
+    backgroundColor: DS.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: DS.border,
+  },
+  tabItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabText: {
+    color: DS.textMuted,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: DS.borderLight,
+    borderRadius: 8,
+    padding: 12,
+  },
+  circleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: DS.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  circleBtnText: {
+    color: DS.text,
+    fontSize: 20,
+  },
+  inputText: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  pctBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 6,
+    backgroundColor: DS.cardAlt,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: DS.border,
+  },
+  pctBtnActive: {
+    backgroundColor: DS.borderLight,
+    borderColor: '#555',
+  },
+  pctText: {
+    color: DS.textMuted,
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  pctTextActive: {
+    color: DS.text,
+  },
+  amountBox: {
+    backgroundColor: DS.cardAlt,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  tradeBtn: {
+    height: 52,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
+}

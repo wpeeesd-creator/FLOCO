@@ -39,19 +39,15 @@ export default function NewsScreen() {
 
   useEffect(() => { loadNews(); }, [loadNews]);
 
-  const openUrl = async (url: string) => {
-    if (!url) return;
-    try {
-      await Linking.openURL(url);
-    } catch {
-      Alert.alert('오류', '뉴스를 열 수 없어요');
-    }
+  const openNews = (item: NewsItem) => {
+    if (!item.url) return;
+    navigation.navigate('WebView', { url: item.url, title: item.title });
   };
 
   const renderItem = ({ item }: { item: NewsItem }) => (
     <TouchableOpacity
       style={styles.newsCard}
-      onPress={() => openUrl(item.url)}
+      onPress={() => openNews(item)}
       activeOpacity={0.7}
     >
       <View style={styles.newsMeta}>

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1775111483086,
+  "lastScanned": 1775441364795,
   "projectRoot": "C:\\Users\\User\\Downloads\\floco-expo\\floco",
   "techStack": {
     "languages": [
@@ -67,7 +67,7 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 2,
-      "lastAccessed": 1775111482941,
+      "lastAccessed": 1775441364735,
       "keyFiles": [
         "index.tsx",
         "_layout.tsx"
@@ -77,7 +77,7 @@
       "path": "assets",
       "purpose": "Static assets",
       "fileCount": 2,
-      "lastAccessed": 1775111482956,
+      "lastAccessed": 1775441364736,
       "keyFiles": [
         "icon.png",
         "splash.png"
@@ -87,7 +87,7 @@
       "path": "components",
       "purpose": "UI components",
       "fileCount": 6,
-      "lastAccessed": 1775111482985,
+      "lastAccessed": 1775441364747,
       "keyFiles": [
         "NewsCard.tsx",
         "QuizComponents.tsx",
@@ -100,7 +100,7 @@
       "path": "constants",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1775111482988,
+      "lastAccessed": 1775441364749,
       "keyFiles": [
         "design.ts"
       ]
@@ -108,10 +108,11 @@
     "context": {
       "path": "context",
       "purpose": null,
-      "fileCount": 2,
-      "lastAccessed": 1775111482990,
+      "fileCount": 3,
+      "lastAccessed": 1775441364750,
       "keyFiles": [
         "AuthContext.tsx",
+        "ThemeContext.tsx",
         "ToastContext.tsx"
       ]
     },
@@ -119,7 +120,7 @@
       "path": "data",
       "purpose": "Data files",
       "fileCount": 2,
-      "lastAccessed": 1775111482991,
+      "lastAccessed": 1775441364751,
       "keyFiles": [
         "dailyQuestions.ts",
         "learningContent.ts"
@@ -129,7 +130,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1775111482992,
+      "lastAccessed": 1775441364751,
       "keyFiles": [
         "metadata.json"
       ]
@@ -138,7 +139,7 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 3,
-      "lastAccessed": 1775111482993,
+      "lastAccessed": 1775441364752,
       "keyFiles": [
         "MOBILE_UX_GUIDELINE.md",
         "NATIVE_SPEC.md",
@@ -149,7 +150,7 @@
       "path": "functions",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1775111482993,
+      "lastAccessed": 1775441364753,
       "keyFiles": [
         "package-lock.json",
         "package.json",
@@ -160,7 +161,7 @@
       "path": "hooks",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1775111482994,
+      "lastAccessed": 1775441364754,
       "keyFiles": [
         "useNetworkStatus.ts",
         "useNews.ts",
@@ -173,7 +174,7 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 16,
-      "lastAccessed": 1775111482995,
+      "lastAccessed": 1775441364754,
       "keyFiles": [
         "adminService.ts",
         "analytics.ts",
@@ -186,7 +187,7 @@
       "path": "navigation",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1775111482996,
+      "lastAccessed": 1775441364756,
       "keyFiles": [
         "AdminTabs.tsx",
         "AuthStack.tsx",
@@ -198,8 +199,8 @@
     "screens": {
       "path": "screens",
       "purpose": null,
-      "fileCount": 45,
-      "lastAccessed": 1775111482997,
+      "fileCount": 46,
+      "lastAccessed": 1775441364756,
       "keyFiles": [
         "AdminScreen.tsx",
         "AssetDetailScreen.tsx",
@@ -212,7 +213,7 @@
       "path": "store",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1775111482998,
+      "lastAccessed": 1775441364757,
       "keyFiles": [
         "appStore.ts",
         "authStore.ts"
@@ -221,18 +222,21 @@
     "utils": {
       "path": "utils",
       "purpose": "Utility functions",
-      "fileCount": 2,
-      "lastAccessed": 1775111482999,
+      "fileCount": 7,
+      "lastAccessed": 1775441364758,
       "keyFiles": [
+        "kisApi.ts",
+        "kisNewsService.ts",
         "notifications.ts",
-        "versionCheck.ts"
+        "priceService.ts",
+        "profitCalculator.ts"
       ]
     },
     "dist\\assets": {
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 6,
-      "lastAccessed": 1775111483003,
+      "lastAccessed": 1775441364760,
       "keyFiles": [
         "0ea69b5077e7c4696db85dbcba75b0e1",
         "5223c8d9b0d08b82a5670fb5f71faf78",
@@ -243,14 +247,14 @@
       "path": "functions\\node_modules",
       "purpose": "Dependencies",
       "fileCount": 1,
-      "lastAccessed": 1775111483006,
+      "lastAccessed": 1775441364762,
       "keyFiles": []
     },
     "functions\\src": {
       "path": "functions\\src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1775111483006,
+      "lastAccessed": 1775441364762,
       "keyFiles": [
         "index.ts"
       ]
@@ -259,45 +263,81 @@
   "hotPaths": [
     {
       "path": "screens\\StockDetailScreen.tsx",
-      "accessCount": 15,
-      "lastAccessed": 1775111980864,
+      "accessCount": 64,
+      "lastAccessed": 1775444018043,
+      "type": "directory"
+    },
+    {
+      "path": "screens\\RankingScreen.tsx",
+      "accessCount": 5,
+      "lastAccessed": 1775442996633,
+      "type": "directory"
+    },
+    {
+      "path": "utils\\notificationService.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775443084768,
       "type": "file"
     },
     {
-      "path": "store\\appStore.ts",
-      "accessCount": 9,
-      "lastAccessed": 1775111695501,
-      "type": "file"
+      "path": "lib\\newsService.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775443120922,
+      "type": "directory"
     },
     {
       "path": "screens\\HomeScreen.tsx",
-      "accessCount": 7,
-      "lastAccessed": 1775111981462,
-      "type": "file"
-    },
-    {
-      "path": "lib\\firestoreService.ts",
-      "accessCount": 2,
-      "lastAccessed": 1775111676506,
-      "type": "file"
-    },
-    {
-      "path": "context\\AuthContext.tsx",
-      "accessCount": 2,
-      "lastAccessed": 1775111728913,
-      "type": "file"
-    },
-    {
-      "path": "store",
-      "accessCount": 1,
-      "lastAccessed": 1775111605133,
+      "accessCount": 3,
+      "lastAccessed": 1775443777636,
       "type": "directory"
     },
     {
-      "path": "lib",
-      "accessCount": 1,
-      "lastAccessed": 1775111610517,
+      "path": "context\\ThemeContext.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1775443778565,
       "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 2,
+      "lastAccessed": 1775441592473,
+      "type": "directory"
+    },
+    {
+      "path": "screens\\NotificationScreen.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1775441726712,
+      "type": "file"
+    },
+    {
+      "path": "screens\\NewsScreen.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1775443106302,
+      "type": "directory"
+    },
+    {
+      "path": "screens",
+      "accessCount": 2,
+      "lastAccessed": 1775443261893,
+      "type": "directory"
+    },
+    {
+      "path": "App.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1775443780494,
+      "type": "directory"
+    },
+    {
+      "path": "screens\\ProfileScreen.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1775443020153,
+      "type": "directory"
+    },
+    {
+      "path": "navigation\\UserTabs.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1775443780426,
+      "type": "file"
     }
   ],
   "userDirectives": []

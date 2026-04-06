@@ -9,6 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, LogBox } from 'react-native';
 import { Slot } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../context/AuthContext';
@@ -24,6 +25,11 @@ LogBox.ignoreLogs([
   'VirtualizedLists should never be nested',
   'Warning: componentWillReceiveProps',
   'Sending `onAnimatedValueUpdate`',
+  'AsyncStorage has been extracted',
+  'EventEmitter.removeListener',
+  'expo-linking',
+  'No native splash screen',
+  'Require cycle:',
 ]);
 
 // ── 스플래시 유지 (앱 초기화 완료까지) ───────────────
@@ -179,18 +185,20 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <SafeAreaProvider>
-          <ToastProvider>
-            <AuthProvider>
-              <OfflineBanner />
-              <Slot />
-              <DisclaimerModal />
-            </AuthProvider>
-          </ToastProvider>
-        </SafeAreaProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <SafeAreaProvider>
+            <ToastProvider>
+              <AuthProvider>
+                <OfflineBanner />
+                <Slot />
+                <DisclaimerModal />
+              </AuthProvider>
+            </ToastProvider>
+          </SafeAreaProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </GestureHandlerRootView>
   );
 }

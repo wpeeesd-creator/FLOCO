@@ -10,10 +10,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
-import { useAppStore, STOCKS } from '../store/appStore';
+import { STOCKS } from '../store/appStore';
 import { Colors } from '../components/ui';
 import StockLogo from '../components/StockLogo';
 
@@ -65,63 +65,61 @@ const EMPTY_MESSAGES: Record<FilterTab, { emoji: string; title: string; desc: st
 export default function TransactionScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
-  const { trades } = useAppStore();
   const [activeTab, setActiveTab] = useState<FilterTab>('전체');
   const [unified, setUnified] = useState<UnifiedTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = useCallback(async () => {
-    const tradeTxs: UnifiedTransaction[] = (trades ?? []).map(t => {
-      const stock = STOCKS.find(s => s.ticker === t.ticker);
-      return {
-        id: t.id,
-        type: t.type as 'buy' | 'sell',
-        ticker: t.ticker,
-        stockName: stock?.name ?? t.ticker,
-        qty: t.qty,
-        price: t.price,
-        fee: t.fee,
-        timestamp: t.timestamp,
-      };
-    });
-
-    let rewardTxs: UnifiedTransaction[] = [];
-    if (user?.id) {
-      try {
-        const snap = await getDoc(doc(db, 'users', user.id, 'learning', 'data'));
-        if (snap.exists()) {
-          const data = snap.data();
-          const history: any[] = data?.rewardHistory ?? [];
-          rewardTxs = history.map((r, idx) => ({
-            id: r.id ?? `reward_${idx}`,
-            type: 'reward' as const,
-            lessonTitle: r.lessonTitle ?? r.title ?? '학습 완료',
-            reward: r.reward ?? r.amount ?? 0,
-            correctCount: r.correctCount,
-            totalCount: r.totalCount,
-            timestamp: r.timestamp ?? Date.now(),
-          }));
-        }
-      } catch {
-        // Firestore fetch failed silently
-      }
-    }
-
-    const merged = [...tradeTxs, ...rewardTxs].sort((a, b) => b.timestamp - a.timestamp);
-    setUnified(merged);
-  }, [trades, user?.id]);
-
+  // Firestore 실시간 구독 — transactions + rewardHistory
   useEffect(() => {
-    setLoading(true);
-    loadData().finally(() => setLoading(false));
-  }, [loadData]);
+    if (!user?.id) { setLoading(false); return; }
 
-  const onRefresh = useCallback(async () => {
+    const unsubscribe = onSnapshot(doc(db, 'users', user.id), (snap) => {
+      if (!snap.exists()) { setUnified([]); setLoading(false); return; }
+      const data = snap.data();
+
+      // 매수/매도 거래
+      const tradeTxs: UnifiedTransaction[] = (Array.isArray(data.transactions) ? data.transactions : [])
+        .map((t: any, i: number) => {
+          const stock = STOCKS.find(s => s.ticker === t.ticker);
+          return {
+            id: t.id ?? `tx_${i}`,
+            type: t.type as 'buy' | 'sell',
+            ticker: t.ticker,
+            stockName: t.stockName ?? stock?.name ?? t.ticker,
+            qty: t.quantity ?? t.qty,
+            price: t.price,
+            fee: t.fee,
+            timestamp: t.createdAt ? new Date(t.createdAt).getTime() : Date.now(),
+          };
+        });
+
+      // 학습 보상
+      const rewardTxs: UnifiedTransaction[] = (Array.isArray(data.rewardHistory) ? data.rewardHistory : [])
+        .map((r: any, i: number) => ({
+          id: r.id ?? `reward_${i}`,
+          type: 'reward' as const,
+          lessonTitle: r.lessonTitle ?? r.title ?? '학습 완료',
+          reward: r.reward ?? r.amount ?? 0,
+          correctCount: r.correctCount,
+          totalCount: r.totalCount,
+          timestamp: r.timestamp ?? (r.createdAt ? new Date(r.createdAt).getTime() : Date.now()),
+        }));
+
+      const merged = [...tradeTxs, ...rewardTxs].sort((a, b) => b.timestamp - a.timestamp);
+      setUnified(merged);
+      setLoading(false);
+      setRefreshing(false);
+    }, () => { setLoading(false); });
+
+    return () => unsubscribe();
+  }, [user?.id]);
+
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
+    // onSnapshot이 자동으로 업데이트하므로 타이머로 해제
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
 
   const filtered = unified.filter(tx => {
     if (activeTab === '전체') return true;

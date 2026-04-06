@@ -2,13 +2,13 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, RefreshControl, ActivityIndicator,
-  Alert,
+  Alert, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAppStore, STOCKS } from '../store/appStore';
 import { useAuth } from '../context/AuthContext';
@@ -17,8 +17,10 @@ import StockLogo from '../components/StockLogo';
 import NewsCard from '../components/NewsCard';
 import { useAllNews } from '../hooks/useNews';
 import { loadTodayMissions, ALL_COMPLETE_BONUS, type DailyMission } from '../lib/missionService';
+import { fetchMultiplePrices, calculateProfit } from '../utils/priceService';
 
 type TopTab = '보유' | '관심';
+type StockTab = '전체' | '국내' | '미국';
 type MarketFilter = '국내' | '미국' | '기타';
 type SortType = 'value' | 'return';
 
@@ -29,14 +31,18 @@ export default function HomeScreen() {
   const { news, loading: newsLoading } = useAllNews(5);
 
   const [topTab, setTopTab] = useState<TopTab>('보유');
-  const [marketFilter, setMarketFilter] = useState<MarketFilter>('국내');
+  const [stockTab, setStockTab] = useState<StockTab>('전체');
   const [sortType, setSortType] = useState<SortType>('value');
   const [refreshing, setRefreshing] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [nickname, setNickname] = useState('투자자');
   const [investmentType, setInvestmentType] = useState<{ emoji: string; name: string } | null>(null);
   const [firestoreBalance, setFirestoreBalance] = useState<number | null>(null);
   const [firestoreTotalAsset, setFirestoreTotalAsset] = useState<number | null>(null);
+  const [firestoreInitialBalance, setFirestoreInitialBalance] = useState<number | null>(null);
   const [missionData, setMissionData] = useState<{ completed: number; total: number; maxReward: number }>({ completed: 0, total: 0, maxReward: 0 });
+  const [wishlist, setWishlist] = useState<any[]>([]);
+  const [wishlistPrices, setWishlistPrices] = useState<Record<string, any>>({});
 
   // ── Firestore real-time listener ──────────────────
   useEffect(() => {
@@ -55,6 +61,13 @@ export default function HomeScreen() {
         }
         if (data?.totalAsset !== undefined) {
           setFirestoreTotalAsset(data.totalAsset);
+        }
+        if (data?.initialBalance !== undefined) {
+          setFirestoreInitialBalance(data.initialBalance);
+        }
+        // wishlist 동기화
+        if (Array.isArray(data?.wishlist)) {
+          setWishlist(data.wishlist);
         }
         // portfolio → appStore holdings 동기화
         if (Array.isArray(data?.portfolio)) {
@@ -83,37 +96,82 @@ export default function HomeScreen() {
     }).catch(() => {});
   }, [user?.id]);
 
+  // ── 보유 종목 실시간 가격 ──────────────────────────
+  const [portfolioPrices, setPortfolioPrices] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    const safeH = holdings ?? [];
+    if (safeH.length === 0) return;
+    const tickers = safeH.map(h => ({
+      ticker: h.ticker,
+      isKR: h.ticker.length === 6 && /^\d+$/.test(h.ticker),
+    }));
+    fetchMultiplePrices(tickers).then(setPortfolioPrices).catch(() => {});
+    const interval = setInterval(() => {
+      fetchMultiplePrices(tickers).then(setPortfolioPrices).catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [holdings?.length]);
+
+  // ── 관심 종목 실시간 가격 ──────────────────────────
+  useEffect(() => {
+    if (wishlist.length === 0) return;
+    const tickers = wishlist.map((s: any) => ({
+      ticker: s.ticker,
+      isKR: s.isKR ?? (s.ticker.length === 6 && /^\d+$/.test(s.ticker)),
+    }));
+    fetchMultiplePrices(tickers).then(setWishlistPrices).catch(() => {});
+    const interval = setInterval(() => {
+      fetchMultiplePrices(tickers).then(setWishlistPrices).catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [wishlist.length]);
+
   // ── Derived values ────────────────────────────────
-  // appStore (Zustand) 값 우선 — 거래 후 즉시 반영 (Optimistic UI)
-  // cash가 0일 수 있으므로 !== undefined 체크
   const balance = cash !== undefined ? cash : (firestoreBalance ?? 1_000_000);
-  const totalValue = getTotalValue ? getTotalValue() : (firestoreTotalAsset ?? 1_000_000);
-  const initialBalance = 1_000_000;
-  const profit = totalValue - initialBalance;
-  const profitRate = (profit / initialBalance) * 100;
+  const safeHoldingsRaw = holdings ?? [];
+  const portfolioValue = safeHoldingsRaw.reduce((sum, h) => {
+    const livePrice = portfolioPrices[h.ticker]?.price;
+    const stockPrice = STOCKS.find(s => s.ticker === h.ticker)?.price ?? 0;
+    return sum + (livePrice ?? stockPrice) * (h.qty ?? 0);
+  }, 0);
+  const realTotalAsset = balance + portfolioValue;
+  const initialBalance = firestoreInitialBalance ?? 1_000_000;
+  const { profit, profitRate } = calculateProfit(realTotalAsset, initialBalance);
+  const totalValue = realTotalAsset;
   const isUp = profit >= 0;
-  const portfolioValue = totalValue - balance;
+
+  // ── Firestore totalAsset 실시간 업데이트 ──────────
+  useEffect(() => {
+    if (!user?.id || safeHoldingsRaw.length === 0) return;
+    if (Math.abs(realTotalAsset - (firestoreTotalAsset ?? 0)) > 100) {
+      updateDoc(doc(db, 'users', user.id), {
+        totalAsset: Math.round(realTotalAsset),
+      }).catch(console.error);
+    }
+  }, [realTotalAsset]);
 
   // ── Holdings computation ──────────────────────────
   const safeHoldings = holdings ?? [];
   const holdingsData = safeHoldings.map(h => {
     const stock = STOCKS.find(s => s.ticker === h.ticker);
     if (!stock) return null;
-    const evalAmt = (stock.price ?? 0) * (h.qty ?? 0);
-    const pnlAmt = ((stock.price ?? 0) - (h.avgPrice ?? 0)) * (h.qty ?? 0);
+    const livePrice = portfolioPrices[h.ticker]?.price ?? stock.price ?? 0;
+    const evalAmt = livePrice * (h.qty ?? 0);
+    const pnlAmt = (livePrice - (h.avgPrice ?? 0)) * (h.qty ?? 0);
     const pnlRate = (h.avgPrice ?? 0) > 0
-      ? (((stock.price ?? 0) - (h.avgPrice ?? 0)) / (h.avgPrice ?? 0)) * 100
+      ? ((livePrice - (h.avgPrice ?? 0)) / (h.avgPrice ?? 0)) * 100
       : 0;
-    return { ...h, stock, evalAmt, pnlAmt, pnlRate };
+    return { ...h, stock: { ...stock, price: livePrice }, evalAmt, pnlAmt, pnlRate };
   }).filter(Boolean) as Array<{
     ticker: string; qty: number; avgPrice: number;
     stock: typeof STOCKS[0]; evalAmt: number; pnlAmt: number; pnlRate: number;
   }>;
 
-  const marketKey = marketFilter === '국내' ? '한국' : marketFilter === '미국' ? '미국' : undefined;
   const filteredHoldings = holdingsData.filter(h => {
-    if (marketFilter === '기타') return h.stock.market !== '한국' && h.stock.market !== '미국';
-    return h.stock.market === marketKey;
+    if (stockTab === '국내') return h.stock.market === '한국';
+    if (stockTab === '미국') return h.stock.market === '미국';
+    return true; // 전체
   });
 
   const sortedHoldings = [...filteredHoldings].sort((a, b) => {
@@ -128,7 +186,7 @@ export default function HomeScreen() {
     : 0;
   const summaryUp = summaryPnl >= 0;
 
-  const watchlistStocks = STOCKS.slice(0, 8);
+  const watchlistStocks = wishlist;
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -137,13 +195,13 @@ export default function HomeScreen() {
 
   // ── Shared banners ────────────────────────────────
   const renderNoticeBanner = () => (
-    <View style={styles.noticeBanner}>
+    <TouchableOpacity onPress={() => setShowGuide(true)} style={styles.noticeBanner} activeOpacity={0.7}>
       <Ionicons name="megaphone-outline" size={16} color={Colors.primary} />
       <Text style={styles.noticeText} numberOfLines={1}>
         투자 전 반드시 설명서를 읽어보세요. 원금손실이 발생할 수 있습니다.
       </Text>
       <Ionicons name="chevron-forward" size={14} color={Colors.textSub} />
-    </View>
+    </TouchableOpacity>
   );
 
   const renderLearnBanner = () => (
@@ -372,20 +430,40 @@ export default function HomeScreen() {
               💡 학습을 완료하면 가상 자산이 늘어나요!
             </Text>
 
-            {/* ── 국내/미국/기타 필터 탭 ── */}
-            <View style={styles.pillTabRow}>
-              {(['국내', '미국', '기타'] as MarketFilter[]).map(m => (
-                <TouchableOpacity
-                  key={m}
-                  style={[styles.pillTab, marketFilter === m && styles.pillTabActive]}
-                  onPress={() => setMarketFilter(m)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.pillTabText, marketFilter === m && styles.pillTabTextActive]}>
-                    {m}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            {/* ── 전체/국내/미국 보유 종목 탭 ── */}
+            <View style={styles.stockTabRow}>
+              {(['전체', '국내', '미국'] as StockTab[]).map(tab => {
+                const krCount = safeHoldings.filter(h => {
+                  const st = STOCKS.find(s => s.ticker === h.ticker);
+                  return st?.market === '한국';
+                }).length;
+                const usCount = safeHoldings.length - krCount;
+                const count = tab === '전체' ? safeHoldings.length : tab === '국내' ? krCount : usCount;
+                return (
+                  <TouchableOpacity
+                    key={tab}
+                    style={styles.stockTabBtn}
+                    onPress={() => setStockTab(tab)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[
+                      styles.stockTabText,
+                      stockTab === tab && styles.stockTabTextActive,
+                    ]}>
+                      {tab === '국내' ? '🇰🇷 국내' : tab === '미국' ? '🇺🇸 미국' : '전체'}
+                      {count > 0 ? ` ${count}` : ''}
+                    </Text>
+                    {stockTab === tab && <View style={styles.stockTabUnderline} />}
+                  </TouchableOpacity>
+                );
+              })}
+              <View style={{ flex: 1 }} />
+              <TouchableOpacity
+                onPress={() => navigation.getParent()?.navigate('투자Tab')}
+                activeOpacity={0.7}
+              >
+                <Text style={{ color: Colors.primary, fontSize: 13 }}>투자탭 →</Text>
+              </TouchableOpacity>
             </View>
 
             {/* ── 평가금/수익금/수익률 summary ── */}
@@ -460,11 +538,27 @@ export default function HomeScreen() {
                         styles.holdingRow,
                         i < sortedHoldings.length - 1 && styles.holdingBorder,
                       ]}
-                      onPress={() =>
+                      onPress={() => {
+                        const pd = portfolioPrices[h.ticker];
                         navigation.getParent()?.navigate('투자Tab', {
-                          screen: '종목상세', params: { ticker: h.ticker },
-                        })
-                      }
+                          screen: '종목상세', params: {
+                            ticker: h.ticker,
+                            price: pd?.price,
+                            change: pd?.change,
+                            changeAmount: pd?.changeAmount,
+                            high: pd?.high,
+                            low: pd?.low,
+                            open: pd?.open,
+                            volume: pd?.volume,
+                            previousClose: pd?.previousClose,
+                            week52High: pd?.week52High,
+                            week52Low: pd?.week52Low,
+                            per: pd?.per,
+                            pbr: pd?.pbr,
+                            marketState: pd?.marketState,
+                          },
+                        });
+                      }}
                       activeOpacity={0.7}
                     >
                       <StockLogo ticker={h.ticker} size={44} />
@@ -560,43 +654,85 @@ export default function HomeScreen() {
             <View style={styles.watchlistHeader}>
               <Text style={styles.watchlistTitle}>관심 종목 {watchlistStocks.length}</Text>
             </View>
-            <View style={styles.holdingCard}>
-              {watchlistStocks.map((s, i) => {
-                const sUp = s.change >= 0;
-                const holding = safeHoldings.find(h => h.ticker === s.ticker);
-                return (
-                  <TouchableOpacity
-                    key={s.ticker}
-                    style={[
-                      styles.holdingRow,
-                      i < watchlistStocks.length - 1 && styles.holdingBorder,
-                    ]}
-                    onPress={() =>
-                      navigation.getParent()?.navigate('투자Tab', {
-                        screen: '종목상세', params: { ticker: s.ticker },
-                      })
-                    }
-                    activeOpacity={0.7}
-                  >
-                    <StockLogo ticker={s.ticker} size={44} />
-                    <View style={styles.holdingMeta}>
-                      <Text style={styles.holdingName}>{s.name}</Text>
-                      <Text style={styles.holdingQty}>
-                        {s.ticker}{holding ? ` · ${holding.qty}주 보유` : ''}
-                      </Text>
-                    </View>
-                    <View style={styles.holdingAmts}>
-                      <Text style={styles.holdingEval}>
-                        {s.krw ? `₩${s.price.toLocaleString()}` : `$${s.price.toFixed(2)}`}
-                      </Text>
-                      <Text style={[styles.holdingPnl, { color: sUp ? Colors.green : Colors.red }]}>
-                        {sUp ? '+' : ''}{s.change.toFixed(2)}%
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {watchlistStocks.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyEmoji}>🤍</Text>
+                <Text style={styles.emptyTitle}>
+                  관심 종목이 없어요{'\n'}투자 탭에서 하트를 눌러 추가해보세요!
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyBtn}
+                  onPress={() => navigation.getParent()?.navigate('투자Tab')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.emptyBtnText}>종목 둘러보기</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.holdingCard}>
+                {watchlistStocks.map((s: any, i: number) => {
+                  const isKR = s.isKR ?? (s.ticker?.length === 6 && /^\d+$/.test(s.ticker));
+                  const priceData = wishlistPrices[s.ticker];
+                  const displayPrice = priceData?.price ?? 0;
+                  const displayChange = priceData?.change ?? 0;
+                  const sUp = displayChange >= 0;
+                  const holding = safeHoldings.find(h => h.ticker === s.ticker);
+                  return (
+                    <TouchableOpacity
+                      key={s.ticker}
+                      style={[
+                        styles.holdingRow,
+                        i < watchlistStocks.length - 1 && styles.holdingBorder,
+                      ]}
+                      onPress={() => {
+                        const pd = wishlistPrices[s.ticker];
+                        navigation.getParent()?.navigate('투자Tab', {
+                          screen: '종목상세', params: {
+                            ticker: s.ticker,
+                            price: pd?.price,
+                            change: pd?.change,
+                            changeAmount: pd?.changeAmount,
+                            high: pd?.high,
+                            low: pd?.low,
+                            open: pd?.open,
+                            volume: pd?.volume,
+                            previousClose: pd?.previousClose,
+                            week52High: pd?.week52High,
+                            week52Low: pd?.week52Low,
+                            per: pd?.per,
+                            pbr: pd?.pbr,
+                            marketState: pd?.marketState,
+                          },
+                        });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <StockLogo ticker={s.ticker} size={44} />
+                      <View style={styles.holdingMeta}>
+                        <Text style={styles.holdingName}>{s.name}</Text>
+                        <Text style={styles.holdingQty}>
+                          {s.ticker}{holding ? ` · ${holding.qty}주 보유` : ''}
+                        </Text>
+                      </View>
+                      <View style={styles.holdingAmts}>
+                        {displayPrice > 0 ? (
+                          <>
+                            <Text style={styles.holdingEval}>
+                              {isKR ? `₩${Math.round(displayPrice).toLocaleString()}` : `$${displayPrice.toFixed(2)}`}
+                            </Text>
+                            <Text style={[styles.holdingPnl, { color: sUp ? Colors.green : Colors.red }]}>
+                              {sUp ? '+' : ''}{displayChange.toFixed(2)}%
+                            </Text>
+                          </>
+                        ) : (
+                          <ActivityIndicator size="small" color={Colors.textSub} />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             {renderNoticeBanner()}
             {renderLearnBanner()}
@@ -604,6 +740,57 @@ export default function HomeScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* ── 투자 안내 모달 ── */}
+      {showGuide && (
+        <Modal visible={showGuide} animationType="slide" transparent>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowGuide(false)} />
+            <View style={{
+              backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+              padding: 24, maxHeight: '80%',
+            }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: Colors.text }}>
+                  모의투자 가이드
+                </Text>
+                <TouchableOpacity onPress={() => setShowGuide(false)}>
+                  <Ionicons name="close" size={24} color={Colors.textSub} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {[
+                  { emoji: '💡', title: 'FLOCO란?', content: '실제 돈을 사용하지 않고 가상의 자산으로 주식 투자를 경험할 수 있는 모의투자 앱이에요.' },
+                  { emoji: '💰', title: '초기 자산', content: '처음 가입하면 1,000,000원의 가상 자산이 지급돼요. 학습을 완료하면 추가 보상을 받을 수 있어요.' },
+                  { emoji: '📈', title: '실시간 주가', content: 'Yahoo Finance API를 통해 실제 주식 시장의 실시간 가격으로 거래할 수 있어요.' },
+                  { emoji: '💸', title: '수수료 안내', content: '매수 시 0.1%, 매도 시 0.1%의 수수료가 부과돼요. 실제 증권사와 유사한 환경이에요.' },
+                  { emoji: '🇺🇸', title: '미국 주식 소수점', content: '미국 주식은 소수점 단위로 매수할 수 있어요. 예: Apple 0.5주 매수 가능' },
+                  { emoji: '🏆', title: '랭킹', content: '수익률 기준으로 다른 사용자와 경쟁해요. 실시간으로 랭킹이 갱신돼요.' },
+                  { emoji: '🎓', title: '학습 보상', content: '학습 탭에서 레슨을 완료하면 가상 자산 보상을 받아요.' },
+                  { emoji: '⚠️', title: '주의사항', content: 'FLOCO는 교육 목적의 모의투자 앱이에요. 실제 투자 결과와 다를 수 있으며, 실제 투자 권유가 아니에요.' },
+                ].map((item, i) => (
+                  <View key={i} style={{ flexDirection: 'row', marginBottom: 20, alignItems: 'flex-start' }}>
+                    <Text style={{ fontSize: 28, marginRight: 12, marginTop: 2 }}>{item.emoji}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: 'bold', fontSize: 15, color: Colors.text, marginBottom: 4 }}>{item.title}</Text>
+                      <Text style={{ color: Colors.textSub, fontSize: 14, lineHeight: 20 }}>{item.content}</Text>
+                    </View>
+                  </View>
+                ))}
+                <TouchableOpacity
+                  onPress={() => setShowGuide(false)}
+                  style={{
+                    backgroundColor: Colors.primary, borderRadius: 16, height: 52,
+                    justifyContent: 'center', alignItems: 'center', marginTop: 8, marginBottom: 16,
+                  }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 }}>확인했어요!</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
 
     </SafeAreaView>
   );
@@ -613,6 +800,35 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: Colors.bg,
+  },
+  stockTabRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 0,
+    gap: 16,
+  },
+  stockTabBtn: {
+    paddingBottom: 10,
+    alignItems: 'center',
+  },
+  stockTabText: {
+    fontSize: 15,
+    color: Colors.textSub,
+  },
+  stockTabTextActive: {
+    fontWeight: 'bold',
+    color: Colors.primary,
+  },
+  stockTabUnderline: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: Colors.primary,
+    borderRadius: 1,
   },
 
   // ── Header ──

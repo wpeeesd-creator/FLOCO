@@ -48,6 +48,7 @@ import EventScreen from '../screens/EventScreen';
 import EventDetailScreen from '../screens/EventDetailScreen';
 import NewsScreen from '../screens/NewsScreen';
 import NotificationScreen from '../screens/NotificationScreen';
+import WebViewScreen from '../screens/WebViewScreen';
 import CustomTabBar from './CustomTabBar';
 
 export type UserTabParamList = {
@@ -81,6 +82,7 @@ function HomeNavigator() {
       <HomeStack.Screen name="알림" component={NotificationScreen} />
       <HomeStack.Screen name="데일리미션" component={DailyMissionScreen} />
       <HomeStack.Screen name="AI분석" component={PortfolioAIScreen} />
+      <HomeStack.Screen name="WebView" component={WebViewScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -98,6 +100,7 @@ function InvestNavigator() {
       <InvestStack.Screen name="Bond" component={BondScreen} />
       <InvestStack.Screen name="ETF" component={ETFScreen} />
       <InvestStack.Screen name="뉴스" component={NewsScreen} />
+      <InvestStack.Screen name="WebView" component={WebViewScreen} />
     </InvestStack.Navigator>
   );
 }

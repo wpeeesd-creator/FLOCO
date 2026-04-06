@@ -1,7 +1,7 @@
 {
   "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:\\\\Users\\\\User\\\\Downloads\\\\floco-expo\\\\floco\\\\store\\\\appStore.ts\"}",
-  "error": "File content (17614 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
-  "timestamp": "2026-04-02T06:34:17.545Z",
-  "retry_count": 3
+  "tool_input_preview": "{\"file_path\":\"C:\\\\Users\\\\User\\\\Downloads\\\\floco-expo\\\\floco\\\\screens\\\\StockDetailScreen.tsx\"}",
+  "error": "File content (23746 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-04-06T02:11:41.068Z",
+  "retry_count": 1
 }

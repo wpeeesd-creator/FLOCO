@@ -14,7 +14,12 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import RootNavigator from '../navigation/RootNavigator';
 import { OfflineBanner } from '../hooks/useNetworkStatus';
-import { checkVersion } from '../utils/versionCheck';
+
+let checkVersion: () => void = () => {};
+try {
+  checkVersion = require('../utils/versionCheck').checkVersion;
+} catch {}
+
 
 // ── 브랜드 로딩 화면 (스플래시 → 앱 전환 사이) ──────
 function BrandedLoading() {
