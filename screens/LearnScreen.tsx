@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore, LESSONS } from '../store/appStore';
 import { Colors, Typography, Card, Badge, Hearts, Streak, XpBar, SectionHeader } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 // ── 레슨 카드 ──────────────────────────────────
 interface LessonCardProps {
@@ -73,6 +74,7 @@ function LessonCard({ lesson, status, onPress }: LessonCardProps) {
 
 // ── 레슨 상세 / 퀴즈 화면 ──────────────────────
 export function LessonDetailScreen({ route }: any) {
+  const { theme } = useTheme();
   const { lessonId } = route.params;
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -122,10 +124,10 @@ export function LessonDetailScreen({ route }: any) {
   };
 
   const optionStyle = (idx: number) => {
-    if (!answered) return [styles.quizOpt];
+    if (!answered) return [styles.quizOpt, { backgroundColor: theme.bgCard }];
     if (idx === lesson.quiz.ans) return [styles.quizOpt, styles.quizOpt_correct];
     if (idx === selected) return [styles.quizOpt, styles.quizOpt_wrong];
-    return [styles.quizOpt, { opacity: 0.5 }];
+    return [styles.quizOpt, { backgroundColor: theme.bgCard, opacity: 0.5 }];
   };
 
   return (
@@ -133,17 +135,17 @@ export function LessonDetailScreen({ route }: any) {
       {/* 헤더 */}
       <View style={[styles.lessonHeader, { backgroundColor: lesson.color, paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
-          <Text style={{ color: '#fff', fontSize: 22 }}>‹</Text>
+          <Text style={{ color: theme.bgCard, fontSize: 22 }}>‹</Text>
         </TouchableOpacity>
         <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={{ color: '#fff', fontSize: 11, opacity: 0.7 }}>STEP {lesson.step} / 8</Text>
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{lesson.title}</Text>
+          <Text style={{ color: theme.bgCard, fontSize: 11, opacity: 0.7 }}>STEP {lesson.step} / 8</Text>
+          <Text style={{ color: theme.bgCard, fontSize: 16, fontWeight: '700' }}>{lesson.title}</Text>
         </View>
         <Hearts count={hearts} />
       </View>
 
       {/* 진행 탭 */}
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { backgroundColor: theme.bgCard }]}>
         {(['concept', 'quiz'] as const).map(t => (
           <TouchableOpacity key={t} style={[styles.tabItem, tab === t && styles.tabItem_active]} onPress={() => setTab(t)}>
             <Text style={[styles.tabText, tab === t && styles.tabText_active]}>
@@ -190,7 +192,7 @@ export function LessonDetailScreen({ route }: any) {
 
             {status !== 'completed' && (
               <TouchableOpacity style={styles.quizBtn} onPress={() => setTab('quiz')} activeOpacity={0.85}>
-                <Text style={styles.quizBtnText}>퀴즈 풀기 →</Text>
+                <Text style={[styles.quizBtnText, { color: theme.bgCard }]}>퀴즈 풀기 →</Text>
               </TouchableOpacity>
             )}
           </>
@@ -206,7 +208,7 @@ export function LessonDetailScreen({ route }: any) {
               {lesson.quiz.opts.map((opt, i) => (
                 <TouchableOpacity key={i} style={optionStyle(i)} onPress={() => handleAnswer(i)} activeOpacity={0.8}>
                   <View style={[styles.optLabel, { backgroundColor: answered && i === lesson.quiz.ans ? Colors.green : answered && i === selected ? Colors.red : Colors.primary }]}>
-                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{String.fromCharCode(65 + i)}</Text>
+                    <Text style={{ color: theme.bgCard, fontWeight: '700', fontSize: 13 }}>{String.fromCharCode(65 + i)}</Text>
                   </View>
                   <Text style={[Typography.body1, { flex: 1 }]}>{opt}</Text>
                   {answered && i === lesson.quiz.ans && <Text>✅</Text>}
@@ -228,7 +230,7 @@ export function LessonDetailScreen({ route }: any) {
       {/* 보상 오버레이 (듀오링고 스타일) */}
       <Modal visible={showReward} transparent animationType="fade">
         <View style={styles.rewardOverlay}>
-          <Animated.View style={[styles.rewardCard, { transform: [{ scale: confettiAnim }] }]}>
+          <Animated.View style={[styles.rewardCard, { backgroundColor: theme.bgCard, transform: [{ scale: confettiAnim }] }]}>
             <Text style={{ fontSize: 60 }}>🎉</Text>
             <Text style={[Typography.h1, { textAlign: 'center', color: Colors.green }]}>정답!</Text>
             <Animated.View style={{ opacity: xpAnim, transform: [{ translateY: xpAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
@@ -242,11 +244,11 @@ export function LessonDetailScreen({ route }: any) {
             </View>
             {rewardData.levelUp && (
               <View style={styles.levelUpBadge}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>⬆️ LEVEL UP!</Text>
+                <Text style={{ color: theme.bgCard, fontWeight: '700' }}>⬆️ LEVEL UP!</Text>
               </View>
             )}
             <TouchableOpacity style={styles.rewardBtn} onPress={() => { setShowReward(false); navigation.goBack(); }}>
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>계속하기 →</Text>
+              <Text style={{ color: theme.bgCard, fontSize: 16, fontWeight: '700' }}>계속하기 →</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -257,6 +259,7 @@ export function LessonDetailScreen({ route }: any) {
 
 // ── 학습 목록 화면 ──────────────────────────────
 export default function LearnScreen() {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { xp, level, streak, hearts, completedLessons, floPoints, getLessonStatus } = useAppStore();
@@ -264,7 +267,7 @@ export default function LearnScreen() {
   return (
     <View style={styles.container}>
       {/* 헤더 */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.bgCard }]}>
         <Text style={Typography.h2}>학습</Text>
         <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
           <Text style={{ fontSize: 16 }}>🔥{streak}</Text>
@@ -325,14 +328,14 @@ export default function LearnScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: Colors.border },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
   lessonCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, borderWidth: 1.5, marginBottom: 2 },
   lessonEmoji: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   dashRow: { flexDirection: 'row', marginBottom: 16 },
   dashItem: { flex: 1, alignItems: 'center', gap: 2 },
   dashDivider: { width: 1, backgroundColor: Colors.border },
   lessonHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
-  tabBar: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: Colors.border },
+  tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border },
   tabItem: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabItem_active: { borderBottomColor: Colors.primary },
   tabText: { fontSize: 14, color: Colors.textSub },
@@ -343,15 +346,15 @@ const styles = StyleSheet.create({
   keypointDot: { width: 6, height: 6, borderRadius: 3, marginTop: 6 },
   rewardPreview: { padding: 12, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: Colors.gold, alignItems: 'center' },
   quizBtn: { backgroundColor: Colors.primary, borderRadius: 10, padding: 16, alignItems: 'center' },
-  quizBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  quizBtnText: { fontSize: 16, fontWeight: '700' },
   quizQuestion: { backgroundColor: Colors.navy, borderRadius: 12, padding: 20 },
-  quizOpt: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: '#fff' },
+  quizOpt: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.border },
   quizOpt_correct: { borderColor: Colors.green, backgroundColor: Colors.greenBg },
   quizOpt_wrong: { borderColor: Colors.red, backgroundColor: Colors.redBg },
   optLabel: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   hintBox: { padding: 12, borderRadius: 10, backgroundColor: Colors.redBg, borderWidth: 1, borderColor: Colors.red },
   rewardOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  rewardCard: { backgroundColor: '#fff', borderRadius: 24, padding: 32, alignItems: 'center', gap: 12, width: '100%' },
+  rewardCard: { borderRadius: 24, padding: 32, alignItems: 'center', gap: 12, width: '100%' },
   rewardInfo: { backgroundColor: Colors.goldBg, borderRadius: 10, padding: 12, width: '100%', gap: 4 },
   levelUpBadge: { backgroundColor: Colors.gold, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
   rewardBtn: { backgroundColor: Colors.primary, borderRadius: 12, padding: 16, width: '100%', alignItems: 'center' },

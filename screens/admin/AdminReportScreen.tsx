@@ -12,6 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../components/ui';
+import { useTheme } from '../../context/ThemeContext';
 import {
   getReports, resolveReport, suspendUser,
   type Report,
@@ -32,6 +33,7 @@ const REASON_COLORS: Record<string, string> = {
 };
 
 export default function AdminReportScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation();
   const [tab, setTab] = useState<'pending' | 'resolved'>('pending');
   const [reports, setReports] = useState<Report[]>([]);
@@ -134,7 +136,7 @@ export default function AdminReportScreen() {
               style={[styles.actionBtn, styles.actionBtnGreen]}
               onPress={() => handleResolve(item.id, 'resolved')}
             >
-              <Text style={[styles.actionBtnText, { color: '#34C759' }]}>✅ 삭제 처리</Text>
+              <Text style={[styles.actionBtnText, { color: theme.green }]}>✅ 삭제 처리</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, styles.actionBtnRed]}
@@ -153,7 +155,7 @@ export default function AdminReportScreen() {
           <View style={styles.statusRow}>
             {item.status === 'resolved' ? (
               <View style={[styles.statusBadge, { backgroundColor: '#E8F8EE' }]}>
-                <Text style={[styles.statusBadgeText, { color: '#34C759' }]}>처리완료</Text>
+                <Text style={[styles.statusBadgeText, { color: theme.green }]}>처리완료</Text>
               </View>
             ) : (
               <View style={[styles.statusBadge, { backgroundColor: Colors.bg }]}>
@@ -168,6 +170,65 @@ export default function AdminReportScreen() {
       </View>
     );
   };
+
+  const styles = StyleSheet.create({
+    safe: { flex: 1, backgroundColor: Colors.bg },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.card,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
+    tabRow: {
+      flexDirection: 'row', backgroundColor: Colors.card,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    tabItem: { flex: 1, alignItems: 'center', paddingVertical: 12, position: 'relative' },
+    tabText: { fontSize: 15, fontWeight: '600', color: Colors.textSub },
+    tabTextActive: { color: Colors.primary },
+    tabUnderline: {
+      position: 'absolute', bottom: 0, left: '15%', right: '15%',
+      height: 2, backgroundColor: Colors.primary, borderRadius: 1,
+    },
+    loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    listContent: { padding: 16, gap: 12 },
+    card: {
+      backgroundColor: Colors.card, borderRadius: 12, padding: 16,
+      shadowColor: theme.text, shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+    },
+    cardBadgeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+    targetBadge: {
+      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20,
+      backgroundColor: Colors.primary + '15',
+    },
+    targetBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.primary },
+    reasonBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+    reasonBadgeText: { fontSize: 11, fontWeight: '700' },
+    contentPreview: {
+      backgroundColor: Colors.bg, borderRadius: 8, padding: 10, marginBottom: 10,
+    },
+    contentText: { fontSize: 13, color: Colors.text, lineHeight: 18 },
+    metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+    metaText: { fontSize: 12, color: Colors.textSub },
+    actionRow: { flexDirection: 'row', gap: 8 },
+    actionBtn: {
+      flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    actionBtnGreen: { borderColor: theme.green },
+    actionBtnRed: { borderColor: '#FF3B30' },
+    actionBtnGray: { borderColor: Colors.border },
+    actionBtnText: { fontSize: 12, fontWeight: '700' },
+    statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+    statusBadgeText: { fontSize: 12, fontWeight: '700' },
+    memoText: { fontSize: 12, color: Colors.textSub, flex: 1 },
+    emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 8 },
+    emptyEmoji: { fontSize: 36 },
+    emptyText: { fontSize: 15, color: Colors.textSub, fontWeight: '500' },
+  });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -221,61 +282,3 @@ export default function AdminReportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.bg },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.card,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
-  tabRow: {
-    flexDirection: 'row', backgroundColor: Colors.card,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 12, position: 'relative' },
-  tabText: { fontSize: 15, fontWeight: '600', color: Colors.textSub },
-  tabTextActive: { color: Colors.primary },
-  tabUnderline: {
-    position: 'absolute', bottom: 0, left: '15%', right: '15%',
-    height: 2, backgroundColor: Colors.primary, borderRadius: 1,
-  },
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { padding: 16, gap: 12 },
-  card: {
-    backgroundColor: Colors.card, borderRadius: 12, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
-  },
-  cardBadgeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  targetBadge: {
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20,
-    backgroundColor: Colors.primary + '15',
-  },
-  targetBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.primary },
-  reasonBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  reasonBadgeText: { fontSize: 11, fontWeight: '700' },
-  contentPreview: {
-    backgroundColor: Colors.bg, borderRadius: 8, padding: 10, marginBottom: 10,
-  },
-  contentText: { fontSize: 13, color: Colors.text, lineHeight: 18 },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  metaText: { fontSize: 12, color: Colors.textSub },
-  actionRow: { flexDirection: 'row', gap: 8 },
-  actionBtn: {
-    flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  actionBtnGreen: { borderColor: '#34C759' },
-  actionBtnRed: { borderColor: '#FF3B30' },
-  actionBtnGray: { borderColor: Colors.border },
-  actionBtnText: { fontSize: 12, fontWeight: '700' },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  statusBadgeText: { fontSize: 12, fontWeight: '700' },
-  memoText: { fontSize: 12, color: Colors.textSub, flex: 1 },
-  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 8 },
-  emptyEmoji: { fontSize: 36 },
-  emptyText: { fontSize: 15, color: Colors.textSub, fontWeight: '500' },
-});

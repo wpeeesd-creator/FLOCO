@@ -12,9 +12,11 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppStore, STOCKS } from '../store/appStore';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import StockLogo from '../components/StockLogo';
 
 export default function AssetDetailScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const { holdings, cash, getTotalValue, getReturnRate } = useAppStore();
 
@@ -211,7 +213,7 @@ export default function AssetDetailScreen() {
           onPress={() => navigation.navigate('거래내역')}
           activeOpacity={0.85}
         >
-          <Text style={styles.btnPrimaryText}>거래내역 보기</Text>
+          <Text style={[styles.btnPrimaryText, { color: theme.bgCard }]}>거래내역 보기</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -474,7 +476,6 @@ const styles = StyleSheet.create({
   btnPrimaryText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
   btnOutline: {
     height: 52,

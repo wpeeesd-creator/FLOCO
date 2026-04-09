@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { useAppStore, STOCKS } from '../store/appStore';
 import StockLogo from '../components/StockLogo';
 import { BottomSheet, Button, Toast, Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 type StockTab = '보유' | '관심';
 type MarketFilter = '전체' | '국내' | '미국';
@@ -19,6 +20,7 @@ const WATCHLIST_TICKERS = [
 ];
 
 export default function StockScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const { holdings, cash, getTotalValue, getReturnRate, buyStock, sellStock } = useAppStore();
 
@@ -208,7 +210,7 @@ export default function StockScreen() {
                 onPress={() => setMarket(m)}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.pillText, market === m && styles.pillTextActive]}>{m}</Text>
+                <Text style={[styles.pillText, market === m && styles.pillTextActive, market === m && { color: theme.bgCard }]}>{m}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -290,7 +292,7 @@ export default function StockScreen() {
                           onPress={() => openSheet(h.ticker, 'sell')}
                           activeOpacity={0.8}
                         >
-                          <Text style={styles.tradeBtnText}>매도</Text>
+                          <Text style={[styles.tradeBtnText, { color: theme.bgCard }]}>매도</Text>
                         </TouchableOpacity>
                       </TouchableOpacity>
                     );
@@ -352,7 +354,7 @@ export default function StockScreen() {
                           onPress={() => openSheet(s.ticker, 'buy')}
                           activeOpacity={0.8}
                         >
-                          <Text style={styles.tradeBtnText}>매수</Text>
+                          <Text style={[styles.tradeBtnText, { color: theme.bgCard }]}>매수</Text>
                         </TouchableOpacity>
                       </TouchableOpacity>
                     );
@@ -394,7 +396,7 @@ export default function StockScreen() {
                     <Text
                       style={[
                         styles.toggleText,
-                        tradeType === t && { color: '#fff' },
+                        tradeType === t && { color: theme.bgCard },
                       ]}
                     >
                       {t === 'buy' ? '매수' : '매도'}
@@ -566,7 +568,6 @@ const styles = StyleSheet.create({
     color: Colors.textSub,
   },
   pillTextActive: {
-    color: '#FFFFFF',
     fontWeight: '600',
   },
 
@@ -668,7 +669,6 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   tradeBtnText: {
-    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
   },

@@ -7,8 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAppStore, STOCKS } from '../store/appStore';
 import StockLogo from '../components/StockLogo';
+import { useTheme } from '../context/ThemeContext';
 
 export default function MockTradeScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const { holdings } = useAppStore();
 
@@ -19,8 +21,55 @@ export default function MockTradeScreen() {
   // Featured stocks for horizontal scroll
   const featured = STOCKS.slice(0, 12);
 
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.bgCard },
+    header: {
+      paddingHorizontal: 20, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
+    },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: '#191919' },
+
+    banner: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      backgroundColor: '#EBF5FF', marginHorizontal: 16, marginTop: 16,
+      borderRadius: 16, padding: 20,
+    },
+    bannerTitle: { fontSize: 16, fontWeight: '700', color: '#191919' },
+    bannerDesc: { fontSize: 13, color: '#8E8E93', marginTop: 4 },
+
+    logoScroll: { paddingHorizontal: 16, paddingVertical: 16, gap: 12 },
+    logoItem: { alignItems: 'center', width: 64, gap: 6 },
+    logoLabel: { fontSize: 11, color: '#8E8E93', textAlign: 'center' },
+
+    sectionHeader: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
+    sectionTitle: { fontSize: 18, fontWeight: '700', color: '#191919' },
+    sectionSub: { fontSize: 13, color: '#8E8E93', marginTop: 2 },
+
+    listCard: {
+      marginHorizontal: 16, backgroundColor: theme.bgCard,
+      borderRadius: 16, overflow: 'hidden',
+      borderWidth: 1, borderColor: '#F2F2F7',
+    },
+    stockRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingHorizontal: 14, paddingVertical: 14,
+    },
+    stockBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
+    rankNum: {
+      width: 24, fontSize: 14, fontWeight: '800',
+      color: theme.primary, textAlign: 'center',
+    },
+    stockName: { fontSize: 14, fontWeight: '600', color: '#191919' },
+    stockSub: { fontSize: 11, color: '#8E8E93', marginTop: 2 },
+    stockPrice: { fontSize: 14, fontWeight: '600', color: '#191919', fontFamily: 'Courier' },
+    changeBadge: {
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2,
+    },
+    changeText: { fontSize: 11, fontWeight: '700' },
+  });
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bgCard }}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -101,49 +150,3 @@ export default function MockTradeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: {
-    paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
-  },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#191919' },
-
-  banner: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#EBF5FF', marginHorizontal: 16, marginTop: 16,
-    borderRadius: 16, padding: 20,
-  },
-  bannerTitle: { fontSize: 16, fontWeight: '700', color: '#191919' },
-  bannerDesc: { fontSize: 13, color: '#8E8E93', marginTop: 4 },
-
-  logoScroll: { paddingHorizontal: 16, paddingVertical: 16, gap: 12 },
-  logoItem: { alignItems: 'center', width: 64, gap: 6 },
-  logoLabel: { fontSize: 11, color: '#8E8E93', textAlign: 'center' },
-
-  sectionHeader: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#191919' },
-  sectionSub: { fontSize: 13, color: '#8E8E93', marginTop: 2 },
-
-  listCard: {
-    marginHorizontal: 16, backgroundColor: '#FFFFFF',
-    borderRadius: 16, overflow: 'hidden',
-    borderWidth: 1, borderColor: '#F2F2F7',
-  },
-  stockRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 14, paddingVertical: 14,
-  },
-  stockBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
-  rankNum: {
-    width: 24, fontSize: 14, fontWeight: '800',
-    color: '#0066FF', textAlign: 'center',
-  },
-  stockName: { fontSize: 14, fontWeight: '600', color: '#191919' },
-  stockSub: { fontSize: 11, color: '#8E8E93', marginTop: 2 },
-  stockPrice: { fontSize: 14, fontWeight: '600', color: '#191919', fontFamily: 'Courier' },
-  changeBadge: {
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2,
-  },
-  changeText: { fontSize: 11, fontWeight: '700' },
-});

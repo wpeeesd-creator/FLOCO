@@ -15,6 +15,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import { getEvents, joinEvent, type AppEvent } from '../lib/adminService';
 
 // ── 더미 데이터 ────────────────────────────────────
@@ -83,6 +84,7 @@ interface EventCardProps {
 }
 
 function EventCard({ event, userId, onJoin, onPress }: EventCardProps) {
+  const { theme } = useTheme();
   const isJoined = userId ? event.participants.includes(userId) : false;
   const daysLeft = getDaysLeft(event.endDate);
 
@@ -100,7 +102,7 @@ function EventCard({ event, userId, onJoin, onPress }: EventCardProps) {
 
   return (
     <TouchableOpacity
-      style={[styles.card, isEnded && styles.cardEnded]}
+      style={[styles.card, { shadowColor: theme.text }, isEnded && styles.cardEnded]}
       onPress={() => onPress(event)}
       activeOpacity={0.85}
     >
@@ -145,7 +147,7 @@ function EventCard({ event, userId, onJoin, onPress }: EventCardProps) {
             activeOpacity={0.8}
             disabled={isJoined}
           >
-            <Text style={[styles.joinBtnText, isJoined && styles.joinBtnTextJoined]}>
+            <Text style={[styles.joinBtnText, { color: theme.bgCard }, isJoined && styles.joinBtnTextJoined]}>
               {isJoined ? '참여중 ✅' : '참여하기'}
             </Text>
           </TouchableOpacity>
@@ -363,7 +365,6 @@ const styles = StyleSheet.create({
     padding: 20,
     marginHorizontal: 16,
     marginBottom: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
@@ -463,7 +464,6 @@ const styles = StyleSheet.create({
   joinBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#fff',
   },
   joinBtnTextJoined: {
     color: Colors.textSub,

@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../components/ui';
+import { useTheme } from '../../context/ThemeContext';
 import StockLogo from '../../components/StockLogo';
 import { getAllUserProfiles, getAllPortfolios } from '../../lib/firestoreService';
 import { STOCKS } from '../../store/appStore';
@@ -41,6 +42,7 @@ function relativeTime(ts: number): string {
 }
 
 export default function AdminTradeLogScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation();
   const [trades, setTrades] = useState<EnrichedTrade[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,7 +127,7 @@ export default function AdminTradeLogScreen() {
             {stock?.name ?? item.ticker} · {item.ticker}
           </Text>
         </View>
-        <View style={[styles.tradeBadge, { backgroundColor: isBuy ? '#FFF0F1' : '#EBF2FF' }]}>
+        <View style={[styles.tradeBadge, { backgroundColor: isBuy ? '#FFF0F1' : theme.primaryLight }]}>
           <Text style={[styles.tradeBadgeText, { color: isBuy ? Colors.green : Colors.red }]}>
             {isBuy ? '매수' : '매도'}
           </Text>
@@ -145,6 +147,118 @@ export default function AdminTradeLogScreen() {
       </View>
     );
   };
+
+  const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: Colors.bg },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    // Header
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: theme.bgCard,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    backBtn: { width: 40, alignItems: 'flex-start' },
+    headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },
+    // Filters
+    filterSection: {
+      backgroundColor: theme.bgCard,
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+      gap: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    typePills: { flexDirection: 'row', gap: 8, paddingTop: 12 },
+    pill: {
+      paddingHorizontal: 16,
+      paddingVertical: 7,
+      borderRadius: 20,
+      backgroundColor: Colors.bg,
+    },
+    pillActive: { backgroundColor: Colors.primary },
+    pillText: { fontSize: 13, fontWeight: '600', color: Colors.textSub },
+    pillTextActive: { color: theme.bgCard },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: Colors.bg,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      gap: 8,
+      borderWidth: 1,
+      borderColor: Colors.border,
+    },
+    searchInput: { flex: 1, fontSize: 14, color: Colors.text, padding: 0 },
+    // Summary
+    summaryCard: {
+      backgroundColor: theme.bgCard,
+      marginHorizontal: 16,
+      marginTop: 12,
+      borderRadius: 14,
+      padding: 14,
+      shadowColor: theme.text,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+      marginBottom: 4,
+    },
+    summaryRow: { flexDirection: 'row', alignItems: 'center' },
+    summaryStat: { flex: 1, alignItems: 'center' },
+    summaryStatVal: { fontSize: 16, fontWeight: '700', color: Colors.text },
+    summaryStatLabel: { fontSize: 11, color: Colors.textSub, marginTop: 2 },
+    summaryDivider: { width: 1, height: 32, backgroundColor: Colors.border },
+    top5Row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 10,
+      gap: 6,
+      flexWrap: 'wrap',
+    },
+    top5Label: { fontSize: 11, fontWeight: '700', color: Colors.textSub },
+    top5Pill: {
+      backgroundColor: '#EAF4FF',
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      borderRadius: 12,
+    },
+    top5PillText: { fontSize: 11, fontWeight: '700', color: Colors.primary },
+    // List
+    listContent: { padding: 16, paddingBottom: 40 },
+    separator: { height: 1, backgroundColor: Colors.border },
+    tradeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.bgCard,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      gap: 10,
+      borderRadius: 12,
+    },
+    tradeInfo: { flex: 1, minWidth: 0 },
+    tradeName: { fontSize: 13, fontWeight: '700', color: Colors.text },
+    tradeTicker: { fontSize: 11, color: Colors.textSub, marginTop: 2 },
+    tradeBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    tradeBadgeText: { fontSize: 11, fontWeight: '700' },
+    tradeAmountCol: { alignItems: 'flex-end', gap: 2 },
+    tradeAmount: { fontSize: 13, fontWeight: '700' },
+    tradeDetail: { fontSize: 10, color: Colors.textSub },
+    tradeTime: { fontSize: 10, color: Colors.textMuted ?? Colors.textSub },
+    // Empty
+    empty: { alignItems: 'center', paddingVertical: 60, gap: 8 },
+    emptyEmoji: { fontSize: 40 },
+    emptyText: { fontSize: 15, color: Colors.textSub, fontWeight: '500' },
+  });
 
   if (loading) {
     return (
@@ -251,114 +365,3 @@ export default function AdminTradeLogScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  backBtn: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },
-  // Filters
-  filterSection: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  typePills: { flexDirection: 'row', gap: 8, paddingTop: 12 },
-  pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: Colors.bg,
-  },
-  pillActive: { backgroundColor: Colors.primary },
-  pillText: { fontSize: 13, fontWeight: '600', color: Colors.textSub },
-  pillTextActive: { color: '#fff' },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.bg,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  searchInput: { flex: 1, fontSize: 14, color: Colors.text, padding: 0 },
-  // Summary
-  summaryCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 14,
-    padding: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-    marginBottom: 4,
-  },
-  summaryRow: { flexDirection: 'row', alignItems: 'center' },
-  summaryStat: { flex: 1, alignItems: 'center' },
-  summaryStatVal: { fontSize: 16, fontWeight: '700', color: Colors.text },
-  summaryStatLabel: { fontSize: 11, color: Colors.textSub, marginTop: 2 },
-  summaryDivider: { width: 1, height: 32, backgroundColor: Colors.border },
-  top5Row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  top5Label: { fontSize: 11, fontWeight: '700', color: Colors.textSub },
-  top5Pill: {
-    backgroundColor: '#EAF4FF',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  top5PillText: { fontSize: 11, fontWeight: '700', color: Colors.primary },
-  // List
-  listContent: { padding: 16, paddingBottom: 40 },
-  separator: { height: 1, backgroundColor: Colors.border },
-  tradeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10,
-    borderRadius: 12,
-  },
-  tradeInfo: { flex: 1, minWidth: 0 },
-  tradeName: { fontSize: 13, fontWeight: '700', color: Colors.text },
-  tradeTicker: { fontSize: 11, color: Colors.textSub, marginTop: 2 },
-  tradeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  tradeBadgeText: { fontSize: 11, fontWeight: '700' },
-  tradeAmountCol: { alignItems: 'flex-end', gap: 2 },
-  tradeAmount: { fontSize: 13, fontWeight: '700' },
-  tradeDetail: { fontSize: 10, color: Colors.textSub },
-  tradeTime: { fontSize: 10, color: Colors.textMuted ?? Colors.textSub },
-  // Empty
-  empty: { alignItems: 'center', paddingVertical: 60, gap: 8 },
-  emptyEmoji: { fontSize: 40 },
-  emptyText: { fontSize: 15, color: Colors.textSub, fontWeight: '500' },
-});

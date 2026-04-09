@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { getLearningData } from '../lib/learningService';
 
@@ -16,6 +17,7 @@ interface WrongAnswer {
 }
 
 export default function WrongAnswerScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
 
@@ -55,6 +57,49 @@ export default function WrongAnswerScreen() {
     );
   }
 
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.bg },
+    header: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: '#F0F2F5',
+    },
+    backBtn: { padding: 4 },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, flex: 1 },
+    badge: {
+      backgroundColor: '#FF3B30', borderRadius: 12,
+      paddingHorizontal: 8, paddingVertical: 2,
+      minWidth: 24, alignItems: 'center',
+    },
+    badgeText: { fontSize: 12, fontWeight: '700', color: theme.bgCard },
+    list: { padding: 16, gap: 12 },
+    card: {
+      backgroundColor: theme.bgCard,
+      borderRadius: 16,
+      borderLeftWidth: 4,
+      borderLeftColor: '#FF3B30',
+      padding: 16,
+      shadowColor: theme.text,
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    iconBox: {
+      width: 44, height: 44, borderRadius: 22,
+      backgroundColor: theme.redLight, alignItems: 'center', justifyContent: 'center',
+    },
+    iconEmoji: { fontSize: 20 },
+    cardContent: { flex: 1 },
+    idText: { fontSize: 14, fontWeight: '600', color: Colors.text },
+    subText: { fontSize: 12, color: Colors.textSub ?? '#6B7280', marginTop: 2 },
+    studyLink: { marginTop: 10, alignSelf: 'flex-end' },
+    studyLinkText: { fontSize: 13, fontWeight: '600', color: Colors.primary ?? '#0066FF' },
+    emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    emptyEmoji: { fontSize: 56 },
+    emptyText: { fontSize: 16, fontWeight: '600', color: Colors.textSub ?? '#6B7280' },
+  });
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -89,45 +134,3 @@ export default function WrongAnswerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#F0F2F5',
-  },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, flex: 1 },
-  badge: {
-    backgroundColor: '#FF3B30', borderRadius: 12,
-    paddingHorizontal: 8, paddingVertical: 2,
-    minWidth: 24, alignItems: 'center',
-  },
-  badgeText: { fontSize: 12, fontWeight: '700', color: '#fff' },
-  list: { padding: 16, gap: 12 },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF3B30',
-    padding: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconBox: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#FFF0F0', alignItems: 'center', justifyContent: 'center',
-  },
-  iconEmoji: { fontSize: 20 },
-  cardContent: { flex: 1 },
-  idText: { fontSize: 14, fontWeight: '600', color: Colors.text },
-  subText: { fontSize: 12, color: Colors.textSub ?? '#6B7280', marginTop: 2 },
-  studyLink: { marginTop: 10, alignSelf: 'flex-end' },
-  studyLinkText: { fontSize: 13, fontWeight: '600', color: Colors.primary ?? '#0066FF' },
-  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  emptyEmoji: { fontSize: 56 },
-  emptyText: { fontSize: 16, fontWeight: '600', color: Colors.textSub ?? '#6B7280' },
-});

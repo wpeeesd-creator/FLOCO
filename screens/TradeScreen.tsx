@@ -18,6 +18,7 @@ import {
   BottomSheet, Button, SectionHeader, EmptyState, Toast,
 } from '../components/ui';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { useTheme } from '../context/ThemeContext';
 
 // ── 미니 차트 ──────────────────────────────────
 function SparkLine({ up, width = 80, height = 30 }: { up: boolean; width?: number; height?: number }) {
@@ -66,6 +67,7 @@ function StockRow({ stock, onPress, holding }: any) {
 
 // ── 종목 상세 화면 ──────────────────────────────
 export function StockDetailScreen({ route }: any) {
+  const { theme, isDark } = useTheme();
   const { ticker } = route.params;
   const navigation = useNavigation();
   const stock = STOCKS.find(s => s.ticker === ticker);
@@ -118,7 +120,7 @@ export function StockDetailScreen({ route }: any) {
   return (
     <View style={styles.container}>
       {/* 헤더 */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.bgCard }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
           <Text style={{ fontSize: 22, color: Colors.text }}>‹</Text>
         </TouchableOpacity>
@@ -151,7 +153,7 @@ export function StockDetailScreen({ route }: any) {
           <View style={styles.periodFilter}>
             {['1일', '1주', '1개월', '3개월', '1년'].map(p => (
               <TouchableOpacity key={p} style={[styles.periodBtn, p === '1개월' && styles.periodBtn_active]}>
-                <Text style={[styles.periodText, p === '1개월' && styles.periodText_active]}>{p}</Text>
+                <Text style={[styles.periodText, p === '1개월' && styles.periodText_active, p === '1개월' && { color: theme.bgCard }]}>{p}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -265,6 +267,7 @@ export function StockDetailScreen({ route }: any) {
 
 // ── 모의투자 메인 화면 ──────────────────────────
 export default function TradeScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const { holdings, getTotalValue, getReturnRate, cash } = useAppStore();
   const [search, setSearch] = useState('');
@@ -290,7 +293,7 @@ export default function TradeScreen() {
   return (
     <View style={styles.container}>
       {/* 헤더 */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.bgCard }]}>
         <Text style={Typography.h2}>모의투자</Text>
       </View>
 
@@ -298,7 +301,7 @@ export default function TradeScreen() {
       <View style={styles.tradeBanner}>
         <View>
           <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>총 평가잔고</Text>
-          <Text style={{ color: '#fff', fontSize: 24, fontWeight: '700', fontFamily: 'Courier' }}>
+          <Text style={{ color: theme.bgCard, fontSize: 24, fontWeight: '700', fontFamily: 'Courier' }}>
             ₩{Math.round(totalValue).toLocaleString()}
           </Text>
         </View>
@@ -306,7 +309,7 @@ export default function TradeScreen() {
       </View>
 
       {/* 탭 */}
-      <View style={styles.tradeTabBar}>
+      <View style={[styles.tradeTabBar, { backgroundColor: theme.bgCard }]}>
         {(['trade', 'portfolio'] as const).map(t => (
           <TouchableOpacity key={t} style={[styles.tradeTab, tradeTab === t && styles.tradeTab_active]} onPress={() => setTradeTab(t)}>
             <Text style={[styles.tradeTabText, tradeTab === t && styles.tradeTabText_active]}>
@@ -319,7 +322,7 @@ export default function TradeScreen() {
       {tradeTab === 'trade' ? (
         <>
           {/* 검색 */}
-          <View style={styles.searchWrap}>
+          <View style={[styles.searchWrap, { backgroundColor: theme.bgCard }]}>
             <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
             <TextInput
               style={styles.searchInput}
@@ -335,7 +338,7 @@ export default function TradeScreen() {
           <View style={styles.marketFilter}>
             {(['전체', '미국', '한국'] as const).map(m => (
               <TouchableOpacity key={m} style={[styles.filterBtn, market === m && styles.filterBtn_active]} onPress={() => setMarket(m)}>
-                <Text style={[styles.filterText, market === m && styles.filterText_active]}>{m}</Text>
+                <Text style={[styles.filterText, market === m && styles.filterText_active, market === m && { color: theme.bgCard }]}>{m}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -401,27 +404,27 @@ export default function TradeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: Colors.border },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
   tradeBanner: { backgroundColor: Colors.primary, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  tradeTabBar: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: Colors.border },
+  tradeTabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border },
   tradeTab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tradeTab_active: { borderBottomColor: Colors.primary },
   tradeTabText: { fontSize: 14, color: Colors.textSub },
   tradeTabText_active: { color: Colors.primary, fontWeight: '700' },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', margin: 12, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.border },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', margin: 12, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.border },
   searchInput: { flex: 1, fontSize: 14, color: Colors.text },
   marketFilter: { flexDirection: 'row', paddingHorizontal: 12, gap: 8, marginBottom: 8 },
   filterBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border },
   filterBtn_active: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   filterText: { fontSize: 13, color: Colors.textSub },
-  filterText_active: { color: '#fff', fontWeight: '700' },
+  filterText_active: { fontWeight: '700' },
   stockRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   stockLogo: { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   periodFilter: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 },
   periodBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 },
   periodBtn_active: { backgroundColor: Colors.primary },
   periodText: { fontSize: 12, color: Colors.textSub },
-  periodText_active: { color: '#fff', fontWeight: '700' },
+  periodText_active: { fontWeight: '700' },
   metricsRow: { flexDirection: 'row', gap: 0 },
   sheetRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   qtyRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: Colors.border, borderRadius: 10, overflow: 'hidden' },

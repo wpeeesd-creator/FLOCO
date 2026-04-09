@@ -15,6 +15,7 @@ import * as SecureStore from 'expo-secure-store';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 interface TutorialStep {
   id: number;
@@ -86,6 +87,7 @@ interface TutorialScreenProps {
 }
 
 export default function TutorialScreen({ onComplete, onNavigateTab }: TutorialScreenProps) {
+  const { theme, isDark } = useTheme();
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -151,6 +153,47 @@ export default function TutorialScreen({ onComplete, onNavigateTab }: TutorialSc
   const handleGoToTab = () => {
     onNavigateTab?.(step.tabName);
   };
+
+  const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: theme.bgCard },
+    topBar: {
+      flexDirection: 'row', alignItems: 'center', padding: 16,
+    },
+    progressRow: { flex: 1, flexDirection: 'row', gap: 6 },
+    progressDot: { flex: 1, height: 4, borderRadius: 2 },
+    skipBtn: { marginLeft: 16, padding: 4 },
+    skipText: { color: theme.textSecondary, fontSize: 14, fontWeight: '500' },
+    content: { flex: 1, padding: 24, alignItems: 'center' },
+    emojiCircle: {
+      width: 140, height: 140, borderRadius: 70,
+      justifyContent: 'center', alignItems: 'center',
+      marginTop: 20, marginBottom: 32,
+    },
+    emoji: { fontSize: 72 },
+    stepLabel: { fontSize: 14, fontWeight: '700', marginBottom: 12 },
+    title: {
+      fontSize: 26, fontWeight: '700', color: theme.text,
+      textAlign: 'center', lineHeight: 36, marginBottom: 16,
+    },
+    description: {
+      fontSize: 16, color: theme.textSecondary, textAlign: 'center',
+      lineHeight: 24, marginBottom: 32,
+    },
+    tipCard: {
+      borderRadius: 16, padding: 16, borderLeftWidth: 4, width: '100%',
+    },
+    tipText: { color: theme.text, fontSize: 14, lineHeight: 22 },
+    bottom: { padding: 24, gap: 12 },
+    actionBtn: {
+      borderRadius: 16, height: 52, justifyContent: 'center',
+      alignItems: 'center', borderWidth: 2, backgroundColor: 'transparent',
+    },
+    actionBtnText: { fontSize: 15, fontWeight: '700' },
+    nextBtn: {
+      borderRadius: 16, height: 56, justifyContent: 'center', alignItems: 'center',
+    },
+    nextBtnText: { color: theme.bgCard, fontSize: 17, fontWeight: '700' },
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -219,7 +262,7 @@ export default function TutorialScreen({ onComplete, onNavigateTab }: TutorialSc
           activeOpacity={0.85}
         >
           {saving ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={theme.bgCard} />
           ) : (
             <Text style={styles.nextBtnText}>
               {currentStep < tutorialSteps.length - 1 ? '다음' : '투자 시작하기!'}
@@ -231,43 +274,3 @@ export default function TutorialScreen({ onComplete, onNavigateTab }: TutorialSc
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
-  topBar: {
-    flexDirection: 'row', alignItems: 'center', padding: 16,
-  },
-  progressRow: { flex: 1, flexDirection: 'row', gap: 6 },
-  progressDot: { flex: 1, height: 4, borderRadius: 2 },
-  skipBtn: { marginLeft: 16, padding: 4 },
-  skipText: { color: '#8B95A1', fontSize: 14, fontWeight: '500' },
-  content: { flex: 1, padding: 24, alignItems: 'center' },
-  emojiCircle: {
-    width: 140, height: 140, borderRadius: 70,
-    justifyContent: 'center', alignItems: 'center',
-    marginTop: 20, marginBottom: 32,
-  },
-  emoji: { fontSize: 72 },
-  stepLabel: { fontSize: 14, fontWeight: '700', marginBottom: 12 },
-  title: {
-    fontSize: 26, fontWeight: '700', color: '#191F28',
-    textAlign: 'center', lineHeight: 36, marginBottom: 16,
-  },
-  description: {
-    fontSize: 16, color: '#8B95A1', textAlign: 'center',
-    lineHeight: 24, marginBottom: 32,
-  },
-  tipCard: {
-    borderRadius: 16, padding: 16, borderLeftWidth: 4, width: '100%',
-  },
-  tipText: { color: '#191F28', fontSize: 14, lineHeight: 22 },
-  bottom: { padding: 24, gap: 12 },
-  actionBtn: {
-    borderRadius: 16, height: 52, justifyContent: 'center',
-    alignItems: 'center', borderWidth: 2, backgroundColor: 'transparent',
-  },
-  actionBtnText: { fontSize: 15, fontWeight: '700' },
-  nextBtn: {
-    borderRadius: 16, height: 56, justifyContent: 'center', alignItems: 'center',
-  },
-  nextBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
-});

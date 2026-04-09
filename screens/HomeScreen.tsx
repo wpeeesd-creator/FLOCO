@@ -18,6 +18,7 @@ import NewsCard from '../components/NewsCard';
 import { useAllNews } from '../hooks/useNews';
 import { loadTodayMissions, ALL_COMPLETE_BONUS, type DailyMission } from '../lib/missionService';
 import { fetchMultiplePrices, calculateProfit } from '../utils/priceService';
+import { useTheme } from '../context/ThemeContext';
 
 type TopTab = '보유' | '관심';
 type StockTab = '전체' | '국내' | '미국';
@@ -25,6 +26,7 @@ type MarketFilter = '국내' | '미국' | '기타';
 type SortType = 'value' | 'return';
 
 export default function HomeScreen() {
+  const { theme, isDark } = useTheme();
   const { user } = useAuth();
   const navigation = useNavigation<any>();
   const { holdings, cash, getTotalValue, getReturnRate } = useAppStore();
@@ -43,6 +45,7 @@ export default function HomeScreen() {
   const [missionData, setMissionData] = useState<{ completed: number; total: number; maxReward: number }>({ completed: 0, total: 0, maxReward: 0 });
   const [wishlist, setWishlist] = useState<any[]>([]);
   const [wishlistPrices, setWishlistPrices] = useState<Record<string, any>>({});
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // ── Firestore real-time listener ──────────────────
   useEffect(() => {
@@ -68,6 +71,12 @@ export default function HomeScreen() {
         // wishlist 동기화
         if (Array.isArray(data?.wishlist)) {
           setWishlist(data.wishlist);
+        }
+        // 읽지 않은 알림 개수
+        if (Array.isArray(data?.notifications)) {
+          setUnreadCount(data.notifications.filter((n: any) => !n.read).length);
+        } else {
+          setUnreadCount(0);
         }
         // portfolio → appStore holdings 동기화
         if (Array.isArray(data?.portfolio)) {
@@ -196,11 +205,11 @@ export default function HomeScreen() {
   // ── Shared banners ────────────────────────────────
   const renderNoticeBanner = () => (
     <TouchableOpacity onPress={() => setShowGuide(true)} style={styles.noticeBanner} activeOpacity={0.7}>
-      <Ionicons name="megaphone-outline" size={16} color={Colors.primary} />
+      <Ionicons name="megaphone-outline" size={16} color={theme.primary} />
       <Text style={styles.noticeText} numberOfLines={1}>
         투자 전 반드시 설명서를 읽어보세요. 원금손실이 발생할 수 있습니다.
       </Text>
-      <Ionicons name="chevron-forward" size={14} color={Colors.textSub} />
+      <Ionicons name="chevron-forward" size={14} color={theme.textSecondary} />
     </TouchableOpacity>
   );
 
@@ -232,7 +241,7 @@ export default function HomeScreen() {
         <Text style={styles.eventBannerTitle}>이벤트 & 챌린지</Text>
         <Text style={styles.eventBannerSub}>참여하고 보상 받아보세요!</Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+      <Ionicons name="chevron-forward" size={20} color={theme.bgCard} />
     </TouchableOpacity>
   );
 
@@ -272,8 +281,8 @@ export default function HomeScreen() {
             <Text style={styles.marketStatusName}>KOSPI</Text>
             <Text style={styles.marketStatusHours}>09:00 – 15:30 KST</Text>
           </View>
-          <View style={[styles.marketStatusDot, { backgroundColor: koreaOpen ? '#00C853' : '#F04452' }]} />
-          <Text style={[styles.marketStatusLabel, { color: koreaOpen ? '#00C853' : '#F04452' }]}>
+          <View style={[styles.marketStatusDot, { backgroundColor: koreaOpen ? '#00C853' : theme.red }]} />
+          <Text style={[styles.marketStatusLabel, { color: koreaOpen ? '#00C853' : theme.red }]}>
             {koreaOpen ? '개장' : '마감'}
           </Text>
         </View>
@@ -283,14 +292,671 @@ export default function HomeScreen() {
             <Text style={styles.marketStatusName}>NASDAQ</Text>
             <Text style={styles.marketStatusHours}>09:30 – 16:00 ET</Text>
           </View>
-          <View style={[styles.marketStatusDot, { backgroundColor: nyOpen ? '#00C853' : '#F04452' }]} />
-          <Text style={[styles.marketStatusLabel, { color: nyOpen ? '#00C853' : '#F04452' }]}>
+          <View style={[styles.marketStatusDot, { backgroundColor: nyOpen ? '#00C853' : theme.red }]} />
+          <Text style={[styles.marketStatusLabel, { color: nyOpen ? '#00C853' : theme.red }]}>
             {nyOpen ? '개장' : '마감'}
           </Text>
         </View>
       </View>
     );
   };
+
+  const styles = StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.bg,
+    },
+    stockTabRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 0,
+      gap: 16,
+    },
+    stockTabBtn: {
+      paddingBottom: 10,
+      alignItems: 'center',
+    },
+    stockTabText: {
+      fontSize: 15,
+      color: theme.textSecondary,
+    },
+    stockTabTextActive: {
+      fontWeight: 'bold',
+      color: theme.primary,
+    },
+    stockTabUnderline: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 2,
+      backgroundColor: theme.primary,
+      borderRadius: 1,
+    },
+
+    // ── Header ──
+    header: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      backgroundColor: theme.bg,
+      paddingHorizontal: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    headerTabs: {
+      flexDirection: 'row',
+    },
+    headerTabBtn: {
+      paddingVertical: 14,
+      paddingHorizontal: 4,
+      marginRight: 20,
+      position: 'relative',
+    },
+    headerTabText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: Colors.inactive,
+    },
+    headerTabTextActive: {
+      color: theme.text,
+      fontWeight: '700',
+    },
+    headerTabUnderline: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 2,
+      backgroundColor: theme.primary,
+      borderRadius: 1,
+    },
+    headerIcons: {
+      flexDirection: 'row',
+      paddingBottom: 8,
+    },
+    iconBtn: {
+      padding: 6,
+      marginLeft: 4,
+    },
+
+    // ── Scroll ──
+    scroll: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingBottom: 40,
+    },
+
+    // ── Account Card ──
+    accountCard: {
+      backgroundColor: theme.bgCard,
+      borderRadius: 12,
+      marginHorizontal: 20,
+      marginTop: 16,
+      paddingVertical: 20,
+      paddingHorizontal: 20,
+      shadowColor: '#00000010',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 1,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    accountTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+    },
+    accountNickname: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.textSecondary,
+    },
+    investTypeBadge: {
+      backgroundColor: '#EBF2FF',
+      borderRadius: 20,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    investTypeBadgeText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.primary,
+    },
+    totalAssetLabel: {
+      fontSize: 13,
+      color: theme.textSecondary,
+      marginBottom: 4,
+    },
+    totalAssetValue: {
+      fontSize: 28,
+      fontWeight: '700',
+      color: theme.text,
+      letterSpacing: -0.8,
+      marginBottom: 8,
+    },
+    profitRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 20,
+    },
+    profitAmt: {
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    profitRateBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    profitRateText: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    actionRow: {
+      flexDirection: 'row',
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      paddingTop: 16,
+    },
+    actionBtn: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 4,
+    },
+    actionBtnDivider: {
+      width: 1,
+      backgroundColor: theme.border,
+      marginVertical: 2,
+    },
+    actionBtnEmoji: {
+      fontSize: 20,
+    },
+    actionBtnText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.text,
+    },
+
+    // ── Balance Card ──
+    balanceCard: {
+      backgroundColor: theme.bgCard,
+      borderRadius: 12,
+      marginHorizontal: 20,
+      marginTop: 8,
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+      shadowColor: '#00000010',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 1,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    balanceRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    balanceItem: {
+      flex: 1,
+    },
+    balanceDivider: {
+      width: 1,
+      backgroundColor: theme.border,
+      height: 40,
+      marginHorizontal: 16,
+    },
+    balanceLabel: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      marginBottom: 4,
+    },
+    balancePrimaryValue: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.primary,
+      letterSpacing: -0.4,
+    },
+    balanceValue: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.text,
+      letterSpacing: -0.4,
+    },
+
+    // ── Pill Tabs ──
+    pillTabRow: {
+      flexDirection: 'row',
+      paddingHorizontal: 20,
+      marginTop: 16,
+      gap: 8,
+    },
+    pillTab: {
+      paddingHorizontal: 16,
+      paddingVertical: 7,
+      borderRadius: 20,
+      backgroundColor: theme.bgCard,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    pillTabActive: {
+      backgroundColor: theme.text,
+      borderColor: theme.text,
+    },
+    pillTabText: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: theme.textSecondary,
+    },
+    pillTabTextActive: {
+      color: theme.bgCard,
+      fontWeight: '600',
+    },
+
+    // ── Summary Row ──
+    summaryRow: {
+      flexDirection: 'row',
+      backgroundColor: theme.bgCard,
+      borderRadius: 12,
+      marginHorizontal: 20,
+      marginTop: 8,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      shadowColor: '#00000010',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 1,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    summaryItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    summaryDivider: {
+      width: 1,
+      backgroundColor: theme.border,
+      marginVertical: 2,
+    },
+    summaryLabel: {
+      fontSize: 11,
+      color: theme.textSecondary,
+      marginBottom: 4,
+    },
+    summaryValue: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.text,
+      letterSpacing: -0.3,
+    },
+
+    // ── Sort Row ──
+    sortRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      marginTop: 16,
+      marginBottom: 4,
+    },
+    sortCount: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.text,
+    },
+    sortBtns: {
+      flexDirection: 'row',
+      gap: 4,
+    },
+    sortBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 6,
+    },
+    sortBtnActive: {
+      backgroundColor: theme.border,
+    },
+    sortBtnText: {
+      fontSize: 12,
+      color: Colors.inactive,
+    },
+    sortBtnTextActive: {
+      color: theme.text,
+      fontWeight: '600',
+    },
+
+    // ── Holding Card ──
+    holdingCard: {
+      backgroundColor: theme.bgCard,
+      borderRadius: 12,
+      marginHorizontal: 20,
+      marginTop: 4,
+      overflow: 'hidden',
+      shadowColor: '#00000010',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 1,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    holdingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      height: 64,
+    },
+    holdingBorder: {
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    holdingMeta: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    holdingName: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.text,
+      letterSpacing: -0.2,
+    },
+    holdingQty: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      marginTop: 2,
+    },
+    holdingAmts: {
+      alignItems: 'flex-end',
+    },
+    holdingEval: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.text,
+      letterSpacing: -0.3,
+    },
+    holdingPnl: {
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 2,
+    },
+
+    // ── Empty State ──
+    emptyBox: {
+      alignItems: 'center',
+      marginHorizontal: 20,
+      marginTop: 4,
+      backgroundColor: theme.bgCard,
+      borderRadius: 12,
+      paddingVertical: 36,
+      paddingHorizontal: 24,
+    },
+    emptyEmoji: {
+      fontSize: 40,
+      marginBottom: 12,
+    },
+    emptyTitle: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    emptyBtn: {
+      marginTop: 20,
+      backgroundColor: theme.primary,
+      borderRadius: 8,
+      paddingHorizontal: 28,
+      height: 44,
+      justifyContent: 'center',
+    },
+    emptyBtnText: {
+      color: theme.bgCard,
+      fontWeight: '700',
+      fontSize: 14,
+    },
+
+    // ── Notice Banner ──
+    noticeBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.bgCard,
+      borderRadius: 12,
+      marginHorizontal: 20,
+      marginTop: 8,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      gap: 8,
+      shadowColor: '#00000010',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 1,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    noticeText: {
+      flex: 1,
+      fontSize: 12,
+      color: theme.textSecondary,
+    },
+
+    // ── Learn Banner ──
+    learnBanner: {
+      backgroundColor: theme.primary,
+      borderRadius: 16,
+      marginHorizontal: 20,
+      marginTop: 8,
+      paddingVertical: 18,
+      paddingHorizontal: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    learnBannerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    learnBannerEmoji: {
+      fontSize: 28,
+    },
+    learnBannerTexts: {
+      gap: 2,
+    },
+    learnBannerTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.bgCard,
+    },
+    learnBannerSub: {
+      fontSize: 12,
+      color: 'rgba(255,255,255,0.8)',
+    },
+
+    // ── Watchlist ──
+    watchlistHeader: {
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 8,
+    },
+    watchlistTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.text,
+    },
+
+    // ── News Section ──
+    newsSectionHeader: {
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 4,
+    },
+    newsSectionTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: theme.text,
+    },
+    newsCard: {
+      backgroundColor: theme.bgCard,
+      borderRadius: 12,
+      marginHorizontal: 20,
+      marginTop: 8,
+      overflow: 'hidden',
+      shadowColor: '#00000010',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 1,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    newsDivider: {
+      height: 1,
+      backgroundColor: theme.border,
+      marginHorizontal: 16,
+    },
+
+    // ── AI Analyze Button ──
+    aiAnalyzeBtn: {
+      backgroundColor: theme.text,
+      borderRadius: 16,
+      marginHorizontal: 20,
+      marginTop: 8,
+      height: 52,
+      justifyContent: 'center',
+      alignItems: 'center',
+      flexDirection: 'row',
+    },
+    aiAnalyzeBtnText: {
+      color: theme.bgCard,
+      fontWeight: '700',
+      fontSize: 15,
+    },
+
+    // ── Mission Banner ──
+    missionBanner: {
+      backgroundColor: theme.bgCard,
+      borderRadius: 20,
+      marginHorizontal: 20,
+      marginTop: 8,
+      padding: 16,
+      shadowColor: '#00000010',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 1,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    missionBannerTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    missionBannerTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.text,
+    },
+    missionBannerLink: {
+      color: theme.primary,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    missionBarBg: {
+      height: 8,
+      backgroundColor: theme.border,
+      borderRadius: 4,
+      marginBottom: 8,
+    },
+    missionBarFill: {
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme.primary,
+    },
+    missionBannerSub: {
+      color: theme.textSecondary,
+      fontSize: 13,
+    },
+
+    // ── Reward Hint ──
+    rewardHint: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      textAlign: 'center',
+      marginTop: 8,
+      marginBottom: 4,
+      paddingHorizontal: 20,
+    },
+    eventBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 20,
+      marginTop: 8,
+      backgroundColor: '#FF9500',
+      borderRadius: 16,
+      padding: 16,
+    },
+    eventBannerEmoji: {
+      fontSize: 24,
+      marginRight: 12,
+    },
+    eventBannerTitle: {
+      color: theme.bgCard,
+      fontWeight: '700',
+      fontSize: 15,
+    },
+    eventBannerSub: {
+      color: 'rgba(255,255,255,0.7)',
+      fontSize: 13,
+      marginTop: 2,
+    },
+
+    // ── Market Status ──
+    marketStatusRow: {
+      flexDirection: 'row',
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      gap: 10,
+      backgroundColor: theme.bg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    marketStatusCard: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.bgCard,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      gap: 8,
+      shadowColor: '#00000010',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 1,
+      shadowRadius: 4,
+      elevation: 1,
+    },
+    marketStatusFlag: {
+      fontSize: 20,
+    },
+    marketStatusInfo: {
+      flex: 1,
+    },
+    marketStatusName: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.text,
+    },
+    marketStatusHours: {
+      fontSize: 10,
+      color: theme.textSecondary,
+      marginTop: 1,
+    },
+    marketStatusDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    marketStatusLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+  });
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -317,14 +983,32 @@ export default function HomeScreen() {
             activeOpacity={0.7}
             onPress={() => navigation.getParent()?.navigate('투자Tab', { screen: '종목검색' })}
           >
-            <Ionicons name="search-outline" size={22} color={Colors.text} />
+            <Ionicons name="search-outline" size={22} color={theme.text} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconBtn}
             activeOpacity={0.7}
             onPress={() => navigation.navigate('알림')}
           >
-            <Ionicons name="notifications-outline" size={22} color={Colors.text} />
+            <Ionicons name="notifications-outline" size={22} color={theme.text} />
+            {unreadCount > 0 && (
+              <View style={{
+                position: 'absolute',
+                top: 2,
+                right: 2,
+                minWidth: 16,
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: theme.red,
+                paddingHorizontal: 4,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700' }}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -336,7 +1020,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
         }
       >
         {topTab === '보유' ? (
@@ -363,14 +1047,14 @@ export default function HomeScreen() {
 
               {/* 수익금 + 수익률 */}
               <View style={styles.profitRow}>
-                <Text style={[styles.profitAmt, { color: isUp ? Colors.green : Colors.red }]}>
+                <Text style={[styles.profitAmt, { color: isUp ? theme.green : theme.red }]}>
                   {isUp ? '+' : ''}{Math.round(profit).toLocaleString()}원
                 </Text>
                 <View style={[
                   styles.profitRateBadge,
                   { backgroundColor: isUp ? Colors.greenBg : Colors.redBg },
                 ]}>
-                  <Text style={[styles.profitRateText, { color: isUp ? Colors.green : Colors.red }]}>
+                  <Text style={[styles.profitRateText, { color: isUp ? theme.green : theme.red }]}>
                     {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{profitRate.toFixed(2)}%
                   </Text>
                 </View>
@@ -462,7 +1146,7 @@ export default function HomeScreen() {
                 onPress={() => navigation.getParent()?.navigate('투자Tab')}
                 activeOpacity={0.7}
               >
-                <Text style={{ color: Colors.primary, fontSize: 13 }}>투자탭 →</Text>
+                <Text style={{ color: theme.primary, fontSize: 13 }}>투자탭 →</Text>
               </TouchableOpacity>
             </View>
 
@@ -477,14 +1161,14 @@ export default function HomeScreen() {
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>수익금</Text>
-                <Text style={[styles.summaryValue, { color: summaryUp ? Colors.green : Colors.red }]}>
+                <Text style={[styles.summaryValue, { color: summaryUp ? theme.green : theme.red }]}>
                   {summaryUp ? '+' : ''}{Math.round(summaryPnl).toLocaleString()}원
                 </Text>
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>수익률</Text>
-                <Text style={[styles.summaryValue, { color: summaryUp ? Colors.green : Colors.red }]}>
+                <Text style={[styles.summaryValue, { color: summaryUp ? theme.green : theme.red }]}>
                   {summaryUp ? '+' : ''}{summaryRate.toFixed(2)}%
                 </Text>
               </View>
@@ -572,7 +1256,7 @@ export default function HomeScreen() {
                             ? `${Math.round(h.evalAmt).toLocaleString()}원`
                             : `$${h.evalAmt.toFixed(2)}`}
                         </Text>
-                        <Text style={[styles.holdingPnl, { color: hUp ? Colors.green : Colors.red }]}>
+                        <Text style={[styles.holdingPnl, { color: hUp ? theme.green : theme.red }]}>
                           {hUp ? '+' : ''}
                           {h.stock.krw
                             ? `${Math.round(h.pnlAmt).toLocaleString()}원`
@@ -629,13 +1313,13 @@ export default function HomeScreen() {
             </View>
             {newsLoading ? (
               <View style={{ alignItems: 'center', marginTop: 12 }}>
-                <ActivityIndicator color={Colors.primary} />
-                <Text style={{ fontSize: 13, color: Colors.textSub, marginTop: 8 }}>뉴스를 불러오는 중...</Text>
+                <ActivityIndicator color={theme.primary} />
+                <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: 8 }}>뉴스를 불러오는 중...</Text>
               </View>
             ) : news.length === 0 ? (
               <View style={{ alignItems: 'center', paddingVertical: 32 }}>
                 <Text style={{ fontSize: 36 }}>📰</Text>
-                <Text style={{ fontSize: 14, color: Colors.textSub, marginTop: 8 }}>뉴스를 불러올 수 없어요</Text>
+                <Text style={{ fontSize: 14, color: theme.textSecondary, marginTop: 8 }}>뉴스를 불러올 수 없어요</Text>
               </View>
             ) : (
               <View style={styles.newsCard}>
@@ -720,12 +1404,12 @@ export default function HomeScreen() {
                             <Text style={styles.holdingEval}>
                               {isKR ? `₩${Math.round(displayPrice).toLocaleString()}` : `$${displayPrice.toFixed(2)}`}
                             </Text>
-                            <Text style={[styles.holdingPnl, { color: sUp ? Colors.green : Colors.red }]}>
+                            <Text style={[styles.holdingPnl, { color: sUp ? theme.green : theme.red }]}>
                               {sUp ? '+' : ''}{displayChange.toFixed(2)}%
                             </Text>
                           </>
                         ) : (
-                          <ActivityIndicator size="small" color={Colors.textSub} />
+                          <ActivityIndicator size="small" color={theme.textSecondary} />
                         )}
                       </View>
                     </TouchableOpacity>
@@ -747,15 +1431,15 @@ export default function HomeScreen() {
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}>
             <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowGuide(false)} />
             <View style={{
-              backgroundColor: Colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+              backgroundColor: theme.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24,
               padding: 24, maxHeight: '80%',
             }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <Text style={{ fontSize: 20, fontWeight: 'bold', color: Colors.text }}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>
                   모의투자 가이드
                 </Text>
                 <TouchableOpacity onPress={() => setShowGuide(false)}>
-                  <Ionicons name="close" size={24} color={Colors.textSub} />
+                  <Ionicons name="close" size={24} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
               <ScrollView showsVerticalScrollIndicator={false}>
@@ -772,19 +1456,19 @@ export default function HomeScreen() {
                   <View key={i} style={{ flexDirection: 'row', marginBottom: 20, alignItems: 'flex-start' }}>
                     <Text style={{ fontSize: 28, marginRight: 12, marginTop: 2 }}>{item.emoji}</Text>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontWeight: 'bold', fontSize: 15, color: Colors.text, marginBottom: 4 }}>{item.title}</Text>
-                      <Text style={{ color: Colors.textSub, fontSize: 14, lineHeight: 20 }}>{item.content}</Text>
+                      <Text style={{ fontWeight: 'bold', fontSize: 15, color: theme.text, marginBottom: 4 }}>{item.title}</Text>
+                      <Text style={{ color: theme.textSecondary, fontSize: 14, lineHeight: 20 }}>{item.content}</Text>
                     </View>
                   </View>
                 ))}
                 <TouchableOpacity
                   onPress={() => setShowGuide(false)}
                   style={{
-                    backgroundColor: Colors.primary, borderRadius: 16, height: 52,
+                    backgroundColor: theme.primary, borderRadius: 16, height: 52,
                     justifyContent: 'center', alignItems: 'center', marginTop: 8, marginBottom: 16,
                   }}
                 >
-                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 }}>확인했어요!</Text>
+                  <Text style={{ color: theme.bgCard, fontWeight: 'bold', fontSize: 16 }}>확인했어요!</Text>
                 </TouchableOpacity>
               </ScrollView>
             </View>
@@ -796,659 +1480,3 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
-  stockTabRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 0,
-    gap: 16,
-  },
-  stockTabBtn: {
-    paddingBottom: 10,
-    alignItems: 'center',
-  },
-  stockTabText: {
-    fontSize: 15,
-    color: Colors.textSub,
-  },
-  stockTabTextActive: {
-    fontWeight: 'bold',
-    color: Colors.primary,
-  },
-  stockTabUnderline: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: Colors.primary,
-    borderRadius: 1,
-  },
-
-  // ── Header ──
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.bg,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerTabs: {
-    flexDirection: 'row',
-  },
-  headerTabBtn: {
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    marginRight: 20,
-    position: 'relative',
-  },
-  headerTabText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.inactive,
-  },
-  headerTabTextActive: {
-    color: Colors.text,
-    fontWeight: '700',
-  },
-  headerTabUnderline: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: Colors.primary,
-    borderRadius: 1,
-  },
-  headerIcons: {
-    flexDirection: 'row',
-    paddingBottom: 8,
-  },
-  iconBtn: {
-    padding: 6,
-    marginLeft: 4,
-  },
-
-  // ── Scroll ──
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-
-  // ── Account Card ──
-  accountCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginTop: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  accountTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  accountNickname: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textSub,
-  },
-  investTypeBadge: {
-    backgroundColor: '#EBF2FF',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  investTypeBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  totalAssetLabel: {
-    fontSize: 13,
-    color: Colors.textSub,
-    marginBottom: 4,
-  },
-  totalAssetValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: Colors.text,
-    letterSpacing: -0.8,
-    marginBottom: 8,
-  },
-  profitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 20,
-  },
-  profitAmt: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  profitRateBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  profitRateText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: 16,
-  },
-  actionBtn: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
-  actionBtnDivider: {
-    width: 1,
-    backgroundColor: Colors.border,
-    marginVertical: 2,
-  },
-  actionBtnEmoji: {
-    fontSize: 20,
-  },
-  actionBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-
-  // ── Balance Card ──
-  balanceCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginTop: 8,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  balanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  balanceItem: {
-    flex: 1,
-  },
-  balanceDivider: {
-    width: 1,
-    backgroundColor: Colors.border,
-    height: 40,
-    marginHorizontal: 16,
-  },
-  balanceLabel: {
-    fontSize: 12,
-    color: Colors.textSub,
-    marginBottom: 4,
-  },
-  balancePrimaryValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.primary,
-    letterSpacing: -0.4,
-  },
-  balanceValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text,
-    letterSpacing: -0.4,
-  },
-
-  // ── Pill Tabs ──
-  pillTabRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginTop: 16,
-    gap: 8,
-  },
-  pillTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  pillTabActive: {
-    backgroundColor: Colors.text,
-    borderColor: Colors.text,
-  },
-  pillTabText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: Colors.textSub,
-  },
-  pillTabTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-
-  // ── Summary Row ──
-  summaryRow: {
-    flexDirection: 'row',
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginTop: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  summaryItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  summaryDivider: {
-    width: 1,
-    backgroundColor: Colors.border,
-    marginVertical: 2,
-  },
-  summaryLabel: {
-    fontSize: 11,
-    color: Colors.textSub,
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.text,
-    letterSpacing: -0.3,
-  },
-
-  // ── Sort Row ──
-  sortRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 4,
-  },
-  sortCount: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  sortBtns: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  sortBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  sortBtnActive: {
-    backgroundColor: Colors.border,
-  },
-  sortBtnText: {
-    fontSize: 12,
-    color: Colors.inactive,
-  },
-  sortBtnTextActive: {
-    color: Colors.text,
-    fontWeight: '600',
-  },
-
-  // ── Holding Card ──
-  holdingCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginTop: 4,
-    overflow: 'hidden',
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  holdingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    height: 64,
-  },
-  holdingBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  holdingMeta: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  holdingName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
-    letterSpacing: -0.2,
-  },
-  holdingQty: {
-    fontSize: 12,
-    color: Colors.textSub,
-    marginTop: 2,
-  },
-  holdingAmts: {
-    alignItems: 'flex-end',
-  },
-  holdingEval: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
-    letterSpacing: -0.3,
-  },
-  holdingPnl: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-
-  // ── Empty State ──
-  emptyBox: {
-    alignItems: 'center',
-    marginHorizontal: 20,
-    marginTop: 4,
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    paddingVertical: 36,
-    paddingHorizontal: 24,
-  },
-  emptyEmoji: {
-    fontSize: 40,
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    fontSize: 14,
-    color: Colors.textSub,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  emptyBtn: {
-    marginTop: 20,
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 28,
-    height: 44,
-    justifyContent: 'center',
-  },
-  emptyBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-
-  // ── Notice Banner ──
-  noticeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginTop: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    gap: 8,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  noticeText: {
-    flex: 1,
-    fontSize: 12,
-    color: Colors.textSub,
-  },
-
-  // ── Learn Banner ──
-  learnBanner: {
-    backgroundColor: Colors.primary,
-    borderRadius: 16,
-    marginHorizontal: 20,
-    marginTop: 8,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  learnBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  learnBannerEmoji: {
-    fontSize: 28,
-  },
-  learnBannerTexts: {
-    gap: 2,
-  },
-  learnBannerTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  learnBannerSub: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-  },
-
-  // ── Watchlist ──
-  watchlistHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  watchlistTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-
-  // ── News Section ──
-  newsSectionHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 4,
-  },
-  newsSectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  newsCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginTop: 8,
-    overflow: 'hidden',
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  newsDivider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginHorizontal: 16,
-  },
-
-  // ── AI Analyze Button ──
-  aiAnalyzeBtn: {
-    backgroundColor: '#191F28',
-    borderRadius: 16,
-    marginHorizontal: 20,
-    marginTop: 8,
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
-  aiAnalyzeBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-
-  // ── Mission Banner ──
-  missionBanner: {
-    backgroundColor: Colors.card,
-    borderRadius: 20,
-    marginHorizontal: 20,
-    marginTop: 8,
-    padding: 16,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  missionBannerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  missionBannerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  missionBannerLink: {
-    color: Colors.primary,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  missionBarBg: {
-    height: 8,
-    backgroundColor: Colors.border,
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  missionBarFill: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.primary,
-  },
-  missionBannerSub: {
-    color: Colors.textSub,
-    fontSize: 13,
-  },
-
-  // ── Reward Hint ──
-  rewardHint: {
-    fontSize: 12,
-    color: Colors.textSub,
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 4,
-    paddingHorizontal: 20,
-  },
-  eventBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 20,
-    marginTop: 8,
-    backgroundColor: '#FF9500',
-    borderRadius: 16,
-    padding: 16,
-  },
-  eventBannerEmoji: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  eventBannerTitle: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  eventBannerSub: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 13,
-    marginTop: 2,
-  },
-
-  // ── Market Status ──
-  marketStatusRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    gap: 10,
-    backgroundColor: Colors.bg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  marketStatusCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  marketStatusFlag: {
-    fontSize: 20,
-  },
-  marketStatusInfo: {
-    flex: 1,
-  },
-  marketStatusName: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  marketStatusHours: {
-    fontSize: 10,
-    color: Colors.textSub,
-    marginTop: 1,
-  },
-  marketStatusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  marketStatusLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-});

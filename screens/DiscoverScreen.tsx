@@ -9,6 +9,7 @@ import { STOCKS } from '../store/appStore';
 import StockLogo from '../components/StockLogo';
 import { useWishlist } from '../hooks/useWishlist';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -47,6 +48,7 @@ const DUMMY_NEWS: NewsItem[] = [
 ];
 
 export default function DiscoverScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const [chartTab, setChartTab] = useState<ChartTab>('거래대금');
   const [feedTab, setFeedTab] = useState<FeedTab>('뉴스');
@@ -104,6 +106,101 @@ export default function DiscoverScreen() {
   };
 
   const chartStocks = getChartStocks();
+
+  const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: Colors.bg },
+    container: { flex: 1, backgroundColor: Colors.bg },
+
+    // Header
+    header: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      paddingHorizontal: 20, paddingVertical: 14,
+      backgroundColor: Colors.card,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.text },
+    indexBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    indexLabel: { fontSize: 12, color: Colors.textSub },
+    indexValue: { fontSize: 13, fontWeight: '700' },
+
+    // Issue Banner
+    issueBanner: {
+      backgroundColor: theme.text,
+      marginHorizontal: 16, marginTop: 14,
+      borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13,
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+    },
+    issueDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.green },
+    issueText: { color: theme.bgCard, fontSize: 14, fontWeight: '600', flex: 1 },
+
+    // Categories
+    categoryRow: {
+      flexDirection: 'row', justifyContent: 'space-around',
+      paddingHorizontal: 16, paddingVertical: 18,
+    },
+    categoryBtn: { alignItems: 'center', gap: 7 },
+    categoryIcon: {
+      width: 54, height: 54, borderRadius: 16,
+      backgroundColor: Colors.card,
+      alignItems: 'center', justifyContent: 'center',
+      shadowColor: '#00000010', shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 1, shadowRadius: 6, elevation: 2,
+    },
+    categoryLabel: { fontSize: 12, color: Colors.text, fontWeight: '500' },
+
+    // Event Cards
+    cardRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 8 },
+    eventCard: { flex: 1, borderRadius: 12, padding: 16, gap: 4 },
+    eventLabel: { fontSize: 12, color: Colors.textSub },
+    eventTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+    eventDesc: { fontSize: 12, color: Colors.textSub },
+
+    // Section Header
+    sectionHeader: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4 },
+    sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
+
+    // Pill Tabs
+    tabsRow: { paddingHorizontal: 16, paddingVertical: 10, gap: 6 },
+    pillTab: {
+      paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+      backgroundColor: Colors.card,
+      borderWidth: 1, borderColor: Colors.border,
+    },
+    pillTabActive: { backgroundColor: Colors.text, borderColor: Colors.text },
+    pillTabText: { fontSize: 13, color: Colors.textSub, fontWeight: '500' },
+    pillTabTextActive: { color: theme.bgCard, fontWeight: '600' },
+
+    // Stock List Card
+    listCard: {
+      marginHorizontal: 16, backgroundColor: Colors.card,
+      borderRadius: 12, overflow: 'hidden',
+      borderWidth: 1, borderColor: Colors.border,
+    },
+    stockRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingHorizontal: 14, paddingVertical: 12,
+    },
+    stockBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
+    rankNum: { width: 22, fontSize: 14, fontWeight: '800', color: Colors.primary, textAlign: 'center' },
+    stockName: { fontSize: 14, fontWeight: '600', color: Colors.text },
+    stockTicker: { fontSize: 11, color: Colors.textSub, marginTop: 1 },
+    stockPrice: { fontSize: 14, fontWeight: '600', color: Colors.text, fontFamily: 'Courier' },
+    changeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2 },
+    changeText: { fontSize: 11, fontWeight: '700' },
+
+    // News List
+    newsList: {
+      marginHorizontal: 16, backgroundColor: Colors.card,
+      borderRadius: 12, overflow: 'hidden',
+      borderWidth: 1, borderColor: Colors.border,
+    },
+    newsCard: { padding: 16 },
+    newsCardBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
+    newsTitle: { fontSize: 14, fontWeight: '600', color: Colors.text, lineHeight: 20 },
+    newsMeta: { flexDirection: 'row', gap: 8, marginTop: 8 },
+    newsSource: { fontSize: 12, color: Colors.primary, fontWeight: '500' },
+    newsDate: { fontSize: 12, color: Colors.textSub },
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -259,97 +356,3 @@ export default function DiscoverScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.bg },
-  container: { flex: 1, backgroundColor: Colors.bg },
-
-  // Header
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 14,
-    backgroundColor: Colors.card,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.text },
-  indexBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  indexLabel: { fontSize: 12, color: Colors.textSub },
-  indexValue: { fontSize: 13, fontWeight: '700' },
-
-  // Issue Banner
-  issueBanner: {
-    backgroundColor: '#191F28',
-    marginHorizontal: 16, marginTop: 14,
-    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13,
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-  },
-  issueDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.green },
-  issueText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', flex: 1 },
-
-  // Categories
-  categoryRow: {
-    flexDirection: 'row', justifyContent: 'space-around',
-    paddingHorizontal: 16, paddingVertical: 18,
-  },
-  categoryBtn: { alignItems: 'center', gap: 7 },
-  categoryIcon: {
-    width: 54, height: 54, borderRadius: 16,
-    backgroundColor: Colors.card,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#00000010', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1, shadowRadius: 6, elevation: 2,
-  },
-  categoryLabel: { fontSize: 12, color: Colors.text, fontWeight: '500' },
-
-  // Event Cards
-  cardRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 8 },
-  eventCard: { flex: 1, borderRadius: 12, padding: 16, gap: 4 },
-  eventLabel: { fontSize: 12, color: Colors.textSub },
-  eventTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
-  eventDesc: { fontSize: 12, color: Colors.textSub },
-
-  // Section Header
-  sectionHeader: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
-
-  // Pill Tabs
-  tabsRow: { paddingHorizontal: 16, paddingVertical: 10, gap: 6 },
-  pillTab: {
-    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: Colors.card,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  pillTabActive: { backgroundColor: Colors.text, borderColor: Colors.text },
-  pillTabText: { fontSize: 13, color: Colors.textSub, fontWeight: '500' },
-  pillTabTextActive: { color: '#FFFFFF', fontWeight: '600' },
-
-  // Stock List Card
-  listCard: {
-    marginHorizontal: 16, backgroundColor: Colors.card,
-    borderRadius: 12, overflow: 'hidden',
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  stockRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 14, paddingVertical: 12,
-  },
-  stockBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
-  rankNum: { width: 22, fontSize: 14, fontWeight: '800', color: Colors.primary, textAlign: 'center' },
-  stockName: { fontSize: 14, fontWeight: '600', color: Colors.text },
-  stockTicker: { fontSize: 11, color: Colors.textSub, marginTop: 1 },
-  stockPrice: { fontSize: 14, fontWeight: '600', color: Colors.text, fontFamily: 'Courier' },
-  changeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2 },
-  changeText: { fontSize: 11, fontWeight: '700' },
-
-  // News List
-  newsList: {
-    marginHorizontal: 16, backgroundColor: Colors.card,
-    borderRadius: 12, overflow: 'hidden',
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  newsCard: { padding: 16 },
-  newsCardBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
-  newsTitle: { fontSize: 14, fontWeight: '600', color: Colors.text, lineHeight: 20 },
-  newsMeta: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  newsSource: { fontSize: 12, color: Colors.primary, fontWeight: '500' },
-  newsDate: { fontSize: 12, color: Colors.textSub },
-});

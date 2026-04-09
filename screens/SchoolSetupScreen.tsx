@@ -16,11 +16,13 @@ import * as Haptics from 'expo-haptics';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 const GRADES = ['1학년', '2학년', '3학년'];
 const CLASSES = ['1반', '2반', '3반', '4반', '5반', '6반', '7반', '8반', '9반', '10반'];
 
 export default function SchoolSetupScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
 
@@ -74,6 +76,57 @@ export default function SchoolSetupScreen() {
       setIsLoading(false);
     }
   };
+
+  const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: theme.bgCard },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    backBtn: { padding: 4 },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
+    scroll: { padding: 24 },
+    emoji: { fontSize: 40, textAlign: 'center' },
+    title: {
+      fontSize: 22, fontWeight: '700', textAlign: 'center',
+      color: Colors.text, marginTop: 12, marginBottom: 8,
+    },
+    description: {
+      color: Colors.textSub, textAlign: 'center', marginBottom: 32, lineHeight: 22,
+    },
+    label: {
+      fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 8,
+    },
+    input: {
+      borderWidth: 2, borderColor: Colors.border, borderRadius: 12,
+      padding: 16, fontSize: 15, color: Colors.text, marginBottom: 20,
+    },
+    inputActive: { borderColor: Colors.primary },
+    chipRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+    chip: {
+      flex: 1, paddingVertical: 12, borderRadius: 12,
+      borderWidth: 2, borderColor: Colors.border,
+      backgroundColor: theme.bgCard, alignItems: 'center',
+    },
+    chipActive: { borderColor: Colors.primary, backgroundColor: theme.primaryLight },
+    chipText: { color: Colors.textSub, fontWeight: '500' },
+    chipTextActive: { color: Colors.primary, fontWeight: '700' },
+    classGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 32 },
+    classChip: {
+      width: '18%', paddingVertical: 12, borderRadius: 12,
+      borderWidth: 2, borderColor: Colors.border,
+      backgroundColor: theme.bgCard, alignItems: 'center',
+    },
+    classChipText: { color: Colors.textSub, fontWeight: '500', fontSize: 13 },
+    saveBtn: {
+      backgroundColor: Colors.border, borderRadius: 16, height: 56,
+      justifyContent: 'center', alignItems: 'center', marginBottom: 40,
+    },
+    saveBtnActive: { backgroundColor: Colors.primary },
+    saveBtnText: { color: Colors.textSub, fontSize: 16, fontWeight: '700' },
+    saveBtnTextActive: { color: theme.bgCard },
+  });
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -141,7 +194,7 @@ export default function SchoolSetupScreen() {
           activeOpacity={0.85}
         >
           {isLoading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={theme.bgCard} />
           ) : (
             <Text style={[styles.saveBtnText, isReady && styles.saveBtnTextActive]}>
               설정 완료
@@ -153,53 +206,3 @@ export default function SchoolSetupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
-  scroll: { padding: 24 },
-  emoji: { fontSize: 40, textAlign: 'center' },
-  title: {
-    fontSize: 22, fontWeight: '700', textAlign: 'center',
-    color: Colors.text, marginTop: 12, marginBottom: 8,
-  },
-  description: {
-    color: Colors.textSub, textAlign: 'center', marginBottom: 32, lineHeight: 22,
-  },
-  label: {
-    fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 8,
-  },
-  input: {
-    borderWidth: 2, borderColor: Colors.border, borderRadius: 12,
-    padding: 16, fontSize: 15, color: Colors.text, marginBottom: 20,
-  },
-  inputActive: { borderColor: Colors.primary },
-  chipRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-  chip: {
-    flex: 1, paddingVertical: 12, borderRadius: 12,
-    borderWidth: 2, borderColor: Colors.border,
-    backgroundColor: '#FFFFFF', alignItems: 'center',
-  },
-  chipActive: { borderColor: Colors.primary, backgroundColor: '#EBF2FF' },
-  chipText: { color: Colors.textSub, fontWeight: '500' },
-  chipTextActive: { color: Colors.primary, fontWeight: '700' },
-  classGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 32 },
-  classChip: {
-    width: '18%', paddingVertical: 12, borderRadius: 12,
-    borderWidth: 2, borderColor: Colors.border,
-    backgroundColor: '#FFFFFF', alignItems: 'center',
-  },
-  classChipText: { color: Colors.textSub, fontWeight: '500', fontSize: 13 },
-  saveBtn: {
-    backgroundColor: Colors.border, borderRadius: 16, height: 56,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 40,
-  },
-  saveBtnActive: { backgroundColor: Colors.primary },
-  saveBtnText: { color: Colors.textSub, fontSize: 16, fontWeight: '700' },
-  saveBtnTextActive: { color: '#FFFFFF' },
-});

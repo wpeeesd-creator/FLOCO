@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import { UnifiedTransaction } from './TransactionScreen';
 
 type RouteParams = {
@@ -37,8 +38,9 @@ interface DetailRowProps {
 }
 
 function DetailRow({ label, value, isLast }: DetailRowProps) {
+  const { theme } = useTheme();
   return (
-    <View style={[styles.detailRow, !isLast && styles.detailRowBorder]}>
+    <View style={[styles.detailRow, !isLast && styles.detailRowBorder, !isLast && { borderBottomColor: theme.bg }]}>
       <Text style={styles.detailLabel}>{label}</Text>
       <Text style={styles.detailValue}>{value}</Text>
     </View>
@@ -46,6 +48,7 @@ function DetailRow({ label, value, isLast }: DetailRowProps) {
 }
 
 export default function TransactionDetailScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, '거래상세'>>();
   const tx = route.params?.transaction;
@@ -78,9 +81,9 @@ export default function TransactionDetailScreen() {
     : (tx.reward ?? 0);
 
   const amountColor =
-    tx.type === 'buy' ? '#F04452'
+    tx.type === 'buy' ? theme.red
     : tx.type === 'sell' ? '#2175F3'
-    : '#34C759';
+    : theme.green;
 
   const amountDisplay =
     tx.type === 'buy'
@@ -108,7 +111,7 @@ export default function TransactionDetailScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
+        <View style={[styles.card, { shadowColor: theme.text }]}>
           {/* Large amount */}
           <View style={styles.amountSection}>
             <Text style={styles.amountLabel}>{typeLabel}</Text>
@@ -171,7 +174,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderRadius: 20,
     padding: 20,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
@@ -208,7 +210,6 @@ const styles = StyleSheet.create({
   },
   detailRowBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#F2F4F6',
   },
   detailLabel: {
     fontSize: 14,

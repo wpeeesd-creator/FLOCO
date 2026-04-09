@@ -13,6 +13,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../context/AuthContext';
+import { ThemeProvider } from '../context/ThemeContext';
 import { ToastProvider, useToast } from '../context/ToastContext';
 import { OfflineBanner } from '../hooks/useNetworkStatus';
 import * as Notifications from 'expo-notifications';
@@ -190,11 +191,13 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <SafeAreaProvider>
             <ToastProvider>
-              <AuthProvider>
-                <OfflineBanner />
-                <Slot />
-                <DisclaimerModal />
-              </AuthProvider>
+              <ThemeProvider>
+                <AuthProvider>
+                  <OfflineBanner />
+                  <Slot />
+                  <DisclaimerModal />
+                </AuthProvider>
+              </ThemeProvider>
             </ToastProvider>
           </SafeAreaProvider>
         </QueryClientProvider>

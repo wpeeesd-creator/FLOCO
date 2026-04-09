@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { STOCKS } from '../store/appStore';
 import type { Stock } from '../store/appStore';
 import { Colors, Typography, EmptyState } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 // ── 머니몽 말풍선 ──────────────────────────────
 const MONEYMONG_TIPS = [
@@ -25,12 +26,13 @@ const MONEYMONG_TIPS = [
 ];
 
 function MoneymongBubble({ visible }: { visible: boolean }) {
+  const { theme, isDark } = useTheme();
   if (!visible) return null;
   const tip = MONEYMONG_TIPS[Math.floor(Math.random() * MONEYMONG_TIPS.length)];
   return (
     <View style={styles.bubbleWrap}>
       <View style={styles.bubble}>
-        <Text style={styles.bubbleText}>{tip}</Text>
+        <Text style={[styles.bubbleText, { color: theme.bgCard }]}>{tip}</Text>
       </View>
       <Text style={styles.bubbleTail}>▼</Text>
       <Text style={styles.moneymong}>🐾</Text>
@@ -64,6 +66,7 @@ function StockRow({ stock, onPress }: { stock: Stock; onPress: () => void }) {
 
 // ── 검색 화면 ──────────────────────────────────
 export default function SearchScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
@@ -184,7 +187,7 @@ const styles = StyleSheet.create({
     maxWidth: '80%',
   },
   bubbleText: {
-    color: '#fff', fontSize: 13, fontWeight: '600', textAlign: 'center',
+    fontSize: 13, fontWeight: '600', textAlign: 'center',
   },
   bubbleTail: {
     color: Colors.primary, fontSize: 10, marginTop: -4,

@@ -9,6 +9,7 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Colors } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import {
   getPosts, toggleLike,
   type CommunityPost,
@@ -48,6 +49,7 @@ interface Props {
 }
 
 export default function CommunityScreen({ navigation }: Props) {
+  const { theme, isDark } = useTheme();
   const { user } = useAuth();
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [selectedTag, setSelectedTag] = useState<Tag>('전체');
@@ -169,7 +171,7 @@ export default function CommunityScreen({ navigation }: Props) {
             <Ionicons
               name={liked ? 'heart' : 'heart-outline'}
               size={16}
-              color={liked ? '#F04452' : Colors.textSub}
+              color={liked ? theme.red : Colors.textSub}
             />
             <Text style={styles.actionText}>{postLikes.length}</Text>
           </TouchableOpacity>
@@ -215,7 +217,7 @@ export default function CommunityScreen({ navigation }: Props) {
                   onPress={() => setSelectedTag(tag)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.tagPillText, isActive && styles.tagPillTextActive]}>
+                  <Text style={[styles.tagPillText, isActive && styles.tagPillTextActive, isActive && { color: theme.bgCard }]}>
                     {tag}
                   </Text>
                 </TouchableOpacity>
@@ -263,6 +265,7 @@ export default function CommunityScreen({ navigation }: Props) {
                       style={[
                         styles.subscribeBtn,
                         isSubscribed && styles.subscribeBtnActive,
+                        isSubscribed && { backgroundColor: theme.primaryLight },
                       ]}
                       onPress={() => toggleSubscribe(item.tag)}
                       activeOpacity={0.7}
@@ -283,11 +286,11 @@ export default function CommunityScreen({ navigation }: Props) {
 
             {/* Subscribe Banner */}
             <TouchableOpacity style={styles.banner} activeOpacity={0.85}>
-              <Text style={styles.bannerTitle}>관심 태그 구독하기</Text>
+              <Text style={[styles.bannerTitle, { color: theme.bgCard }]}>관심 태그 구독하기</Text>
               <Text style={styles.bannerDesc}>
                 관심 있는 태그를 구독하면{'\n'}맞춤 이슈를 바로 확인할 수 있어요
               </Text>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.bannerIcon} />
+              <Ionicons name="chevron-forward" size={20} color={theme.bgCard} style={styles.bannerIcon} />
             </TouchableOpacity>
 
             {/* Remaining Posts */}
@@ -311,7 +314,7 @@ export default function CommunityScreen({ navigation }: Props) {
         onPress={() => navigation.navigate('게시물작성')}
         activeOpacity={0.85}
       >
-        <Text style={styles.fabText}>+</Text>
+        <Text style={[styles.fabText, { color: theme.bgCard }]}>+</Text>
       </TouchableOpacity>
     </View>
   );
@@ -363,9 +366,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.textSub,
   },
-  tagPillTextActive: {
-    color: '#FFFFFF',
-  },
+  tagPillTextActive: {},
   loadingContainer: {
     paddingVertical: 60,
     alignItems: 'center',
@@ -465,7 +466,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
   },
   subscribeBtnActive: {
-    backgroundColor: '#EBF2FF',
     borderColor: Colors.primary,
   },
   subscribeBtnText: {
@@ -487,7 +487,6 @@ const styles = StyleSheet.create({
   bannerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
     marginBottom: 6,
   },
   bannerDesc: {
@@ -529,7 +528,6 @@ const styles = StyleSheet.create({
   },
   fabText: {
     fontSize: 28,
-    color: '#FFFFFF',
     fontWeight: '400',
     lineHeight: 32,
   },

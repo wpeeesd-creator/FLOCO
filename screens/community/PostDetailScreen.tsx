@@ -16,6 +16,7 @@ import {
 import { db } from '../../lib/firebase';
 import { Colors } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { getPost, deletePost, type CommunityPost } from '../../lib/firestoreService';
 
 interface Comment {
@@ -41,6 +42,7 @@ const formatTime = (timestamp: any): string => {
 };
 
 export default function PostDetailScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const postId = route.params?.postId ?? '';
@@ -209,6 +211,88 @@ export default function PostDetailScreen() {
 
   const isLiked = user && post ? (post.likes ?? []).includes(user.id) : false;
 
+  const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: Colors.bg },
+    header: {
+      flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card,
+      paddingHorizontal: 4, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    headerIconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600', color: Colors.text },
+    loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    errorText: { fontSize: 15, color: Colors.textSub },
+    listContent: { paddingBottom: 16 },
+    postSection: { backgroundColor: Colors.card, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 16 },
+    authorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 10 },
+    avatarCircle: {
+      width: 36, height: 36, borderRadius: 18,
+      backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center',
+    },
+    avatarEmoji: { fontSize: 18 },
+    authorInfo: { flex: 1, gap: 2 },
+    authorNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    authorNickname: { fontSize: 15, fontWeight: '600', color: Colors.text },
+    myBadge: { backgroundColor: '#0066FF20', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+    myBadgeText: { color: theme.primary, fontSize: 11, fontWeight: '600' },
+    postTime: { fontSize: 12, color: Colors.textMuted },
+    postContent: { fontSize: 16, color: Colors.text, lineHeight: 24, marginBottom: 14, paddingHorizontal: 0 },
+    tickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
+    tickerChip: { backgroundColor: theme.bg, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
+    tickerChipText: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
+    actionsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4 },
+    actionsLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    likeButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
+    likeCount: { fontSize: 14, color: Colors.textSub, fontWeight: '600' },
+    likeCountActive: { color: theme.red },
+    commentCountRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    commentCountText: { fontSize: 14, color: Colors.textSub, fontWeight: '600' },
+    deletePostButton: { padding: 6, borderRadius: 8, backgroundColor: Colors.bg },
+    thickDivider: { height: 8, backgroundColor: theme.bg },
+    commentsHeader: {
+      backgroundColor: Colors.card, paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    commentsTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
+    commentItem: {
+      backgroundColor: Colors.card, paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: theme.bg,
+    },
+    commentRow: { flexDirection: 'row', gap: 10 },
+    commentBody: { flex: 1, gap: 4 },
+    commentMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    commentNickname: { fontSize: 13, fontWeight: '600', color: Colors.text },
+    commentTime: { fontSize: 12, color: Colors.textMuted, marginLeft: 'auto' },
+    commentContent: { fontSize: 15, color: Colors.text, lineHeight: 22 },
+    commentActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 },
+    commentLikeButton: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    commentLikeCount: { fontSize: 12, color: Colors.textSub, fontWeight: '600' },
+    commentLikeCountActive: { color: theme.red },
+    deleteCommentText: { fontSize: 12, color: Colors.textMuted },
+    emptyComments: { backgroundColor: Colors.card, paddingVertical: 40, alignItems: 'center' },
+    emptyCommentsText: { fontSize: 14, color: Colors.textSub },
+    inputBar: {
+      flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card,
+      borderTopWidth: 1, borderTopColor: theme.borderStrong,
+      paddingHorizontal: 12, paddingVertical: 10, gap: 8,
+    },
+    inputAvatarSmall: {
+      width: 28, height: 28, borderRadius: 14,
+      backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center',
+    },
+    inputAvatarEmoji: { fontSize: 14 },
+    commentInput: {
+      flex: 1, backgroundColor: theme.bg, borderRadius: 20,
+      paddingHorizontal: 14, paddingVertical: 10,
+      fontSize: 14, color: Colors.text, maxHeight: 80,
+    },
+    sendButton: {
+      width: 40, height: 40, borderRadius: 20,
+      backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
+    },
+    sendButtonDisabled: { backgroundColor: theme.borderStrong },
+  });
+
   const renderComment = ({ item }: { item: Comment }) => {
     const commentLiked = user ? item.likes.includes(user.id) : false;
     const isMyComment = user?.id === item.uid;
@@ -238,7 +322,7 @@ export default function PostDetailScreen() {
                 <Ionicons
                   name={commentLiked ? 'heart' : 'heart-outline'}
                   size={14}
-                  color={commentLiked ? '#F04452' : Colors.textSub}
+                  color={commentLiked ? theme.red : Colors.textSub}
                 />
                 {item.likes.length > 0 && (
                   <Text style={[styles.commentLikeCount, commentLiked && styles.commentLikeCountActive]}>
@@ -306,7 +390,7 @@ export default function PostDetailScreen() {
                 <Ionicons
                   name={isLiked ? 'heart' : 'heart-outline'}
                   size={18}
-                  color={isLiked ? '#F04452' : Colors.textSub}
+                  color={isLiked ? theme.red : Colors.textSub}
                 />
                 <Text style={[styles.likeCount, isLiked && styles.likeCountActive]}>
                   {(post.likes ?? []).length}
@@ -412,9 +496,9 @@ export default function PostDetailScreen() {
                 disabled={!commentText.trim() || submitting}
               >
                 {submitting ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={theme.bgCard} />
                 ) : (
-                  <Ionicons name="send" size={18} color="#FFFFFF" />
+                  <Ionicons name="send" size={18} color={theme.bgCard} />
                 )}
               </TouchableOpacity>
             </View>
@@ -424,285 +508,3 @@ export default function PostDetailScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    paddingHorizontal: 4,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerIconBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 17,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  errorText: {
-    fontSize: 15,
-    color: Colors.textSub,
-  },
-  listContent: {
-    paddingBottom: 16,
-  },
-  postSection: {
-    backgroundColor: Colors.card,
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  authorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-    gap: 10,
-  },
-  avatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F2F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarEmoji: {
-    fontSize: 18,
-  },
-  authorInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  authorNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  authorNickname: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  myBadge: {
-    backgroundColor: '#0066FF20',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  myBadgeText: {
-    color: '#0066FF',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  postTime: {
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
-  postContent: {
-    fontSize: 16,
-    color: Colors.text,
-    lineHeight: 24,
-    marginBottom: 14,
-    paddingHorizontal: 0,
-  },
-  tickerRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 16,
-  },
-  tickerChip: {
-    backgroundColor: '#F2F4F6',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  tickerChipText: {
-    fontSize: 13,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 4,
-  },
-  actionsLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  likeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 4,
-  },
-  likeCount: {
-    fontSize: 14,
-    color: Colors.textSub,
-    fontWeight: '600',
-  },
-  likeCountActive: {
-    color: '#F04452',
-  },
-  commentCountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  commentCountText: {
-    fontSize: 14,
-    color: Colors.textSub,
-    fontWeight: '600',
-  },
-  deletePostButton: {
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: Colors.bg,
-  },
-  thickDivider: {
-    height: 8,
-    backgroundColor: '#F2F4F6',
-  },
-  commentsHeader: {
-    backgroundColor: Colors.card,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  commentsTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  commentItem: {
-    backgroundColor: Colors.card,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F4F6',
-  },
-  commentRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  commentBody: {
-    flex: 1,
-    gap: 4,
-  },
-  commentMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  commentNickname: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  commentTime: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginLeft: 'auto',
-  },
-  commentContent: {
-    fontSize: 15,
-    color: Colors.text,
-    lineHeight: 22,
-  },
-  commentActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginTop: 4,
-  },
-  commentLikeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  commentLikeCount: {
-    fontSize: 12,
-    color: Colors.textSub,
-    fontWeight: '600',
-  },
-  commentLikeCountActive: {
-    color: '#F04452',
-  },
-  deleteCommentText: {
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
-  emptyComments: {
-    backgroundColor: Colors.card,
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  emptyCommentsText: {
-    fontSize: 14,
-    color: Colors.textSub,
-  },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E8EB',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  inputAvatarSmall: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F2F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inputAvatarEmoji: {
-    fontSize: 14,
-  },
-  commentInput: {
-    flex: 1,
-    backgroundColor: '#F2F4F6',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: Colors.text,
-    maxHeight: 80,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#E5E8EB',
-  },
-});

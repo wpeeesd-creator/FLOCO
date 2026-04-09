@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { useTheme } from '../../context/ThemeContext';
 
 // ── 데이터 ──────────────────────────────────
 
@@ -42,6 +43,7 @@ const RATE_CARDS = [
 // ── 컴포넌트 ──────────────────────────────
 
 export default function BondScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const [tab, setTab] = useState<BondTab>('전체');
   const [refreshing, setRefreshing] = useState(false);
@@ -53,8 +55,81 @@ export default function BondScreen() {
 
   const filtered = tab === '전체' ? BONDS : BONDS.filter(b => b.type === tab);
 
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.bgCard },
+    header: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
+    },
+    backBtn: { padding: 4 },
+    backText: { fontSize: 22, color: theme.primary, fontWeight: '600' },
+    headerTitle: { fontSize: 17, fontWeight: '700', color: '#191919' },
+    introCard: {
+      margin: 16, backgroundColor: '#FFFBEB', borderRadius: 16, padding: 20,
+      borderWidth: 1, borderColor: '#FDE68A',
+    },
+    introTitle: { fontSize: 17, fontWeight: '800', color: '#191919', marginBottom: 4 },
+    introDesc: { fontSize: 13, color: '#8E8E93', marginBottom: 14, lineHeight: 18 },
+    introItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+    introBullet: { fontSize: 14 },
+    introItemText: { fontSize: 14, fontWeight: '600', color: '#44403C' },
+    rateRow: { paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
+    rateCard: { backgroundColor: '#F8F9FA', borderRadius: 14, padding: 16, width: 160, gap: 6 },
+    rateLabel: { fontSize: 13, fontWeight: '600', color: '#191919' },
+    rateValue: { fontSize: 24, fontWeight: '800', color: '#191919', fontFamily: 'Courier' },
+    rateOrg: { fontSize: 11, color: '#8E8E93' },
+    tabRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 6 },
+    tabBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F8F9FA' },
+    tabBtnActive: { backgroundColor: theme.primary },
+    tabText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
+    tabTextActive: { color: theme.bgCard, fontWeight: '700' },
+    countRow: { paddingHorizontal: 20, paddingBottom: 8 },
+    countText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
+    listCard: {
+      marginHorizontal: 16, backgroundColor: theme.bgCard, borderRadius: 16,
+      overflow: 'hidden', borderWidth: 1, borderColor: '#F2F2F7',
+    },
+    bondRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14 },
+    bondBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
+    bondIcon: {
+      width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFF8E1',
+      alignItems: 'center', justifyContent: 'center',
+    },
+    bondName: { fontSize: 15, fontWeight: '700', color: '#191919' },
+    bondMeta: { fontSize: 12, color: '#8E8E93', marginTop: 2 },
+    bondRate: { fontSize: 18, fontWeight: '800', color: '#191919', fontFamily: 'Courier' },
+    bondChange: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+    compareCard: {
+      marginHorizontal: 16, marginTop: 24, backgroundColor: '#F8FAFC',
+      borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#E2E8F0',
+    },
+    compareTitle: { fontSize: 17, fontWeight: '800', color: '#191919', marginBottom: 16 },
+    compareRow: { flexDirection: 'row' },
+    compareCol: { flex: 1, gap: 10 },
+    compareDivider: { width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 12 },
+    compareLabel: { fontSize: 15, fontWeight: '700', color: '#191919', marginBottom: 4 },
+    compareItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    compareStat: { fontSize: 13, color: '#64748B' },
+    compareStars: { fontSize: 12 },
+    relationCard: {
+      marginHorizontal: 16, marginTop: 16, backgroundColor: '#F0F7FF',
+      borderRadius: 16, padding: 20, borderLeftWidth: 4, borderLeftColor: theme.primary,
+    },
+    relationTitle: { fontSize: 17, fontWeight: '800', color: '#191919', marginBottom: 4 },
+    relationDesc: { fontSize: 13, color: '#8E8E93', marginBottom: 16 },
+    relationBox: { gap: 10, marginBottom: 14 },
+    relationItem: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      gap: 8, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16,
+    },
+    relationEmoji: { fontSize: 20 },
+    relationLabel: { fontSize: 13, fontWeight: '600', color: '#191919' },
+    relationArrow: { fontSize: 16, color: '#8E8E93', fontWeight: '700' },
+    relationTip: { fontSize: 13, color: theme.primary, fontWeight: '600', lineHeight: 18 },
+  });
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bgCard }}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -68,7 +143,7 @@ export default function BondScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 30 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0066FF" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
         >
           {/* 채권이란? 카드 */}
           <View style={styles.introCard}>
@@ -217,90 +292,3 @@ export default function BondScreen() {
   );
 }
 
-// ── 스타일 ──────────────────────────────────
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
-  },
-  backBtn: { padding: 4 },
-  backText: { fontSize: 22, color: '#0066FF', fontWeight: '600' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#191919' },
-
-  // 채권이란? 카드
-  introCard: {
-    margin: 16, backgroundColor: '#FFFBEB', borderRadius: 16, padding: 20,
-    borderWidth: 1, borderColor: '#FDE68A',
-  },
-  introTitle: { fontSize: 17, fontWeight: '800', color: '#191919', marginBottom: 4 },
-  introDesc: { fontSize: 13, color: '#8E8E93', marginBottom: 14, lineHeight: 18 },
-  introItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  introBullet: { fontSize: 14 },
-  introItemText: { fontSize: 14, fontWeight: '600', color: '#44403C' },
-
-  // 기준금리
-  rateRow: { paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
-  rateCard: { backgroundColor: '#F8F9FA', borderRadius: 14, padding: 16, width: 160, gap: 6 },
-  rateLabel: { fontSize: 13, fontWeight: '600', color: '#191919' },
-  rateValue: { fontSize: 24, fontWeight: '800', color: '#191919', fontFamily: 'Courier' },
-  rateOrg: { fontSize: 11, color: '#8E8E93' },
-
-  // 탭
-  tabRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 6 },
-  tabBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F8F9FA' },
-  tabBtnActive: { backgroundColor: '#0066FF' },
-  tabText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
-  tabTextActive: { color: '#FFFFFF', fontWeight: '700' },
-
-  countRow: { paddingHorizontal: 20, paddingBottom: 8 },
-  countText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
-
-  // 채권 리스트
-  listCard: {
-    marginHorizontal: 16, backgroundColor: '#FFFFFF', borderRadius: 16,
-    overflow: 'hidden', borderWidth: 1, borderColor: '#F2F2F7',
-  },
-  bondRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14 },
-  bondBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
-  bondIcon: {
-    width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFF8E1',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  bondName: { fontSize: 15, fontWeight: '700', color: '#191919' },
-  bondMeta: { fontSize: 12, color: '#8E8E93', marginTop: 2 },
-  bondRate: { fontSize: 18, fontWeight: '800', color: '#191919', fontFamily: 'Courier' },
-  bondChange: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-
-  // 채권 vs 주식
-  compareCard: {
-    marginHorizontal: 16, marginTop: 24, backgroundColor: '#F8FAFC',
-    borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#E2E8F0',
-  },
-  compareTitle: { fontSize: 17, fontWeight: '800', color: '#191919', marginBottom: 16 },
-  compareRow: { flexDirection: 'row' },
-  compareCol: { flex: 1, gap: 10 },
-  compareDivider: { width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 12 },
-  compareLabel: { fontSize: 15, fontWeight: '700', color: '#191919', marginBottom: 4 },
-  compareItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  compareStat: { fontSize: 13, color: '#64748B' },
-  compareStars: { fontSize: 12 },
-
-  // 금리 관계
-  relationCard: {
-    marginHorizontal: 16, marginTop: 16, backgroundColor: '#F0F7FF',
-    borderRadius: 16, padding: 20, borderLeftWidth: 4, borderLeftColor: '#0066FF',
-  },
-  relationTitle: { fontSize: 17, fontWeight: '800', color: '#191919', marginBottom: 4 },
-  relationDesc: { fontSize: 13, color: '#8E8E93', marginBottom: 16 },
-  relationBox: { gap: 10, marginBottom: 14 },
-  relationItem: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16,
-  },
-  relationEmoji: { fontSize: 20 },
-  relationLabel: { fontSize: 13, fontWeight: '600', color: '#191919' },
-  relationArrow: { fontSize: 16, color: '#8E8E93', fontWeight: '700' },
-  relationTip: { fontSize: 13, color: '#0066FF', fontWeight: '600', lineHeight: 18 },
-});

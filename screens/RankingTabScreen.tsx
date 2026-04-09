@@ -6,6 +6,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import RankingScreen from './RankingScreen';
 import ClassRankingScreen from './ClassRankingScreen';
 import CommunityScreen from './community/CommunityScreen';
@@ -21,6 +22,7 @@ interface SchoolInfo {
 }
 
 export default function RankingTabScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -55,7 +57,7 @@ export default function RankingTabScreen() {
             style={styles.emptyBtn}
             activeOpacity={0.85}
           >
-            <Text style={styles.emptyBtnText}>학교/반 설정하기</Text>
+            <Text style={[styles.emptyBtnText, { color: theme.bgCard }]}>학교/반 설정하기</Text>
           </TouchableOpacity>
         </View>
       );
@@ -155,7 +157,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyBtnText: {
-    color: '#FFFFFF',
     fontWeight: '700',
   },
 });

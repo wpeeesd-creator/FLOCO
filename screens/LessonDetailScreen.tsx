@@ -11,8 +11,10 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore, LESSONS } from '../store/appStore';
 import { Colors, Typography, Button, Badge, BottomSheet, Hearts } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 export default function LessonDetailScreen() {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -65,6 +67,39 @@ export default function LessonDetailScreen() {
     setShowReward(false);
     navigation.goBack();
   }
+
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.bg },
+    header: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      paddingHorizontal: 16, paddingBottom: 12,
+      backgroundColor: theme.bgCard, borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    backBtn: { padding: 4 },
+    backText: { fontSize: 15, color: Colors.primary, fontWeight: '600' },
+    progressBar: { height: 4, backgroundColor: Colors.border },
+    progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 2 },
+    content: { padding: 20, gap: 16 },
+    emojiBox: { width: 72, height: 72, borderRadius: 20, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
+    emojiText: { fontSize: 34 },
+    conceptBox: { backgroundColor: theme.bgCard, borderRadius: 12, padding: 16, borderLeftWidth: 4, borderLeftColor: Colors.primary },
+    conceptText: { fontSize: 15, lineHeight: 24, color: Colors.text },
+    highlightBox: { backgroundColor: Colors.goldBg, borderRadius: 10, padding: 14 },
+    highlightText: { fontSize: 14, fontWeight: '700', color: Colors.gold, lineHeight: 22 },
+    exampleBox: { backgroundColor: Colors.bg, borderRadius: 10, padding: 14 },
+    keypointsBox: { backgroundColor: theme.bgCard, borderRadius: 12, padding: 16 },
+    keypointRow: { flexDirection: 'row', gap: 10, marginBottom: 8, alignItems: 'flex-start' },
+    keypointDot: { fontSize: 14, color: Colors.green, fontWeight: '700', marginTop: 1 },
+    quizLabel: { fontSize: 12, fontWeight: '700', color: Colors.primary, textTransform: 'uppercase', letterSpacing: 1 },
+    optionBtn: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      borderWidth: 2, borderRadius: 12, padding: 16, marginBottom: 10,
+    },
+    optionLetter: { fontSize: 16, fontWeight: '800', width: 24, textAlign: 'center' },
+    rewardContent: { alignItems: 'center', gap: 12, paddingBottom: 8 },
+    rewardEmoji: { fontSize: 56 },
+    xpRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
+  });
 
   return (
     <View style={styles.container}>
@@ -200,35 +235,3 @@ export default function LessonDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingBottom: 12,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  backBtn: { padding: 4 },
-  backText: { fontSize: 15, color: Colors.primary, fontWeight: '600' },
-  progressBar: { height: 4, backgroundColor: Colors.border },
-  progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 2 },
-  content: { padding: 20, gap: 16 },
-  emojiBox: { width: 72, height: 72, borderRadius: 20, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
-  emojiText: { fontSize: 34 },
-  conceptBox: { backgroundColor: '#fff', borderRadius: 12, padding: 16, borderLeftWidth: 4, borderLeftColor: Colors.primary },
-  conceptText: { fontSize: 15, lineHeight: 24, color: Colors.text },
-  highlightBox: { backgroundColor: Colors.goldBg, borderRadius: 10, padding: 14 },
-  highlightText: { fontSize: 14, fontWeight: '700', color: Colors.gold, lineHeight: 22 },
-  exampleBox: { backgroundColor: Colors.bg, borderRadius: 10, padding: 14 },
-  keypointsBox: { backgroundColor: '#fff', borderRadius: 12, padding: 16 },
-  keypointRow: { flexDirection: 'row', gap: 10, marginBottom: 8, alignItems: 'flex-start' },
-  keypointDot: { fontSize: 14, color: Colors.green, fontWeight: '700', marginTop: 1 },
-  quizLabel: { fontSize: 12, fontWeight: '700', color: Colors.primary, textTransform: 'uppercase', letterSpacing: 1 },
-  optionBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderWidth: 2, borderRadius: 12, padding: 16, marginBottom: 10,
-  },
-  optionLetter: { fontSize: 16, fontWeight: '800', width: 24, textAlign: 'center' },
-  rewardContent: { alignItems: 'center', gap: 12, paddingBottom: 8 },
-  rewardEmoji: { fontSize: 56 },
-  xpRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
-});

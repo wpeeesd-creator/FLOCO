@@ -16,6 +16,7 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useAppStore, STOCKS, type Stock } from '../store/appStore';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import { fetchMultiplePrices } from '../utils/priceService';
 
 // ── 타입 ──────────────────────────────────────────
@@ -33,6 +34,7 @@ const US_SECTORS = ['전체', ...Array.from(new Set(US_STOCKS.map(s => s.sector)
 //  InvestScreen
 // ══════════════════════════════════════════════════
 export default function InvestScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const { holdings, cash } = useAppStore();
@@ -162,7 +164,7 @@ export default function InvestScreen() {
             onPress={() => setSelectedTab(tab)}
             style={[s.tabChip, selectedTab === tab && s.tabChipActive]}
           >
-            <Text style={[s.tabChipText, selectedTab === tab && s.tabChipTextActive]}>
+            <Text style={[s.tabChipText, selectedTab === tab && s.tabChipTextActive, selectedTab === tab && { color: theme.bgCard }]}>
               {tab}
               {tab === '보유' && portfolio.length > 0 ? ` ${portfolio.length}` : ''}
               {tab === '관심' && wishlist.length > 0 ? ` ${wishlist.length}` : ''}
@@ -201,7 +203,7 @@ export default function InvestScreen() {
                 onPress={() => { setSelectedMarket(market); setSelectedSector('전체'); }}
                 style={[s.marketBtn, selectedMarket === market && s.marketBtnActive]}
               >
-                <Text style={[s.marketBtnText, selectedMarket === market && s.marketBtnTextActive]}>
+                <Text style={[s.marketBtnText, selectedMarket === market && s.marketBtnTextActive, selectedMarket === market && { color: theme.bgCard }]}>
                   {market === 'KR' ? '🇰🇷 국내' : '🇺🇸 미국'}
                 </Text>
               </TouchableOpacity>
@@ -232,7 +234,7 @@ export default function InvestScreen() {
           {/* 업데이트 상태 */}
           <View style={s.statusRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={[s.statusDot, { backgroundColor: isLoadingPrices ? '#FF9500' : '#34C759' }]} />
+              <View style={[s.statusDot, { backgroundColor: isLoadingPrices ? '#FF9500' : theme.green }]} />
               <Text style={s.statusText}>
                 {isLoadingPrices
                   ? '업데이트 중...'
@@ -286,7 +288,7 @@ export default function InvestScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={[s.stockLogo, { backgroundColor: (item as any).bg ?? '#8E8E93' }]}>
-                    <Text style={s.stockLogoText}>{item.logo || item.ticker.slice(0, 2)}</Text>
+                    <Text style={[s.stockLogoText, { color: theme.bgCard }]}>{item.logo || item.ticker.slice(0, 2)}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.stockName}>{item.name}</Text>
@@ -332,7 +334,7 @@ export default function InvestScreen() {
                 보유 종목이 없어요{'\n'}전체 탭에서 투자를 시작해보세요!
               </Text>
               <TouchableOpacity onPress={() => setSelectedTab('전체')} style={s.emptyBtn}>
-                <Text style={s.emptyBtnText}>종목 둘러보기</Text>
+                <Text style={[s.emptyBtnText, { color: theme.bgCard }]}>종목 둘러보기</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -400,7 +402,7 @@ export default function InvestScreen() {
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <View style={[s.stockLogo, { backgroundColor: (stock as any).bg ?? '#8E8E93' }]}>
-                        <Text style={s.stockLogoText}>{stock.logo || stock.ticker.slice(0, 2)}</Text>
+                        <Text style={[s.stockLogoText, { color: theme.bgCard }]}>{stock.logo || stock.ticker.slice(0, 2)}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={s.stockName}>{stock.name}</Text>
@@ -507,7 +509,7 @@ export default function InvestScreen() {
                     activeOpacity={0.7}
                   >
                     <View style={[s.stockLogo, { backgroundColor: (stock as any).bg ?? '#8E8E93' }]}>
-                      <Text style={s.stockLogoText}>{stock.logo || stock.ticker.slice(0, 2)}</Text>
+                      <Text style={[s.stockLogoText, { color: theme.bgCard }]}>{stock.logo || stock.ticker.slice(0, 2)}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={s.stockName}>{stock.name}</Text>
@@ -682,9 +684,7 @@ const s = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-  tabChipTextActive: {
-    color: '#FFFFFF',
-  },
+  tabChipTextActive: {},
 
   // 검색
   searchWrap: {
@@ -730,9 +730,7 @@ const s = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-  marketBtnTextActive: {
-    color: '#FFFFFF',
-  },
+  marketBtnTextActive: {},
 
   // 섹터
   sectorScroll: {
@@ -809,7 +807,6 @@ const s = StyleSheet.create({
     marginRight: 12,
   },
   stockLogoText: {
-    color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 12,
   },
@@ -904,7 +901,6 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyBtnText: {
-    color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 15,
   },

@@ -10,6 +10,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useAppStore, FLO_EVENTS, STOCKS } from '../store/appStore';
 import { Colors, Typography, Badge, SectionHeader } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import { fetchAllNews, fetchKRNews, formatNewsTime, type NewsItem } from '../lib/newsService';
 
 const { width } = Dimensions.get('window');
@@ -32,6 +33,7 @@ const ZONE_COLORS: Record<string, string> = {
 };
 
 function ZoneCard({ zone }: { zone: typeof ZONES[0] }) {
+  const { theme } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePress = () => {
@@ -53,7 +55,7 @@ function ZoneCard({ zone }: { zone: typeof ZONES[0] }) {
       >
         {!zone.active && <Text style={styles.zoneLock}>🔒</Text>}
         <Text style={[styles.zoneEmoji, !zone.active && { opacity: 0.4 }]}>{zone.emoji}</Text>
-        <Text style={[styles.zoneName, !zone.active && { opacity: 0.5 }]}>{zone.name}</Text>
+        <Text style={[styles.zoneName, { color: theme.bgCard }, !zone.active && { opacity: 0.5 }]}>{zone.name}</Text>
         {zone.active && (
           <View style={styles.zoneActiveDot} />
         )}
@@ -65,6 +67,7 @@ function ZoneCard({ zone }: { zone: typeof ZONES[0] }) {
 type NewsTab = '전체' | '국내' | '미국';
 
 export default function FloWorldScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const { completedEvents, floPoints, streak } = useAppStore();
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -117,6 +120,7 @@ export default function FloWorldScreen() {
               style={[
                 styles.star,
                 {
+                  backgroundColor: theme.bgCard,
                   top: `${(i * 17 + 5) % 80}%` as any,
                   left: `${(i * 23 + 3) % 100}%` as any,
                   opacity: 0.3 + (i % 5) * 0.14,
@@ -128,10 +132,10 @@ export default function FloWorldScreen() {
           {/* Title row */}
           <View style={{ alignItems: 'center' }}>
             <View style={styles.floTitleRow}>
-              <Text style={styles.floTitle}>FLOCO WORLD</Text>
+              <Text style={[styles.floTitle, { color: theme.bgCard }]}>FLOCO WORLD</Text>
               <View style={styles.liveBadge}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveText}>LIVE</Text>
+                <View style={[styles.liveDot, { backgroundColor: theme.bgCard }]} />
+                <Text style={[styles.liveText, { color: theme.bgCard }]}>LIVE</Text>
               </View>
             </View>
             <Text style={styles.floSubtitle}>실시간 세계 이벤트로 배우는 투자</Text>
@@ -140,15 +144,15 @@ export default function FloWorldScreen() {
           {/* Stats row */}
           <View style={styles.heroStats}>
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatNum}>{streak}일</Text>
+              <Text style={[styles.heroStatNum, { color: theme.bgCard }]}>{streak}일</Text>
               <Text style={styles.heroStatLabel}>스트릭 🔥</Text>
             </View>
             <View style={[styles.heroStat, styles.heroStatMiddle]}>
-              <Text style={styles.heroStatNum}>{floPoints}</Text>
+              <Text style={[styles.heroStatNum, { color: theme.bgCard }]}>{floPoints}</Text>
               <Text style={styles.heroStatLabel}>FLO</Text>
             </View>
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatNum}>{completedEvents.length}</Text>
+              <Text style={[styles.heroStatNum, { color: theme.bgCard }]}>{completedEvents.length}</Text>
               <Text style={styles.heroStatLabel}>완료</Text>
             </View>
           </View>
@@ -162,14 +166,14 @@ export default function FloWorldScreen() {
             activeOpacity={0.8}
           >
             <Text style={styles.todayEventLabel}>📰 오늘의 주요 뉴스</Text>
-            <Text style={styles.todayEventTitle} numberOfLines={3}>
+            <Text style={[styles.todayEventTitle, { color: theme.bgCard }]} numberOfLines={3}>
               {todayEvent.title}
             </Text>
             <Text style={styles.todayEventMeta}>
               {todayEvent.source} · {formatNewsTime(todayEvent.publishedAt)}
             </Text>
             <View style={styles.todayEventBtn}>
-              <Text style={styles.todayEventBtnText}>자세히 보기 →</Text>
+              <Text style={[styles.todayEventBtnText, { color: theme.bgCard }]}>자세히 보기 →</Text>
             </View>
           </TouchableOpacity>
         )}
@@ -241,7 +245,7 @@ export default function FloWorldScreen() {
                 onPress={() => setNewsTab(t)}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.newsTabText, newsTab === t && styles.newsTabTextActive]}>
+                <Text style={[styles.newsTabText, newsTab === t && styles.newsTabTextActive, newsTab === t && { color: theme.bgCard }]}>
                   {t === '국내' ? '🇰🇷 국내' : t === '미국' ? '🇺🇸 미국' : '전체'}
                 </Text>
               </TouchableOpacity>
@@ -314,16 +318,16 @@ const styles = StyleSheet.create({
     minHeight: 190,
     position: 'relative', overflow: 'hidden',
   },
-  star: { position: 'absolute', width: 2, height: 2, backgroundColor: '#fff', borderRadius: 1 },
+  star: { position: 'absolute', width: 2, height: 2, borderRadius: 1 },
   floTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  floTitle: { color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 1 },
+  floTitle: { fontSize: 22, fontWeight: '700', letterSpacing: 1 },
   liveBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: Colors.green,
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
   },
-  liveDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' },
-  liveText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  liveDot: { width: 5, height: 5, borderRadius: 2.5 },
+  liveText: { fontSize: 10, fontWeight: '700' },
   floSubtitle: { color: 'rgba(255,255,255,0.50)', fontSize: 13 },
 
   heroStats: {
@@ -336,7 +340,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1, borderRightWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
   },
-  heroStatNum: { color: '#fff', fontSize: 18, fontWeight: '700', fontFamily: 'Courier' },
+  heroStatNum: { fontSize: 18, fontWeight: '700', fontFamily: 'Courier' },
   heroStatLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 10, marginTop: 3 },
 
   // Today's news card
@@ -346,14 +350,14 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 20,
   },
   todayEventLabel: { color: 'rgba(255,255,255,0.65)', fontSize: 12 },
-  todayEventTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginTop: 8, lineHeight: 24 },
+  todayEventTitle: { fontSize: 16, fontWeight: '700', marginTop: 8, lineHeight: 24 },
   todayEventMeta: { color: 'rgba(255,255,255,0.65)', fontSize: 12, marginTop: 8 },
   todayEventBtn: {
     marginTop: 12, backgroundColor: 'rgba(255,255,255,0.18)',
     borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14,
     alignSelf: 'flex-start',
   },
-  todayEventBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  todayEventBtnText: { fontWeight: '700', fontSize: 13 },
 
   // Zone grid
   zoneGrid: {
@@ -369,7 +373,7 @@ const styles = StyleSheet.create({
   },
   zoneLock: { position: 'absolute', top: 8, right: 8, fontSize: 14 },
   zoneEmoji: { fontSize: 28, marginBottom: 6 },
-  zoneName: { color: '#fff', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  zoneName: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
   zoneActiveDot: {
     position: 'absolute', bottom: 8, right: 8,
     width: 6, height: 6, borderRadius: 3,
@@ -405,7 +409,7 @@ const styles = StyleSheet.create({
   },
   newsTabActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   newsTabText: { fontSize: 13, color: Colors.textSub, fontWeight: '600' },
-  newsTabTextActive: { color: '#fff', fontWeight: '700' },
+  newsTabTextActive: { fontWeight: '700' },
   skeleton: { backgroundColor: Colors.border, borderRadius: 12, height: 100 },
   newsCard: {
     backgroundColor: Colors.card,

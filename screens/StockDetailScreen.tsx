@@ -41,12 +41,15 @@ function useDS() {
     cardAlt: theme.bgInput,
     rise: theme.red,
     fall: theme.blue,
+    riseLight: theme.redLight,
+    fallLight: theme.blueLight,
     text: theme.stockText,
     textSub: theme.textSecondary,
     textMuted: theme.textTertiary,
     textDim: theme.mode === 'dark' ? '#444444' : '#B0B8C1',
     border: theme.stockBorder,
     borderLight: theme.borderStrong,
+    overlay: theme.overlay,
     radius: 12,
   }), [theme]);
 }
@@ -87,9 +90,11 @@ interface KISChartProps {
   isKR: boolean;
   riseColor: string;
   fallColor: string;
+  gridColor: string;
+  labelColor: string;
 }
 
-function KISChart({ data, width, height, type, period, isKR, riseColor, fallColor }: KISChartProps) {
+function KISChart({ data, width, height, type, period, isKR, riseColor, fallColor, gridColor, labelColor }: KISChartProps) {
   if (data.length === 0) return null;
 
   const drawW = width - CHART_PAD.left - CHART_PAD.right;
@@ -148,11 +153,11 @@ function KISChart({ data, width, height, type, period, isKR, riseColor, fallColo
           <SvgLine
             x1={CHART_PAD.left} y1={toY(v)}
             x2={width - CHART_PAD.right} y2={toY(v)}
-            stroke="#222" strokeWidth={1}
+            stroke={gridColor} strokeWidth={1}
           />
           <SvgText
             x={CHART_PAD.left - 6} y={toY(v) + 4}
-            fill="#666" fontSize={10} textAnchor="end"
+            fill={labelColor} fontSize={10} textAnchor="end"
           >
             {fmtTick(v)}
           </SvgText>
@@ -164,7 +169,7 @@ function KISChart({ data, width, height, type, period, isKR, riseColor, fallColo
         <SvgText
           key={`x-${idx}`}
           x={toX(idx)} y={height - 6}
-          fill="#666" fontSize={10} textAnchor="middle"
+          fill={labelColor} fontSize={10} textAnchor="middle"
         >
           {label}
         </SvgText>
@@ -209,6 +214,7 @@ export default function StockDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user } = useAuth();
+  const { theme, isDark } = useTheme();
   const ticker = route.params?.ticker ?? 'AAPL';
   const { cash, holdings } = useAppStore();
   const DS = useDS();
@@ -407,7 +413,7 @@ export default function StockDetailScreen() {
   //  RENDER
   // ──────────────────────────────────────────────
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: DS.bg }}>
+    <View style={{ flex: 1, backgroundColor: DS.bg, paddingTop: 59 }}>
       {/* ── 상단 헤더 ── */}
       <View style={s.header}>
         <TouchableOpacity
@@ -419,16 +425,6 @@ export default function StockDetailScreen() {
 
         <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={s.headerName}>{stock.name}</Text>
-          {priceLoading ? (
-            <ActivityIndicator size="small" color={DS.textSub} style={{ marginTop: 4 }} />
-          ) : hasPrice ? (
-            <Text style={{ color: changeColor, fontSize: 13, marginTop: 2 }}>
-              {fmt(livePrice)}{' '}
-              {isPositive ? '+' : ''}{liveChange.toFixed(2)}%
-            </Text>
-          ) : (
-            <Text style={{ color: DS.textMuted, fontSize: 13, marginTop: 2 }}>데이터 없음</Text>
-          )}
         </View>
 
         <TouchableOpacity
@@ -463,11 +459,22 @@ export default function StockDetailScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => navigation.navigate('알림')}
+          onPress={() => Alert.alert('준비 중', '주가 알림 기능은 다음 업데이트에서 제공될 예정이에요! 🔔')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Text style={{ fontSize: 20, color: DS.text }}>🔔</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* 헤더 아래 가격 표시 */}
+      <View style={{ alignItems: 'center', paddingVertical: 4, backgroundColor: theme.bgCard }}>
+        {priceLoading ? (
+          <ActivityIndicator size="small" />
+        ) : hasPrice ? (
+          <Text style={{ color: changeColor, fontSize: 13 }}>
+            {fmt(livePrice)} {isPositive ? '+' : ''}{liveChange.toFixed(2)}%
+          </Text>
+        ) : null}
       </View>
 
       {/* ── 탭 메뉴 ── */}
@@ -554,7 +561,7 @@ export default function StockDetailScreen() {
                   }}
                 >
                   <Text style={{
-                    color: chartPeriod === p.key ? '#000000' : DS.textMuted,
+                    color: chartPeriod === p.key ? DS.bg : DS.textMuted,
                     fontWeight: chartPeriod === p.key ? 'bold' : 'normal',
                     fontSize: 14,
                   }}>
@@ -587,6 +594,8 @@ export default function StockDetailScreen() {
                   isKR={isKR}
                   riseColor={DS.rise}
                   fallColor={DS.fall}
+                  gridColor={DS.border}
+                  labelColor={DS.textSub}
                 />
               ) : (
                 <View style={{ height: 300, justifyContent: 'center', alignItems: 'center' }}>
@@ -811,14 +820,14 @@ export default function StockDetailScreen() {
       <View style={s.bottomBar}>
         <TouchableOpacity
           onPress={() => openSheet('sell')}
-          style={[s.bottomBtn, { backgroundColor: '#1A3A6A' }]}
+          style={[s.bottomBtn, { backgroundColor: DS.fallLight }]}
           activeOpacity={0.85}
         >
           <Text style={{ color: DS.fall, fontSize: 16, fontWeight: 'bold' }}>매도</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => openSheet('buy')}
-          style={[s.bottomBtn, { backgroundColor: '#6A1A1A' }]}
+          style={[s.bottomBtn, { backgroundColor: DS.riseLight }]}
           activeOpacity={0.85}
         >
           <Text style={{ color: DS.rise, fontSize: 16, fontWeight: 'bold' }}>매수</Text>
@@ -834,7 +843,7 @@ export default function StockDetailScreen() {
           onRequestClose={() => setShowChartModal(false)}
         >
           <View style={{ flex: 1, backgroundColor: DS.bg }}>
-            <SafeAreaView>
+            <View style={{ flex: 1, paddingTop: 59 }}>
               {/* 헤더 */}
               <View style={{
                 flexDirection: 'row',
@@ -903,6 +912,39 @@ export default function StockDetailScreen() {
                 {['✏️ 선 그리기', '🔔 가격알림'].map(btn => (
                   <TouchableOpacity
                     key={btn}
+                    onPress={btn === '🔔 가격알림' ? () => {
+                      if (!user?.id) return;
+                      if (Platform.OS === 'android') {
+                        Alert.alert('안내', '가격 알림은 곧 안드로이드에서도 지원될 예정이에요! 🔔');
+                        return;
+                      }
+                      Alert.prompt(
+                        '목표 주가 설정',
+                        `${stock.name} 목표 주가를 입력해주세요 (현재가: ${livePrice?.toLocaleString()}원)`,
+                        async (targetPrice) => {
+                          if (!targetPrice || isNaN(Number(targetPrice))) return;
+                          const notif = {
+                            id: Date.now().toString(),
+                            type: 'price_alert',
+                            title: '📈 가격 알림 설정',
+                            body: `${stock.name} 목표가 ${Number(targetPrice).toLocaleString()}원 설정됨`,
+                            ticker: ticker,
+                            stockName: stock.name,
+                            targetPrice: Number(targetPrice),
+                            createdAt: new Date().toISOString(),
+                            read: false,
+                          };
+                          const userRef = doc(db, 'users', user.id);
+                          const snap = await getDoc(userRef);
+                          const existing = snap.data()?.notifications ?? [];
+                          await updateDoc(userRef, {
+                            notifications: [notif, ...existing].slice(0, 50),
+                          });
+                          Alert.alert('✅ 설정 완료', `${stock.name} 목표가 ${Number(targetPrice).toLocaleString()}원이 설정됐어요!`);
+                        },
+                        'plain-text'
+                      );
+                    } : undefined}
                     style={{
                       backgroundColor: DS.card,
                       borderRadius: 20,
@@ -929,7 +971,7 @@ export default function StockDetailScreen() {
                   <Ionicons name="contract-outline" size={16} color={DS.text} />
                 </TouchableOpacity>
               </View>
-            </SafeAreaView>
+            </View>
 
             {/* 차트 */}
             <View style={{ flex: 1, justifyContent: 'center' }}>
@@ -1031,12 +1073,12 @@ export default function StockDetailScreen() {
                   style={{
                     flex: 1, height: 52,
                     borderRadius: 30,
-                    backgroundColor: '#2255CC',
+                    backgroundColor: DS.fall,
                     justifyContent: 'center',
                     alignItems: 'center'
                   }}
                 >
-                  <Text style={{ color: '#FFF', fontSize: 17, fontWeight: 'bold' }}>
+                  <Text style={{ color: theme.bgCard, fontSize: 17, fontWeight: 'bold' }}>
                     판매하기
                   </Text>
                 </TouchableOpacity>
@@ -1049,12 +1091,12 @@ export default function StockDetailScreen() {
                   style={{
                     flex: 1, height: 52,
                     borderRadius: 30,
-                    backgroundColor: '#CC2222',
+                    backgroundColor: DS.rise,
                     justifyContent: 'center',
                     alignItems: 'center'
                   }}
                 >
-                  <Text style={{ color: '#FFF', fontSize: 17, fontWeight: 'bold' }}>
+                  <Text style={{ color: theme.bgCard, fontSize: 17, fontWeight: 'bold' }}>
                     구매하기
                   </Text>
                 </TouchableOpacity>
@@ -1078,7 +1120,7 @@ export default function StockDetailScreen() {
           onClose={() => setShowTradeSheet(false)}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -1101,6 +1143,7 @@ function TradeSheet({
   stock, livePrice, liveChange, isKR, type: initialType,
   userData, cash, userId, onClose,
 }: TradeSheetProps) {
+  const { theme } = useTheme();
   const DS = useDS();
   const [tradeType, setTradeType] = useState(initialType);
   const [fixedPrice] = useState(livePrice);
@@ -1323,7 +1366,7 @@ function TradeSheet({
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity
-        style={{ flex: 1, backgroundColor: '#00000060' }}
+        style={{ flex: 1, backgroundColor: DS.overlay }}
         activeOpacity={1}
         onPress={onClose}
       />
@@ -1451,14 +1494,14 @@ function TradeSheet({
                 disabled={isButtonDisabled}
                 style={{
                   height: 52, borderRadius: 12, justifyContent: 'center', alignItems: 'center',
-                  backgroundColor: isButtonDisabled ? DS.borderLight : tradeType === 'buy' ? '#CC2222' : '#2255CC',
+                  backgroundColor: isButtonDisabled ? DS.borderLight : tradeType === 'buy' ? DS.rise : DS.fall,
                 }}
                 activeOpacity={0.85}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color={theme.bgCard} />
                 ) : (
-                  <Text style={{ color: isButtonDisabled ? DS.textMuted : '#FFFFFF', fontSize: 17, fontWeight: 'bold' }}>
+                  <Text style={{ color: isButtonDisabled ? DS.textMuted : theme.bgCard, fontSize: 17, fontWeight: 'bold' }}>
                     {tradeType === 'sell' && quantity > maxSellQty
                       ? '보유 수량 초과'
                       : tradeType === 'buy' && balance < totalCost
@@ -1731,7 +1774,8 @@ function createMainStyles(DS: ReturnType<typeof useDS>) {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 0,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: DS.border,
   },
@@ -1776,7 +1820,7 @@ function createMainStyles(DS: ReturnType<typeof useDS>) {
   },
   chipBtnActive: {
     backgroundColor: DS.borderLight,
-    borderColor: '#555',
+    borderColor: DS.borderLight,
   },
   chipText: {
     color: DS.textMuted,
@@ -1913,7 +1957,7 @@ function createTradeStyles(DS: ReturnType<typeof useDS>) {
   },
   pctBtnActive: {
     backgroundColor: DS.borderLight,
-    borderColor: '#555',
+    borderColor: DS.borderLight,
   },
   pctText: {
     color: DS.textMuted,

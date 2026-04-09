@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { getAllPortfolios } from '../lib/firestoreService';
 import { STOCKS } from '../store/appStore';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 const INITIAL_FUND = 1_000_000;
@@ -35,6 +36,7 @@ interface ClassRankingScreenProps {
 }
 
 export default function ClassRankingScreen({ classId, schoolName, grade, classNum }: ClassRankingScreenProps) {
+  const { theme } = useTheme();
   const { user } = useAuth();
   const navigation = useNavigation<any>();
 
@@ -92,6 +94,43 @@ export default function ClassRankingScreen({ classId, schoolName, grade, classNu
     setRefreshing(true);
     load();
   }, [load]);
+
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.bg },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    classCard: {
+      backgroundColor: Colors.primary, margin: 16, borderRadius: 20, padding: 20,
+    },
+    classCardLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13 },
+    classCardTitle: {
+      color: theme.bgCard, fontSize: 22, fontWeight: '700', marginTop: 4,
+    },
+    classCardSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 4 },
+    list: { paddingHorizontal: 16, paddingBottom: 20 },
+    row: {
+      backgroundColor: theme.bgCard, borderRadius: 16, padding: 16,
+      marginBottom: 8, flexDirection: 'row', alignItems: 'center',
+    },
+    rowMe: { backgroundColor: theme.primaryLight },
+    rank: { fontSize: 20, width: 36, textAlign: 'center' },
+    rowEmoji: { fontSize: 20, marginHorizontal: 8 },
+    rowMeta: { flex: 1 },
+    rowName: { fontWeight: '700', color: Colors.text, fontSize: 15 },
+    rowAsset: { color: Colors.textSub, fontSize: 13, marginTop: 2 },
+    rowReturn: { fontWeight: '700', fontSize: 15 },
+    empty: {
+      flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40,
+    },
+    emptyEmoji: { fontSize: 48 },
+    emptyText: {
+      color: Colors.textSub, marginTop: 16, textAlign: 'center', fontSize: 16, lineHeight: 24,
+    },
+    emptyBtn: {
+      marginTop: 16, backgroundColor: Colors.primary, borderRadius: 12,
+      paddingHorizontal: 24, height: 44, justifyContent: 'center',
+    },
+    emptyBtnText: { color: theme.bgCard, fontWeight: '700' },
+  });
 
   if (loading) {
     return (
@@ -162,39 +201,3 @@ export default function ClassRankingScreen({ classId, schoolName, grade, classNu
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  classCard: {
-    backgroundColor: Colors.primary, margin: 16, borderRadius: 20, padding: 20,
-  },
-  classCardLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13 },
-  classCardTitle: {
-    color: '#FFFFFF', fontSize: 22, fontWeight: '700', marginTop: 4,
-  },
-  classCardSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 4 },
-  list: { paddingHorizontal: 16, paddingBottom: 20 },
-  row: {
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16,
-    marginBottom: 8, flexDirection: 'row', alignItems: 'center',
-  },
-  rowMe: { backgroundColor: '#EBF2FF' },
-  rank: { fontSize: 20, width: 36, textAlign: 'center' },
-  rowEmoji: { fontSize: 20, marginHorizontal: 8 },
-  rowMeta: { flex: 1 },
-  rowName: { fontWeight: '700', color: Colors.text, fontSize: 15 },
-  rowAsset: { color: Colors.textSub, fontSize: 13, marginTop: 2 },
-  rowReturn: { fontWeight: '700', fontSize: 15 },
-  empty: {
-    flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40,
-  },
-  emptyEmoji: { fontSize: 48 },
-  emptyText: {
-    color: Colors.textSub, marginTop: 16, textAlign: 'center', fontSize: 16, lineHeight: 24,
-  },
-  emptyBtn: {
-    marginTop: 16, backgroundColor: Colors.primary, borderRadius: 12,
-    paddingHorizontal: 24, height: 44, justifyContent: 'center',
-  },
-  emptyBtnText: { color: '#FFFFFF', fontWeight: '700' },
-});

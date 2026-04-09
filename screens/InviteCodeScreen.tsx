@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { applyInviteCode } from '../lib/inviteService';
 
 interface InviteCodeScreenProps {
@@ -18,6 +19,7 @@ interface InviteCodeScreenProps {
 }
 
 export default function InviteCodeScreen({ onComplete }: InviteCodeScreenProps) {
+  const { theme } = useTheme();
   const { user } = useAuth();
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -57,6 +59,87 @@ export default function InviteCodeScreen({ onComplete }: InviteCodeScreenProps) 
 
   const isReady = code.length === 6;
 
+  const styles = StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.bgCard,
+    },
+    container: {
+      flex: 1,
+      padding: 24,
+    },
+    skipBtn: {
+      alignSelf: 'flex-end',
+      padding: 8,
+    },
+    skipText: {
+      color: theme.textSecondary,
+      fontSize: 15,
+      fontWeight: '500',
+    },
+    content: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    emoji: {
+      fontSize: 40,
+    },
+    title: {
+      fontSize: 26,
+      fontWeight: '700',
+      color: theme.text,
+      textAlign: 'center',
+      marginTop: 16,
+      lineHeight: 36,
+    },
+    description: {
+      color: theme.textSecondary,
+      textAlign: 'center',
+      marginTop: 12,
+      fontSize: 15,
+      lineHeight: 22,
+    },
+    inputWrap: {
+      marginTop: 40,
+      borderWidth: 2,
+      borderColor: theme.borderStrong,
+      borderRadius: 16,
+      padding: 16,
+      width: '100%',
+    },
+    inputWrapActive: {
+      borderColor: theme.primary,
+    },
+    input: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: theme.text,
+      textAlign: 'center',
+      letterSpacing: 8,
+    },
+    applyBtn: {
+      marginTop: 16,
+      backgroundColor: theme.borderStrong,
+      borderRadius: 16,
+      height: 56,
+      justifyContent: 'center',
+      alignItems: 'center',
+      width: '100%',
+    },
+    applyBtnActive: {
+      backgroundColor: theme.primary,
+    },
+    applyText: {
+      color: theme.textSecondary,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    applyTextActive: {
+      color: theme.bgCard,
+    },
+  });
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -80,7 +163,7 @@ export default function InviteCodeScreen({ onComplete }: InviteCodeScreenProps) 
               value={code}
               onChangeText={(text) => setCode(text.toUpperCase())}
               placeholder="초대 코드 6자리 입력"
-              placeholderTextColor="#8B95A1"
+              placeholderTextColor={theme.textSecondary}
               maxLength={6}
               autoCapitalize="characters"
               style={styles.input}
@@ -95,7 +178,7 @@ export default function InviteCodeScreen({ onComplete }: InviteCodeScreenProps) 
             activeOpacity={0.85}
           >
             {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={theme.bgCard} />
             ) : (
               <Text style={[styles.applyText, isReady && styles.applyTextActive]}>
                 적용하기
@@ -108,83 +191,3 @@ export default function InviteCodeScreen({ onComplete }: InviteCodeScreenProps) 
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  container: {
-    flex: 1,
-    padding: 24,
-  },
-  skipBtn: {
-    alignSelf: 'flex-end',
-    padding: 8,
-  },
-  skipText: {
-    color: '#8B95A1',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emoji: {
-    fontSize: 40,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#191F28',
-    textAlign: 'center',
-    marginTop: 16,
-    lineHeight: 36,
-  },
-  description: {
-    color: '#8B95A1',
-    textAlign: 'center',
-    marginTop: 12,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  inputWrap: {
-    marginTop: 40,
-    borderWidth: 2,
-    borderColor: '#E5E8EB',
-    borderRadius: 16,
-    padding: 16,
-    width: '100%',
-  },
-  inputWrapActive: {
-    borderColor: '#0066FF',
-  },
-  input: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#191F28',
-    textAlign: 'center',
-    letterSpacing: 8,
-  },
-  applyBtn: {
-    marginTop: 16,
-    backgroundColor: '#E5E8EB',
-    borderRadius: 16,
-    height: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-  },
-  applyBtnActive: {
-    backgroundColor: '#0066FF',
-  },
-  applyText: {
-    color: '#8B95A1',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  applyTextActive: {
-    color: '#FFFFFF',
-  },
-});
