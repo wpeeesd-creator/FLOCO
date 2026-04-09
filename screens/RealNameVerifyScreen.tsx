@@ -9,8 +9,10 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 export default function RealNameVerifyScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const { user: currentUser } = useAuth();
 
@@ -93,7 +95,7 @@ export default function RealNameVerifyScreen() {
           activeOpacity={0.85}
           disabled={!isValid || isSubmitting}
         >
-          <Text style={styles.submitBtnText}>
+          <Text style={[styles.submitBtnText, { color: theme.bgCard }]}>
             {isSubmitting ? '인증 중...' : '인증 완료'}
           </Text>
         </TouchableOpacity>
@@ -182,6 +184,5 @@ const styles = StyleSheet.create({
   submitBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
 });

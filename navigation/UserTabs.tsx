@@ -91,7 +91,14 @@ function InvestNavigator() {
   return (
     <InvestStack.Navigator id="InvestStack" screenOptions={{ headerShown: false }}>
       <InvestStack.Screen name="투자메인" component={InvestScreen} />
-      <InvestStack.Screen name="종목상세" component={StockDetailScreen} />
+      <InvestStack.Screen
+        name="종목상세"
+        component={StockDetailScreen}
+        options={{
+          headerShown: false,
+          animation: 'fade',
+        }}
+      />
       <InvestStack.Screen name="종목검색" component={SearchScreen} />
       <InvestStack.Screen name="거래" component={TradingScreen} />
       <InvestStack.Screen name="AI분석" component={ChatScreen} />

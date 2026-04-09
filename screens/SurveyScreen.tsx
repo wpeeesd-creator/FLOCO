@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 // ── 타입 ──────────────────────────────────────────
 type ScoreKey = 'safe' | 'balanced' | 'aggressive' | 'analytical' | 'trader' | 'longterm' | 'passive' | 'contrarian';
@@ -155,6 +156,7 @@ const QUESTIONS: SurveyQuestion[] = [
 
 // ── 컴포넌트 ──────────────────────────────────────
 export default function SurveyScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
@@ -226,6 +228,42 @@ export default function SurveyScreen() {
     }
   };
 
+  const styles = StyleSheet.create({
+    safe: { flex: 1, backgroundColor: theme.bgCard },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, paddingVertical: 12,
+    },
+    backBtn: { padding: 4 },
+    headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },
+    headerCount: { fontSize: 14, fontWeight: '600', color: Colors.textSub, minWidth: 40, textAlign: 'right' },
+    progressBg: { height: 4, backgroundColor: theme.bg, marginHorizontal: 16 },
+    progressFill: { height: 4, backgroundColor: Colors.primary, borderRadius: 2 },
+    content: { flex: 1, paddingHorizontal: 24, paddingTop: 32 },
+    categoryBadge: {
+      alignSelf: 'flex-start', backgroundColor: '#EBF5FF',
+      paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginBottom: 16,
+    },
+    categoryText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
+    question: { fontSize: 22, fontWeight: '700', color: Colors.text, lineHeight: 32, marginBottom: 32 },
+    optionsWrap: { gap: 12 },
+    option: {
+      flexDirection: 'row', alignItems: 'center', gap: 14,
+      backgroundColor: '#F8F9FA', borderRadius: 16, padding: 18,
+      borderWidth: 2, borderColor: 'transparent',
+    },
+    optionSelected: { backgroundColor: '#EBF5FF', borderColor: Colors.primary },
+    optionCircle: {
+      width: 32, height: 32, borderRadius: 16,
+      backgroundColor: theme.borderStrong, alignItems: 'center', justifyContent: 'center',
+    },
+    optionCircleSelected: { backgroundColor: Colors.primary },
+    optionCircleText: { fontSize: 14, fontWeight: '700', color: Colors.textSub },
+    optionCircleTextSelected: { color: theme.bgCard },
+    optionText: { flex: 1, fontSize: 15, fontWeight: '500', color: Colors.text, lineHeight: 22 },
+    optionTextSelected: { fontWeight: '700', color: Colors.primary },
+  });
+
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
@@ -278,39 +316,3 @@ export default function SurveyScreen() {
   );
 }
 
-// ── 스타일 ────────────────────────────────────────
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-  },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },
-  headerCount: { fontSize: 14, fontWeight: '600', color: Colors.textSub, minWidth: 40, textAlign: 'right' },
-  progressBg: { height: 4, backgroundColor: '#F2F4F6', marginHorizontal: 16 },
-  progressFill: { height: 4, backgroundColor: Colors.primary, borderRadius: 2 },
-  content: { flex: 1, paddingHorizontal: 24, paddingTop: 32 },
-  categoryBadge: {
-    alignSelf: 'flex-start', backgroundColor: '#EBF5FF',
-    paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginBottom: 16,
-  },
-  categoryText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
-  question: { fontSize: 22, fontWeight: '700', color: Colors.text, lineHeight: 32, marginBottom: 32 },
-  optionsWrap: { gap: 12 },
-  option: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: '#F8F9FA', borderRadius: 16, padding: 18,
-    borderWidth: 2, borderColor: 'transparent',
-  },
-  optionSelected: { backgroundColor: '#EBF5FF', borderColor: Colors.primary },
-  optionCircle: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: '#E5E8EB', alignItems: 'center', justifyContent: 'center',
-  },
-  optionCircleSelected: { backgroundColor: Colors.primary },
-  optionCircleText: { fontSize: 14, fontWeight: '700', color: Colors.textSub },
-  optionCircleTextSelected: { color: '#FFFFFF' },
-  optionText: { flex: 1, fontSize: 15, fontWeight: '500', color: Colors.text, lineHeight: 22 },
-  optionTextSelected: { fontWeight: '700', color: Colors.primary },
-});

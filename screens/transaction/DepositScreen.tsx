@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../store/appStore';
 import { Colors } from '../../components/ui';
+import { useTheme } from '../../context/ThemeContext';
 
 const EXCHANGE_RATE = 1391.70;
 
@@ -23,6 +24,7 @@ const KEYS = [
 ];
 
 export default function DepositScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const { cash } = useAppStore();
   const [amount, setAmount] = useState('');
@@ -136,7 +138,7 @@ export default function DepositScreen() {
         activeOpacity={0.8}
         disabled={!isValid}
       >
-        <Text style={styles.nextBtnText}>다음</Text>
+        <Text style={[styles.nextBtnText, { color: theme.bgCard }]}>다음</Text>
       </TouchableOpacity>
 
       {/* Custom Numpad */}
@@ -246,7 +248,6 @@ const styles = StyleSheet.create({
   nextBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
 
   numpad: {

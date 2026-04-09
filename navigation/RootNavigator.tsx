@@ -15,27 +15,29 @@ import OnboardingScreen from '../screens/OnboardingScreen';
 import InviteCodeScreen from '../screens/InviteCodeScreen';
 import TutorialScreen from '../screens/TutorialScreen';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { useRealTimeStocks } from '../hooks/useRealTimeStocks';
 
 // ── 브랜드 로딩 화면 ────────────────────────────
 function LoadingView() {
+  const { theme } = useTheme();
   return (
     <View style={{
       flex: 1, justifyContent: 'center', alignItems: 'center',
-      backgroundColor: '#0066FF',
+      backgroundColor: theme.primary,
     }}>
       <Image
         source={require('../assets/icon.png')}
         style={{ width: 120, height: 120, borderRadius: 28 }}
       />
       <Text style={{
-        color: '#FFFFFF', fontSize: 36, fontWeight: '800', letterSpacing: 4,
+        color: theme.bgCard, fontSize: 36, fontWeight: '800', letterSpacing: 4,
         marginTop: 16,
       }}>
         FLOCO
       </Text>
-      <ActivityIndicator color="#FFFFFF" size="large" style={{ marginTop: 20 }} />
+      <ActivityIndicator color={theme.bgCard} size="large" style={{ marginTop: 20 }} />
       <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 10 }}>
         잠시만 기다려주세요
       </Text>

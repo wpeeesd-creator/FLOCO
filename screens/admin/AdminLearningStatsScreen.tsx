@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../components/ui';
+import { useTheme } from '../../context/ThemeContext';
 import {
   fetchAllUsersForAdmin, fetchAllPortfoliosForAdmin,
 } from '../../lib/adminService';
@@ -44,6 +45,7 @@ const WRONG_QUESTIONS_DUMMY = [
 ];
 
 export default function AdminLearningStatsScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation();
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -113,6 +115,62 @@ export default function AdminLearningStatsScreen() {
   };
 
   const RANK_MEDALS = ['🥇', '🥈', '🥉', '4', '5'];
+
+  const styles = StyleSheet.create({
+    safe: { flex: 1, backgroundColor: Colors.bg },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.card,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
+    loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    scroll: { flex: 1 },
+    scrollContent: { padding: 16, gap: 12 },
+    overviewRow: { flexDirection: 'row', gap: 10 },
+    overviewCard: {
+      flex: 1, backgroundColor: Colors.card, borderRadius: 12,
+      padding: 16, alignItems: 'center', gap: 4,
+      shadowColor: theme.text, shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+    },
+    overviewValue: { fontSize: 22, fontWeight: '800', color: Colors.text },
+    overviewLabel: { fontSize: 11, color: Colors.textSub, fontWeight: '500', textAlign: 'center' },
+    section: {
+      backgroundColor: Colors.card, borderRadius: 12, padding: 16,
+      shadowColor: theme.text, shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+    },
+    sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.text, marginBottom: 14 },
+    barRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
+    barLabel: { fontSize: 13, color: Colors.text, width: 90 },
+    barTrack: {
+      flex: 1, height: 8, backgroundColor: Colors.bg, borderRadius: 4, overflow: 'hidden',
+    },
+    barFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 4 },
+    barPct: { fontSize: 12, color: Colors.textSub, width: 34, textAlign: 'right', fontWeight: '600' },
+    leaderRow: {
+      flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    rankText: { fontSize: 18, width: 32, textAlign: 'center' },
+    leaderName: { flex: 1, fontSize: 14, fontWeight: '600', color: Colors.text, marginLeft: 8 },
+    streakBadge: {
+      backgroundColor: '#FFF3D6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+    },
+    streakBadgeText: { fontSize: 13, fontWeight: '700', color: '#F59E0B' },
+    wrongRow: {
+      flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10,
+      borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10,
+    },
+    wrongNum: {
+      width: 22, height: 22, borderRadius: 11, backgroundColor: '#FF3B3020',
+      textAlign: 'center', lineHeight: 22, fontSize: 12, fontWeight: '700', color: '#FF3B30',
+    },
+    wrongQ: { flex: 1, fontSize: 13, color: Colors.text, lineHeight: 18 },
+    emptyText: { fontSize: 14, color: Colors.textSub, textAlign: 'center', paddingVertical: 20 },
+  });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -202,58 +260,3 @@ export default function AdminLearningStatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.bg },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.card,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 16, gap: 12 },
-  overviewRow: { flexDirection: 'row', gap: 10 },
-  overviewCard: {
-    flex: 1, backgroundColor: Colors.card, borderRadius: 12,
-    padding: 16, alignItems: 'center', gap: 4,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
-  },
-  overviewValue: { fontSize: 22, fontWeight: '800', color: Colors.text },
-  overviewLabel: { fontSize: 11, color: Colors.textSub, fontWeight: '500', textAlign: 'center' },
-  section: {
-    backgroundColor: Colors.card, borderRadius: 12, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
-  },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.text, marginBottom: 14 },
-  barRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
-  barLabel: { fontSize: 13, color: Colors.text, width: 90 },
-  barTrack: {
-    flex: 1, height: 8, backgroundColor: Colors.bg, borderRadius: 4, overflow: 'hidden',
-  },
-  barFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 4 },
-  barPct: { fontSize: 12, color: Colors.textSub, width: 34, textAlign: 'right', fontWeight: '600' },
-  leaderRow: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  rankText: { fontSize: 18, width: 32, textAlign: 'center' },
-  leaderName: { flex: 1, fontSize: 14, fontWeight: '600', color: Colors.text, marginLeft: 8 },
-  streakBadge: {
-    backgroundColor: '#FFF3D6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-  },
-  streakBadgeText: { fontSize: 13, fontWeight: '700', color: '#F59E0B' },
-  wrongRow: {
-    flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10,
-  },
-  wrongNum: {
-    width: 22, height: 22, borderRadius: 11, backgroundColor: '#FF3B3020',
-    textAlign: 'center', lineHeight: 22, fontSize: 12, fontWeight: '700', color: '#FF3B30',
-  },
-  wrongQ: { flex: 1, fontSize: 13, color: Colors.text, lineHeight: 18 },
-  emptyText: { fontSize: 14, color: Colors.textSub, textAlign: 'center', paddingVertical: 20 },
-});

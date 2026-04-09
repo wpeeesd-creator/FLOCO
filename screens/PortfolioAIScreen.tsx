@@ -16,6 +16,7 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useAppStore, STOCKS } from '../store/appStore';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import { fetchWithTimeout, classifyError } from '../lib/errorHandler';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { fetchMultiplePrices } from '../utils/priceService';
@@ -42,6 +43,7 @@ interface AnalysisData {
 }
 
 export default function PortfolioAIScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const { holdings, cash } = useAppStore();
@@ -218,6 +220,53 @@ ${portfolioSummary}
     }
   };
 
+  const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: Colors.bg },
+    header: {
+      backgroundColor: theme.bgCard, flexDirection: 'row', alignItems: 'center',
+      justifyContent: 'space-between', padding: 16,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    backBtn: { padding: 4 },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
+    summaryCard: { backgroundColor: theme.text, margin: 16, borderRadius: 20, padding: 20 },
+    summaryLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 4 },
+    summaryValue: { color: theme.bgCard, fontSize: 28, fontWeight: '700' },
+    summaryProfit: { fontSize: 16, marginTop: 4 },
+    ratioBar: { marginTop: 16 },
+    ratioLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+    ratioLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
+    ratioBarBg: { height: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 4, overflow: 'hidden' },
+    ratioBarFill: { height: 8, backgroundColor: Colors.primary, borderRadius: 4 },
+    card: { backgroundColor: theme.bgCard, marginHorizontal: 16, marginBottom: 12, borderRadius: 20, padding: 20 },
+    cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 16 },
+    sectorRow: { marginBottom: 12 },
+    sectorLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+    sectorName: { color: Colors.text, fontSize: 14 },
+    sectorPct: { fontWeight: '700', fontSize: 14 },
+    sectorBarBg: { height: 6, backgroundColor: Colors.bg, borderRadius: 3 },
+    sectorBarFill: { height: 6, borderRadius: 3 },
+    countryRow: { flexDirection: 'row', marginTop: 8, gap: 8 },
+    countryBox: { flex: 1, borderRadius: 12, padding: 12, alignItems: 'center' },
+    countryFlag: { fontSize: 20 },
+    countryPct: { fontWeight: '700', marginTop: 4 },
+    countryLabel: { color: Colors.textSub, fontSize: 12 },
+    aiHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+    aiEmoji: { fontSize: 24, marginRight: 8 },
+    aiText: { fontSize: 15, color: Colors.text, lineHeight: 26 },
+    reAnalyzeBtn: { marginTop: 16, backgroundColor: Colors.bg, borderRadius: 12, height: 44, justifyContent: 'center', alignItems: 'center' },
+    reAnalyzeBtnText: { color: Colors.textSub, fontWeight: '700' },
+    ctaCard: { alignItems: 'center' },
+    ctaEmoji: { fontSize: 48, marginBottom: 16 },
+    ctaTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 8 },
+    ctaDesc: { color: Colors.textSub, textAlign: 'center', fontSize: 14, lineHeight: 22, marginBottom: 20 },
+    analyzeBtn: {
+      backgroundColor: theme.text, borderRadius: 16, height: 52,
+      width: '100%', justifyContent: 'center', alignItems: 'center', flexDirection: 'row',
+    },
+    analyzeBtnText: { color: theme.bgCard, fontWeight: '700', fontSize: 15, marginLeft: 4 },
+  });
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* 헤더 */}
@@ -234,7 +283,7 @@ ${portfolioSummary}
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>내 포트폴리오</Text>
           <Text style={styles.summaryValue}>{Math.round(totalAsset).toLocaleString()}원</Text>
-          <Text style={[styles.summaryProfit, { color: isUp ? '#34C759' : '#FF3B30' }]}>
+          <Text style={[styles.summaryProfit, { color: isUp ? theme.green : '#FF3B30' }]}>
             {isUp ? '+' : ''}{Math.round(profit).toLocaleString()}원 ({isUp ? '+' : ''}{profitRate}%)
           </Text>
 
@@ -308,7 +357,7 @@ ${portfolioSummary}
             >
               {isLoading ? (
                 <>
-                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <ActivityIndicator color={theme.bgCard} size="small" />
                   <Text style={styles.analyzeBtnText}>AI 분석 중...</Text>
                 </>
               ) : (
@@ -342,59 +391,3 @@ ${portfolioSummary}
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.bg },
-  header: {
-    backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', padding: 16,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
-
-  // Summary
-  summaryCard: { backgroundColor: '#191F28', margin: 16, borderRadius: 20, padding: 20 },
-  summaryLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 4 },
-  summaryValue: { color: '#FFFFFF', fontSize: 28, fontWeight: '700' },
-  summaryProfit: { fontSize: 16, marginTop: 4 },
-  ratioBar: { marginTop: 16 },
-  ratioLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  ratioLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
-  ratioBarBg: { height: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 4, overflow: 'hidden' },
-  ratioBarFill: { height: 8, backgroundColor: Colors.primary, borderRadius: 4 },
-
-  // Card
-  card: { backgroundColor: '#FFFFFF', marginHorizontal: 16, marginBottom: 12, borderRadius: 20, padding: 20 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 16 },
-
-  // Sector
-  sectorRow: { marginBottom: 12 },
-  sectorLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  sectorName: { color: Colors.text, fontSize: 14 },
-  sectorPct: { fontWeight: '700', fontSize: 14 },
-  sectorBarBg: { height: 6, backgroundColor: Colors.bg, borderRadius: 3 },
-  sectorBarFill: { height: 6, borderRadius: 3 },
-  countryRow: { flexDirection: 'row', marginTop: 8, gap: 8 },
-  countryBox: { flex: 1, borderRadius: 12, padding: 12, alignItems: 'center' },
-  countryFlag: { fontSize: 20 },
-  countryPct: { fontWeight: '700', marginTop: 4 },
-  countryLabel: { color: Colors.textSub, fontSize: 12 },
-
-  // AI
-  aiHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  aiEmoji: { fontSize: 24, marginRight: 8 },
-  aiText: { fontSize: 15, color: Colors.text, lineHeight: 26 },
-  reAnalyzeBtn: { marginTop: 16, backgroundColor: Colors.bg, borderRadius: 12, height: 44, justifyContent: 'center', alignItems: 'center' },
-  reAnalyzeBtnText: { color: Colors.textSub, fontWeight: '700' },
-
-  // CTA
-  ctaCard: { alignItems: 'center' },
-  ctaEmoji: { fontSize: 48, marginBottom: 16 },
-  ctaTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 8 },
-  ctaDesc: { color: Colors.textSub, textAlign: 'center', fontSize: 14, lineHeight: 22, marginBottom: 20 },
-  analyzeBtn: {
-    backgroundColor: '#191F28', borderRadius: 16, height: 52,
-    width: '100%', justifyContent: 'center', alignItems: 'center', flexDirection: 'row',
-  },
-  analyzeBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15, marginLeft: 4 },
-});

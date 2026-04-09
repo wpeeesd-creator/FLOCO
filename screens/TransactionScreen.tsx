@@ -15,6 +15,7 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { STOCKS } from '../store/appStore';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import StockLogo from '../components/StockLogo';
 
 export interface UnifiedTransaction {
@@ -63,6 +64,7 @@ const EMPTY_MESSAGES: Record<FilterTab, { emoji: string; title: string; desc: st
 };
 
 export default function TransactionScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<FilterTab>('전체');
@@ -197,7 +199,7 @@ export default function TransactionScreen() {
               </View>
               <View style={styles.summaryBox}>
                 <Text style={styles.summaryLabel}>총 매수</Text>
-                <Text style={[styles.summaryValue, { color: '#F04452' }]}>{formatKRW(totalBuy)}</Text>
+                <Text style={[styles.summaryValue, { color: theme.red }]}>{formatKRW(totalBuy)}</Text>
               </View>
               <View style={styles.summaryBox}>
                 <Text style={styles.summaryLabel}>총 매도</Text>
@@ -205,7 +207,7 @@ export default function TransactionScreen() {
               </View>
               <View style={styles.summaryBox}>
                 <Text style={styles.summaryLabel}>학습 보상</Text>
-                <Text style={[styles.summaryValue, { color: '#34C759' }]}>{formatKRW(totalReward)}</Text>
+                <Text style={[styles.summaryValue, { color: theme.green }]}>{formatKRW(totalReward)}</Text>
               </View>
             </View>
           </View>
@@ -269,9 +271,9 @@ export default function TransactionScreen() {
                           styles.txAmount,
                           {
                             color:
-                              tx.type === 'buy' ? '#F04452'
+                              tx.type === 'buy' ? theme.red
                               : tx.type === 'sell' ? '#2175F3'
-                              : '#34C759',
+                              : theme.green,
                           },
                         ]}>
                           {tx.type === 'buy'

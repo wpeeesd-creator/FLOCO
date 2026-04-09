@@ -8,6 +8,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAppStore, STOCKS } from '../store/appStore';
 import { fetchWithTimeout, classifyError } from '../lib/errorHandler';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { useTheme } from '../context/ThemeContext';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -22,6 +23,7 @@ const DEFAULT_QUESTIONS = [
 ];
 
 export default function ChatScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const ticker = route.params?.ticker ?? '';
@@ -191,6 +193,62 @@ ${ownedQty > 0 ? `평균매수가: ${Math.round(avgPrice).toLocaleString()}원
 
   const showSuggestions = messages.length === 0;
 
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#F8F9FA' },
+    header: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      backgroundColor: theme.bgCard, paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
+    },
+    backBtn: { padding: 4 },
+    backText: { fontSize: 22, color: theme.primary, fontWeight: '600' },
+    headerTitle: { fontSize: 16, fontWeight: '700', color: '#191919' },
+    headerSub: { fontSize: 12, color: '#8E8E93' },
+    aiBadge: { backgroundColor: '#EBF5FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+    aiBadgeText: { fontSize: 12, fontWeight: '800', color: theme.primary },
+    chatArea: { flex: 1 },
+    welcomeBox: {
+      alignItems: 'center', backgroundColor: theme.bgCard,
+      borderRadius: 16, padding: 24, marginBottom: 16,
+      shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1,
+    },
+    welcomeEmoji: { fontSize: 48, marginBottom: 8 },
+    welcomeTitle: { fontSize: 18, fontWeight: '700', color: '#191919', marginBottom: 4 },
+    welcomeDesc: { fontSize: 14, color: '#8E8E93', textAlign: 'center' },
+    holdingInfoBox: { marginTop: 8, backgroundColor: '#F8F9FA', borderRadius: 10, padding: 10, width: '100%' },
+    holdingInfoTitle: { fontSize: 12, fontWeight: '700', color: '#8E8E93', marginBottom: 4 },
+    holdingInfoText: { fontSize: 13, color: '#191919', lineHeight: 20 },
+    suggestionsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+    suggestBtn: {
+      backgroundColor: theme.bgCard, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10,
+      borderWidth: 1, borderColor: theme.primary,
+    },
+    suggestText: { fontSize: 13, color: theme.primary, fontWeight: '600' },
+    bubble: { maxWidth: '85%', marginBottom: 12, borderRadius: 16, padding: 14 },
+    userBubble: { alignSelf: 'flex-end', backgroundColor: theme.primary, borderBottomRightRadius: 4 },
+    aiBubble: {
+      alignSelf: 'flex-start', backgroundColor: theme.bgCard, borderBottomLeftRadius: 4,
+      shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1,
+    },
+    aiLabel: { fontSize: 11, color: '#8E8E93', fontWeight: '600', marginBottom: 4 },
+    bubbleText: { fontSize: 14, lineHeight: 20 },
+    userBubbleText: { color: theme.bgCard },
+    aiBubbleText: { color: '#191919' },
+    inputBar: {
+      flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+      backgroundColor: theme.bgCard, paddingHorizontal: 12, paddingVertical: 8,
+      borderTopWidth: 1, borderTopColor: '#F2F2F7',
+    },
+    input: {
+      flex: 1, backgroundColor: '#F8F9FA', borderRadius: 20,
+      paddingHorizontal: 16, paddingVertical: 10,
+      fontSize: 14, color: '#191919', maxHeight: 100,
+    },
+    sendBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center' },
+    sendBtnDisabled: { backgroundColor: '#B0B8C1' },
+    sendBtnText: { color: theme.bgCard, fontSize: 18, fontWeight: '700' },
+  });
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
       <View style={styles.container}>
@@ -240,7 +298,7 @@ ${ownedQty > 0 ? `평균매수가: ${Math.round(avgPrice).toLocaleString()}원
                           {ownedQty}주 · 평균 {Math.round(avgPrice).toLocaleString()}원
                         </Text>
                         <Text style={[styles.holdingInfoText, {
-                          color: evalProfit >= 0 ? '#F04452' : '#2175F3',
+                          color: evalProfit >= 0 ? theme.red : '#2175F3',
                           fontWeight: '700',
                         }]}>
                           평가손익: {evalProfit >= 0 ? '+' : ''}{Math.round(evalProfit).toLocaleString()}원 ({evalProfitRate >= 0 ? '+' : ''}{evalProfitRate.toFixed(2)}%)
@@ -302,7 +360,7 @@ ${ownedQty > 0 ? `평균매수가: ${Math.round(avgPrice).toLocaleString()}원
               <View style={[styles.bubble, styles.aiBubble]}>
                 <Text style={styles.aiLabel}>🐾 머니몽</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <ActivityIndicator size="small" color="#0066FF" />
+                  <ActivityIndicator size="small" color={theme.primary} />
                   <Text style={styles.aiBubbleText}>생각하는 중...</Text>
                 </View>
               </View>
@@ -335,80 +393,3 @@ ${ownedQty > 0 ? `평균매수가: ${Math.round(avgPrice).toLocaleString()}원
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
-  },
-  backBtn: { padding: 4 },
-  backText: { fontSize: 22, color: '#0066FF', fontWeight: '600' },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: '#191919' },
-  headerSub: { fontSize: 12, color: '#8E8E93' },
-  aiBadge: {
-    backgroundColor: '#EBF5FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10,
-  },
-  aiBadgeText: { fontSize: 12, fontWeight: '800', color: '#0066FF' },
-
-  chatArea: { flex: 1 },
-
-  welcomeBox: {
-    alignItems: 'center', backgroundColor: '#FFFFFF',
-    borderRadius: 16, padding: 24, marginBottom: 16,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1,
-  },
-  welcomeEmoji: { fontSize: 48, marginBottom: 8 },
-  welcomeTitle: { fontSize: 18, fontWeight: '700', color: '#191919', marginBottom: 4 },
-  welcomeDesc: { fontSize: 14, color: '#8E8E93', textAlign: 'center' },
-
-  holdingInfoBox: {
-    marginTop: 8, backgroundColor: '#F8F9FA', borderRadius: 10,
-    padding: 10, width: '100%',
-  },
-  holdingInfoTitle: {
-    fontSize: 12, fontWeight: '700', color: '#8E8E93', marginBottom: 4,
-  },
-  holdingInfoText: {
-    fontSize: 13, color: '#191919', lineHeight: 20,
-  },
-
-  suggestionsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  suggestBtn: {
-    backgroundColor: '#FFFFFF', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10,
-    borderWidth: 1, borderColor: '#0066FF',
-  },
-  suggestText: { fontSize: 13, color: '#0066FF', fontWeight: '600' },
-
-  bubble: { maxWidth: '85%', marginBottom: 12, borderRadius: 16, padding: 14 },
-  userBubble: {
-    alignSelf: 'flex-end', backgroundColor: '#0066FF',
-    borderBottomRightRadius: 4,
-  },
-  aiBubble: {
-    alignSelf: 'flex-start', backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 4,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1,
-  },
-  aiLabel: { fontSize: 11, color: '#8E8E93', fontWeight: '600', marginBottom: 4 },
-  bubbleText: { fontSize: 14, lineHeight: 20 },
-  userBubbleText: { color: '#FFFFFF' },
-  aiBubbleText: { color: '#191919' },
-
-  inputBar: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
-    backgroundColor: '#FFFFFF', paddingHorizontal: 12, paddingVertical: 8,
-    borderTopWidth: 1, borderTopColor: '#F2F2F7',
-  },
-  input: {
-    flex: 1, backgroundColor: '#F8F9FA', borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 10,
-    fontSize: 14, color: '#191919', maxHeight: 100,
-  },
-  sendBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#0066FF', alignItems: 'center', justifyContent: 'center',
-  },
-  sendBtnDisabled: { backgroundColor: '#B0B8C1' },
-  sendBtnText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-});

@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../components/ui';
+import { useTheme } from '../../context/ThemeContext';
 
 interface ExchangeTransaction {
   type: 'krw_to_usd' | 'usd_to_krw';
@@ -81,6 +82,7 @@ function DetailRow({ label, value, valueColor, collapsible }: DetailRowProps) {
 }
 
 export default function ExchangeDetailScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const [showInHistory, setShowInHistory] = useState(true);
@@ -120,7 +122,7 @@ export default function ExchangeDetailScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Content Card */}
-        <View style={styles.contentCard}>
+        <View style={[styles.contentCard, { shadowColor: theme.text }]}>
           {/* Type + Amount */}
           <View style={styles.amountSection}>
             <Text style={styles.typeLabel}>{typeLabel}</Text>
@@ -160,7 +162,7 @@ export default function ExchangeDetailScreen() {
               value={showInHistory}
               onValueChange={setShowInHistory}
               trackColor={{ false: Colors.border, true: Colors.primary }}
-              thumbColor="#FFFFFF"
+              thumbColor={theme.bgCard}
             />
           </View>
         </View>
@@ -191,7 +193,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,

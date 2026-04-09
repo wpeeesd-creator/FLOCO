@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { useTheme } from '../../context/ThemeContext';
 
 // ── 데이터 ──────────────────────────────────
 
@@ -102,6 +103,7 @@ const SUMMARY = [
 // ── 컴포넌트 ──────────────────────────────
 
 export default function ETFScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const [tab, setTab] = useState<EtfTab>('전체');
   const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
@@ -114,8 +116,70 @@ export default function ETFScreen() {
 
   const filtered = tab === '전체' ? ETFS : ETFS.filter(e => e.type === tab);
 
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.bgCard },
+    header: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
+    },
+    backBtn: { padding: 4 },
+    backText: { fontSize: 22, color: theme.primary, fontWeight: '600' },
+    headerTitle: { fontSize: 17, fontWeight: '700', color: '#191919' },
+    introCard: {
+      margin: 16, backgroundColor: '#F0F7FF', borderRadius: 16, padding: 20,
+      borderWidth: 1, borderColor: '#BFDBFE',
+    },
+    introTitle: { fontSize: 17, fontWeight: '800', color: '#191919', marginBottom: 4 },
+    introDesc: { fontSize: 13, color: '#8E8E93', marginBottom: 14, lineHeight: 18 },
+    introItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+    introBullet: { fontSize: 14 },
+    introItemText: { fontSize: 14, fontWeight: '600', color: '#1E40AF' },
+    summaryRow: { paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
+    summaryCard: { backgroundColor: '#F8F9FA', borderRadius: 14, padding: 14, width: 90, alignItems: 'center', gap: 4 },
+    summaryValue: { fontSize: 16, fontWeight: '800', color: '#191919' },
+    summaryLabel: { fontSize: 11, color: '#8E8E93' },
+    tabRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 6 },
+    tabBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F8F9FA' },
+    tabBtnActive: { backgroundColor: theme.primary },
+    tabText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
+    tabTextActive: { color: theme.bgCard, fontWeight: '700' },
+    countRow: { paddingHorizontal: 20, paddingBottom: 8 },
+    countText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
+    listCard: {
+      marginHorizontal: 16, backgroundColor: theme.bgCard, borderRadius: 16,
+      overflow: 'hidden', borderWidth: 1, borderColor: '#F2F2F7',
+    },
+    etfRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14 },
+    etfBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
+    etfIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    etfName: { fontSize: 15, fontWeight: '700', color: '#191919' },
+    etfDesc: { fontSize: 11, color: '#8E8E93', marginTop: 2 },
+    etfPrice: { fontSize: 15, fontWeight: '700', color: '#191919', fontFamily: 'Courier' },
+    changeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginTop: 3 },
+    changeText: { fontSize: 12, fontWeight: '700' },
+    holdingsBox: {
+      backgroundColor: '#F8FAFC', paddingHorizontal: 20, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
+    },
+    holdingsTitle: { fontSize: 13, fontWeight: '700', color: '#191919', marginBottom: 8 },
+    holdingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+    holdingRank: { width: 20, fontSize: 12, fontWeight: '700', color: theme.primary, textAlign: 'center' },
+    holdingName: { fontSize: 13, color: '#4A4A4A' },
+    detailBtn: { marginTop: 10, backgroundColor: theme.primary, borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
+    detailBtnText: { color: theme.bgCard, fontSize: 13, fontWeight: '700' },
+    eduBox: {
+      marginHorizontal: 16, marginTop: 24, backgroundColor: '#F8FAFC',
+      borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#E2E8F0',
+    },
+    eduTitle: { fontSize: 17, fontWeight: '800', color: '#191919', marginBottom: 16 },
+    eduItem: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+    eduBullet: { fontSize: 16, marginTop: 1 },
+    eduItemTitle: { fontSize: 14, fontWeight: '700', color: '#191919', marginBottom: 2 },
+    eduItemText: { fontSize: 13, color: '#64748B', lineHeight: 18 },
+  });
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bgCard }}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -129,7 +193,7 @@ export default function ETFScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 30 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0066FF" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
         >
           {/* ETF란? 카드 */}
           <View style={styles.introCard}>
@@ -193,7 +257,7 @@ export default function ETFScreen() {
                   >
                     {/* Icon */}
                     <View style={[styles.etfIcon, { backgroundColor: eUp ? '#F0FFF4' : '#FFF5F5' }]}>
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: e.krw ? '#0066FF' : '#7C3AED' }}>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: e.krw ? theme.primary : '#7C3AED' }}>
                         {e.krw ? 'KR' : 'US'}
                       </Text>
                     </View>
@@ -274,82 +338,3 @@ export default function ETFScreen() {
   );
 }
 
-// ── 스타일 ──────────────────────────────────
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
-  },
-  backBtn: { padding: 4 },
-  backText: { fontSize: 22, color: '#0066FF', fontWeight: '600' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#191919' },
-
-  introCard: {
-    margin: 16, backgroundColor: '#F0F7FF', borderRadius: 16, padding: 20,
-    borderWidth: 1, borderColor: '#BFDBFE',
-  },
-  introTitle: { fontSize: 17, fontWeight: '800', color: '#191919', marginBottom: 4 },
-  introDesc: { fontSize: 13, color: '#8E8E93', marginBottom: 14, lineHeight: 18 },
-  introItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  introBullet: { fontSize: 14 },
-  introItemText: { fontSize: 14, fontWeight: '600', color: '#1E40AF' },
-
-  summaryRow: { paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
-  summaryCard: {
-    backgroundColor: '#F8F9FA', borderRadius: 14, padding: 14, width: 90,
-    alignItems: 'center', gap: 4,
-  },
-  summaryValue: { fontSize: 16, fontWeight: '800', color: '#191919' },
-  summaryLabel: { fontSize: 11, color: '#8E8E93' },
-
-  tabRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 6 },
-  tabBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F8F9FA' },
-  tabBtnActive: { backgroundColor: '#0066FF' },
-  tabText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
-  tabTextActive: { color: '#FFFFFF', fontWeight: '700' },
-
-  countRow: { paddingHorizontal: 20, paddingBottom: 8 },
-  countText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
-
-  listCard: {
-    marginHorizontal: 16, backgroundColor: '#FFFFFF', borderRadius: 16,
-    overflow: 'hidden', borderWidth: 1, borderColor: '#F2F2F7',
-  },
-  etfRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14 },
-  etfBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
-  etfIcon: {
-    width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-  },
-  etfName: { fontSize: 15, fontWeight: '700', color: '#191919' },
-  etfDesc: { fontSize: 11, color: '#8E8E93', marginTop: 2 },
-  etfPrice: { fontSize: 15, fontWeight: '700', color: '#191919', fontFamily: 'Courier' },
-  changeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginTop: 3 },
-  changeText: { fontSize: 12, fontWeight: '700' },
-
-  // 구성 종목 펼치기
-  holdingsBox: {
-    backgroundColor: '#F8FAFC', paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
-  },
-  holdingsTitle: { fontSize: 13, fontWeight: '700', color: '#191919', marginBottom: 8 },
-  holdingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  holdingRank: { width: 20, fontSize: 12, fontWeight: '700', color: '#0066FF', textAlign: 'center' },
-  holdingName: { fontSize: 13, color: '#4A4A4A' },
-  detailBtn: {
-    marginTop: 10, backgroundColor: '#0066FF', borderRadius: 8,
-    paddingVertical: 8, alignItems: 'center',
-  },
-  detailBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-
-  eduBox: {
-    marginHorizontal: 16, marginTop: 24, backgroundColor: '#F8FAFC',
-    borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#E2E8F0',
-  },
-  eduTitle: { fontSize: 17, fontWeight: '800', color: '#191919', marginBottom: 16 },
-  eduItem: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  eduBullet: { fontSize: 16, marginTop: 1 },
-  eduItemTitle: { fontSize: 14, fontWeight: '700', color: '#191919', marginBottom: 2 },
-  eduItemText: { fontSize: 13, color: '#64748B', lineHeight: 18 },
-});

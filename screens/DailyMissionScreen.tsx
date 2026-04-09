@@ -17,8 +17,10 @@ import {
   type DailyMission,
 } from '../lib/missionService';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 export default function DailyMissionScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
 
@@ -53,6 +55,64 @@ export default function DailyMissionScreen() {
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
   const allCompleted = completedCount === totalCount && totalCount > 0;
   const totalRewardSum = missions.reduce((sum, m) => sum + m.reward, 0);
+
+  const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: Colors.bg },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    header: {
+      backgroundColor: theme.bgCard, flexDirection: 'row', alignItems: 'center',
+      padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    backBtn: { padding: 4 },
+    headerTitle: { fontSize: 18, fontWeight: '700', marginLeft: 8, color: Colors.text },
+    headerDate: { marginLeft: 'auto', color: Colors.textSub, fontSize: 14 },
+
+    // Progress card
+    progressCard: { margin: 16, borderRadius: 20, padding: 20 },
+    progressLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13 },
+    progressValue: { color: theme.bgCard, fontSize: 28, fontWeight: '700', marginTop: 4 },
+    progressBarBg: { height: 8, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 4, marginTop: 12, marginBottom: 8 },
+    progressBarFill: { height: 8, borderRadius: 4, backgroundColor: theme.bgCard },
+    progressHint: { color: 'rgba(255,255,255,0.6)', fontSize: 13 },
+
+    // Mission list
+    missionCard: { backgroundColor: theme.bgCard, marginHorizontal: 16, borderRadius: 20, overflow: 'hidden', marginBottom: 16 },
+    missionRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+    missionBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
+    missionCompleted: { opacity: 0.7 },
+    missionIcon: {
+      width: 48, height: 48, borderRadius: 24,
+      backgroundColor: Colors.bg, justifyContent: 'center', alignItems: 'center', marginRight: 12,
+    },
+    missionIconDone: { backgroundColor: '#E8FFF0' },
+    missionEmoji: { fontSize: 24 },
+    missionContent: { flex: 1 },
+    missionTitle: { fontWeight: '700', fontSize: 15, color: Colors.text },
+    missionTitleDone: { textDecorationLine: 'line-through' },
+    missionDesc: { color: Colors.textSub, fontSize: 13, marginTop: 2 },
+    miniBarBg: { height: 4, backgroundColor: Colors.border, borderRadius: 2, marginTop: 6 },
+    miniBarFill: { height: 4, borderRadius: 2, backgroundColor: Colors.primary },
+    missionReward: { alignItems: 'flex-end', marginLeft: 12 },
+    rewardText: { fontWeight: '700', fontSize: 14, color: Colors.primary },
+    rewardTextDone: { color: theme.green },
+    rewardProgress: { color: Colors.textSub, fontSize: 12, marginTop: 2 },
+
+    // Bonus card
+    bonusCard: {
+      backgroundColor: theme.bgCard, marginHorizontal: 16, borderRadius: 20,
+      padding: 20, flexDirection: 'row', alignItems: 'center',
+      marginBottom: 16, borderWidth: 2, borderColor: Colors.border,
+    },
+    bonusCardDone: { backgroundColor: '#E8FFF0', borderColor: theme.green },
+    bonusEmoji: { fontSize: 32, marginRight: 16 },
+    bonusMeta: { flex: 1 },
+    bonusTitle: { fontWeight: '700', fontSize: 16, color: Colors.text },
+    bonusDesc: { color: Colors.textSub, fontSize: 13, marginTop: 2 },
+    bonusAmount: { fontWeight: '700', fontSize: 18, color: Colors.primary },
+    bonusAmountDone: { color: theme.green },
+
+    hint: { color: Colors.textSub, fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 40 },
+  });
 
   if (loading) {
     return (
@@ -92,7 +152,7 @@ export default function DailyMissionScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
         {/* 진행률 카드 */}
-        <View style={[styles.progressCard, { backgroundColor: allCompleted ? '#34C759' : Colors.primary }]}>
+        <View style={[styles.progressCard, { backgroundColor: allCompleted ? theme.green : Colors.primary }]}>
           <Text style={styles.progressLabel}>오늘의 미션</Text>
           <Text style={styles.progressValue}>{completedCount} / {totalCount} 완료</Text>
           <View style={styles.progressBarBg}>
@@ -180,60 +240,3 @@ export default function DailyMissionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.bg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: {
-    backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center',
-    padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700', marginLeft: 8, color: Colors.text },
-  headerDate: { marginLeft: 'auto', color: Colors.textSub, fontSize: 14 },
-
-  // Progress card
-  progressCard: { margin: 16, borderRadius: 20, padding: 20 },
-  progressLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13 },
-  progressValue: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginTop: 4 },
-  progressBarBg: { height: 8, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 4, marginTop: 12, marginBottom: 8 },
-  progressBarFill: { height: 8, borderRadius: 4, backgroundColor: '#FFFFFF' },
-  progressHint: { color: 'rgba(255,255,255,0.6)', fontSize: 13 },
-
-  // Mission list
-  missionCard: { backgroundColor: '#FFFFFF', marginHorizontal: 16, borderRadius: 20, overflow: 'hidden', marginBottom: 16 },
-  missionRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
-  missionBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
-  missionCompleted: { opacity: 0.7 },
-  missionIcon: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: Colors.bg, justifyContent: 'center', alignItems: 'center', marginRight: 12,
-  },
-  missionIconDone: { backgroundColor: '#E8FFF0' },
-  missionEmoji: { fontSize: 24 },
-  missionContent: { flex: 1 },
-  missionTitle: { fontWeight: '700', fontSize: 15, color: Colors.text },
-  missionTitleDone: { textDecorationLine: 'line-through' },
-  missionDesc: { color: Colors.textSub, fontSize: 13, marginTop: 2 },
-  miniBarBg: { height: 4, backgroundColor: Colors.border, borderRadius: 2, marginTop: 6 },
-  miniBarFill: { height: 4, borderRadius: 2, backgroundColor: Colors.primary },
-  missionReward: { alignItems: 'flex-end', marginLeft: 12 },
-  rewardText: { fontWeight: '700', fontSize: 14, color: Colors.primary },
-  rewardTextDone: { color: '#34C759' },
-  rewardProgress: { color: Colors.textSub, fontSize: 12, marginTop: 2 },
-
-  // Bonus card
-  bonusCard: {
-    backgroundColor: '#FFFFFF', marginHorizontal: 16, borderRadius: 20,
-    padding: 20, flexDirection: 'row', alignItems: 'center',
-    marginBottom: 16, borderWidth: 2, borderColor: Colors.border,
-  },
-  bonusCardDone: { backgroundColor: '#E8FFF0', borderColor: '#34C759' },
-  bonusEmoji: { fontSize: 32, marginRight: 16 },
-  bonusMeta: { flex: 1 },
-  bonusTitle: { fontWeight: '700', fontSize: 16, color: Colors.text },
-  bonusDesc: { color: Colors.textSub, fontSize: 13, marginTop: 2 },
-  bonusAmount: { fontWeight: '700', fontSize: 18, color: Colors.primary },
-  bonusAmountDone: { color: '#34C759' },
-
-  hint: { color: Colors.textSub, fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 40 },
-});

@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import {
   CATEGORIES,
   CATEGORY_META,
@@ -31,6 +32,7 @@ const CATEGORY_DESCRIPTIONS: Record<CategoryId, string> = {
 };
 
 export default function LearningScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const [learningData, setLearningData] = useState<LearningData | null>(null);
@@ -72,6 +74,78 @@ export default function LearningScreen() {
 
   const firstIncomplete = learningData ? getFirstIncomplete() : null;
   const streak = learningData?.streak ?? 0;
+
+  const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: '#F8F9FA' },
+    header: {
+      backgroundColor: theme.bgCard,
+      paddingHorizontal: 20,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.text },
+    scrollContent: { paddingBottom: 16 },
+    statusBar: {
+      backgroundColor: theme.bgCard,
+      marginHorizontal: 16, marginTop: 16, borderRadius: 16,
+      paddingVertical: 16, paddingHorizontal: 8,
+      flexDirection: 'row', alignItems: 'center',
+      shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    },
+    statusItem: { flex: 1, alignItems: 'center' },
+    statusEmoji: { fontSize: 24, marginBottom: 4 },
+    statusValue: { fontSize: 20, fontWeight: '700', color: Colors.text },
+    statusLabel: { fontSize: 12, color: Colors.textSub, marginTop: 2 },
+    statusDivider: { width: 1, height: 40, backgroundColor: Colors.border },
+    todayCard: {
+      backgroundColor: Colors.primary,
+      marginHorizontal: 16, marginTop: 16, borderRadius: 20, padding: 20,
+    },
+    todayLabel: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '600', marginBottom: 6 },
+    todayTitle: { fontSize: 18, fontWeight: '700', color: theme.bgCard, marginBottom: 4 },
+    todayCategoryName: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 16 },
+    todayBtn: {
+      backgroundColor: theme.bgCard,
+      borderRadius: 12, paddingVertical: 10, paddingHorizontal: 20, alignSelf: 'flex-start',
+    },
+    todayBtnText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+    sectionTitle: {
+      fontSize: 17, fontWeight: '700', color: Colors.text,
+      marginHorizontal: 16, marginTop: 24, marginBottom: 12,
+    },
+    categoryCard: {
+      backgroundColor: theme.bgCard,
+      marginHorizontal: 16, marginBottom: 10, borderRadius: 20, padding: 16,
+      flexDirection: 'row', alignItems: 'center',
+      borderLeftWidth: 4,
+      shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 10, elevation: 2, gap: 14,
+    },
+    categoryIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+    categoryEmoji: { fontSize: 28 },
+    categoryCenter: { flex: 1, gap: 4 },
+    categoryTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+    categoryDesc: { fontSize: 13, color: Colors.textSub },
+    progressBg: { height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden', marginTop: 6 },
+    progressFill: { height: '100%', borderRadius: 2 },
+    categoryRight: { minWidth: 36, alignItems: 'center' },
+    categoryDone: { fontSize: 22 },
+    categoryPct: { fontSize: 14, fontWeight: '700' },
+    wrongCard: {
+      backgroundColor: theme.bgCard,
+      marginHorizontal: 16, marginTop: 8, borderRadius: 16, padding: 16,
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    },
+    wrongLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    wrongEmoji: { fontSize: 28 },
+    wrongTextBlock: { gap: 2 },
+    wrongTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    wrongTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
+    wrongBadge: { backgroundColor: '#FF4B4B', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 1 },
+    wrongBadgeText: { fontSize: 12, fontWeight: '700', color: theme.bgCard },
+    wrongSub: { fontSize: 13, color: Colors.textSub },
+  });
   const hearts = learningData?.hearts ?? 3;
   const points = learningData?.totalPoints ?? 0;
   const wrongCount = learningData?.wrongAnswers?.length ?? 0;
@@ -226,225 +300,3 @@ export default function LearningScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  scrollContent: {
-    paddingBottom: 16,
-  },
-
-  // Status bar
-  statusBar: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  statusItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statusEmoji: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  statusValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  statusLabel: {
-    fontSize: 12,
-    color: Colors.textSub,
-    marginTop: 2,
-  },
-  statusDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: Colors.border,
-  },
-
-  // Today's lesson card
-  todayCard: {
-    backgroundColor: Colors.primary,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 20,
-    padding: 20,
-  },
-  todayLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  todayTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  todayCategoryName: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 16,
-  },
-  todayBtn: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    alignSelf: 'flex-start',
-  },
-  todayBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-
-  // Section title
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: Colors.text,
-    marginHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 12,
-  },
-
-  // Category cards
-  categoryCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginBottom: 10,
-    borderRadius: 20,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
-    gap: 14,
-  },
-  categoryIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryEmoji: {
-    fontSize: 28,
-  },
-  categoryCenter: {
-    flex: 1,
-    gap: 4,
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  categoryDesc: {
-    fontSize: 13,
-    color: Colors.textSub,
-  },
-  progressBg: {
-    height: 4,
-    backgroundColor: Colors.border,
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginTop: 6,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  categoryRight: {
-    minWidth: 36,
-    alignItems: 'center',
-  },
-  categoryDone: {
-    fontSize: 22,
-  },
-  categoryPct: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  // Wrong answers card
-  wrongCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  wrongLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  wrongEmoji: {
-    fontSize: 28,
-  },
-  wrongTextBlock: {
-    gap: 2,
-  },
-  wrongTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  wrongTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  wrongBadge: {
-    backgroundColor: '#FF4B4B',
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 1,
-  },
-  wrongBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  wrongSub: {
-    fontSize: 13,
-    color: Colors.textSub,
-  },
-});

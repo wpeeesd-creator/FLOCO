@@ -10,6 +10,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 interface RewardEntry {
   lessonId: string;
@@ -21,6 +22,7 @@ interface RewardEntry {
 }
 
 export default function RewardHistoryScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const [rewards, setRewards] = useState<RewardEntry[]>([]);
@@ -42,6 +44,152 @@ export default function RewardHistoryScreen() {
       finally { setLoading(false); }
     })();
   }, [user?.id]);
+
+  const styles = StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: Colors.bg,
+    },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: Colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: Colors.text,
+    },
+    summaryCard: {
+      flexDirection: 'row',
+      backgroundColor: Colors.primary,
+      borderRadius: 16,
+      marginHorizontal: 16,
+      marginTop: 16,
+      paddingVertical: 24,
+      paddingHorizontal: 20,
+    },
+    summaryItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    summaryDivider: {
+      width: 1,
+      backgroundColor: 'rgba(255,255,255,0.3)',
+      marginVertical: 4,
+    },
+    summaryLabel: {
+      fontSize: 12,
+      color: 'rgba(255,255,255,0.7)',
+      marginBottom: 6,
+    },
+    summaryValue: {
+      fontSize: 22,
+      fontWeight: '800',
+      color: theme.bgCard,
+    },
+    rewardHint: {
+      fontSize: 12,
+      color: Colors.textSub,
+      textAlign: 'center',
+      marginTop: 12,
+      marginBottom: 4,
+    },
+    emptyBox: {
+      alignItems: 'center',
+      marginHorizontal: 16,
+      marginTop: 32,
+      backgroundColor: Colors.card,
+      borderRadius: 16,
+      paddingVertical: 48,
+      paddingHorizontal: 24,
+    },
+    emptyEmoji: { fontSize: 48, marginBottom: 12 },
+    emptyTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+    emptyDesc: { fontSize: 13, color: Colors.textSub, marginTop: 4 },
+    emptyBtn: {
+      marginTop: 20,
+      backgroundColor: Colors.primary,
+      borderRadius: 10,
+      paddingHorizontal: 28,
+      height: 44,
+      justifyContent: 'center',
+    },
+    emptyBtnText: { color: theme.bgCard, fontWeight: '700', fontSize: 14 },
+    listCard: {
+      backgroundColor: Colors.card,
+      borderRadius: 16,
+      marginHorizontal: 16,
+      marginTop: 12,
+      overflow: 'hidden',
+      shadowColor: theme.text,
+      shadowOpacity: 0.04,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 12,
+    },
+    rowBorder: {
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    rowIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    rowMeta: {
+      flex: 1,
+    },
+    rowTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors.text,
+    },
+    rowSubRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 4,
+    },
+    rowDate: {
+      fontSize: 12,
+      color: Colors.textSub,
+    },
+    rateBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    rateText: {
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    rowReward: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: '#58CC02',
+    },
+  });
 
   const totalReward = rewards.reduce((sum, r) => sum + r.reward, 0);
   const totalLessons = rewards.length;
@@ -168,148 +316,3 @@ export default function RewardHistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  summaryCard: {
-    flexDirection: 'row',
-    backgroundColor: Colors.primary,
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-  },
-  summaryItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  summaryDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    marginVertical: 4,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-    marginBottom: 6,
-  },
-  summaryValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  rewardHint: {
-    fontSize: 12,
-    color: Colors.textSub,
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  emptyBox: {
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 32,
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    paddingVertical: 48,
-    paddingHorizontal: 24,
-  },
-  emptyEmoji: { fontSize: 48, marginBottom: 12 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
-  emptyDesc: { fontSize: 13, color: Colors.textSub, marginTop: 4 },
-  emptyBtn: {
-    marginTop: 20,
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingHorizontal: 28,
-    height: 44,
-    justifyContent: 'center',
-  },
-  emptyBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
-  listCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginTop: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  rowIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#EBF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowMeta: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  rowSubRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  rowDate: {
-    fontSize: 12,
-    color: Colors.textSub,
-  },
-  rateBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  rateText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  rowReward: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#58CC02',
-  },
-});

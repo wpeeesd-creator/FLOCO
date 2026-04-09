@@ -125,8 +125,8 @@ export default function ProfileScreen() {
   const buyCount = safeTrades.filter((t) => t.type === 'buy').length;
   const sellCount = safeTrades.filter((t) => t.type === 'sell').length;
 
-  const profitColor = isUp ? Colors.green : Colors.red;
-  const returnColor = returnRate >= 0 ? Colors.green : Colors.red;
+  const profitColor = isUp ? theme.green : theme.red;
+  const returnColor = returnRate >= 0 ? theme.green : theme.red;
 
   // ── Badge summary ─────────────────────────────────────────────────────
   const badgeCheckData = {
@@ -245,8 +245,80 @@ export default function ProfileScreen() {
   // ── Helpers ───────────────────────────────────────────────────────────
   const formatKRW = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`;
 
-  const typeColor = investmentType?.color ?? Colors.primary;
+  const typeColor = investmentType?.color ?? theme.primary;
   const typeBgColor = typeColor + '33'; // ~20% opacity
+
+  const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: theme.bg },
+    scrollContent: { paddingTop: 16, paddingBottom: 40 },
+    card: {
+      backgroundColor: theme.bgCard,
+      borderRadius: 20,
+      marginHorizontal: 16,
+      marginBottom: 12,
+      padding: 20,
+      shadowColor: '#000',
+      shadowOpacity: 0.04,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2,
+    },
+    cardHeader: { fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: 16 },
+    avatarWrap: {
+      alignSelf: 'center', width: 80, height: 80, borderRadius: 40,
+      backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+    },
+    avatarEmoji: { fontSize: 40 },
+    nicknameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4 },
+    nicknameText: { fontSize: 20, fontWeight: '700', color: theme.text },
+    nicknameInput: {
+      fontSize: 20, fontWeight: '700', color: theme.text,
+      borderBottomWidth: 2, borderBottomColor: theme.primary,
+      minWidth: 120, paddingVertical: 2, textAlign: 'center',
+    },
+    iconBtn: { padding: 4 },
+    emailText: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', marginBottom: 14 },
+    typeBadge: { alignSelf: 'center', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+    typeBadgeText: { fontSize: 14, fontWeight: '600', color: theme.text, textAlign: 'center' },
+    verifiedBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#34C75920', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 14 },
+    verifiedText: { color: '#34C759', fontSize: 11, fontWeight: '700', marginLeft: 3 },
+    verifyBtn: { alignSelf: 'center', marginBottom: 14 },
+    verifyBtnText: { color: theme.primary, fontSize: 13, fontWeight: '600' },
+    surveyBtn: { alignSelf: 'center', backgroundColor: theme.primary, borderRadius: 16, paddingHorizontal: 24, paddingVertical: 12, marginTop: 4 },
+    surveyBtnText: { fontSize: 15, fontWeight: '700', color: theme.bgCard },
+    statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
+    statBox: { width: '47%', backgroundColor: theme.bg, borderRadius: 12, padding: 12 },
+    statLabel: { fontSize: 12, color: theme.textSecondary, marginBottom: 4 },
+    statValue: { fontSize: 16, fontWeight: '700', color: theme.text },
+    returnRateText: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
+    learnRow: { flexDirection: 'row', marginBottom: 14 },
+    learnItem: { flex: 1, alignItems: 'center', paddingVertical: 8, gap: 4 },
+    learnBorderLeft: { borderLeftWidth: 1, borderLeftColor: theme.border },
+    learnEmoji: { fontSize: 24 },
+    learnValue: { fontSize: 18, fontWeight: '800', color: theme.text },
+    learnLabel: { fontSize: 11, color: theme.textSecondary },
+    aiBtn: { backgroundColor: theme.text, borderRadius: 12, height: 44, justifyContent: 'center', alignItems: 'center', marginHorizontal: 16, marginBottom: 12, flexDirection: 'row' },
+    aiBtnText: { color: theme.bgCard, fontWeight: '700', fontSize: 14 },
+    inviteCodeBox: { backgroundColor: theme.blueLight, borderRadius: 16, padding: 16, alignItems: 'center', marginBottom: 14 },
+    inviteCodeLabel: { color: theme.textSecondary, fontSize: 13, marginBottom: 8 },
+    inviteCodeValue: { fontSize: 32, fontWeight: '700', color: theme.primary, letterSpacing: 8 },
+    inviteHint: { backgroundColor: theme.bg, borderRadius: 12, padding: 12, marginTop: 12 },
+    inviteHintText: { color: theme.textSecondary, fontSize: 13, lineHeight: 20, textAlign: 'center' },
+    primaryBtn: { backgroundColor: theme.primary, borderRadius: 16, height: 44, justifyContent: 'center', alignItems: 'center' },
+    primaryBtnText: { fontSize: 15, fontWeight: '700', color: theme.bgCard },
+    ghostBtn: { backgroundColor: theme.bg, borderRadius: 16, height: 44, justifyContent: 'center', alignItems: 'center' },
+    ghostBtnText: { fontSize: 15, fontWeight: '600', color: theme.text },
+    menuCard: { padding: 0, overflow: 'hidden' },
+    menuRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16 },
+    menuIcon: { marginRight: 12 },
+    menuLabel: { flex: 1, fontSize: 15, fontWeight: '500', color: theme.text },
+    menuValue: { fontSize: 14, color: theme.textSecondary },
+    menuDivider: { height: 1, backgroundColor: theme.bg, marginLeft: 48 },
+    adminBtn: { marginHorizontal: 16, marginBottom: 12, backgroundColor: '#F0EEFF', borderRadius: 16, height: 52, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#C4B5FD' },
+    adminBtnText: { fontSize: 15, fontWeight: '700', color: '#7C3AED' },
+    logoutBtn: { marginHorizontal: 16, marginBottom: 8, backgroundColor: theme.redLight, borderRadius: 16, height: 52, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.red },
+    logoutBtnText: { fontSize: 15, fontWeight: '600', color: theme.red },
+  });
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -281,14 +353,14 @@ export default function ProfileScreen() {
                   placeholderTextColor={Colors.textMuted}
                 />
                 <TouchableOpacity onPress={handleUpdateNickname} style={styles.iconBtn}>
-                  <Ionicons name="checkmark" size={22} color={Colors.primary} />
+                  <Ionicons name="checkmark" size={22} color={theme.primary} />
                 </TouchableOpacity>
               </>
             ) : (
               <>
                 <Text style={styles.nicknameText}>{nickname}</Text>
                 <TouchableOpacity onPress={handleStartEdit} style={styles.iconBtn}>
-                  <Ionicons name="pencil-outline" size={18} color={Colors.textSub} />
+                  <Ionicons name="pencil-outline" size={18} color={theme.textSecondary} />
                 </TouchableOpacity>
               </>
             )}
@@ -317,11 +389,11 @@ export default function ProfileScreen() {
             >
               <Text style={styles.typeBadgeText}>
                 {investmentType.emoji}{'  '}{investmentType.title}{'  '}
-                <Text style={{ color: Colors.textSub, fontWeight: '400' }}>
+                <Text style={{ color: theme.textSecondary, fontWeight: '400' }}>
                   {investmentType.mbtiLike}
                 </Text>
                 {'  '}
-                <Text style={{ color: Colors.primary }}>재분석 →</Text>
+                <Text style={{ color: theme.primary }}>재분석 →</Text>
               </Text>
             </TouchableOpacity>
           ) : (
@@ -335,12 +407,8 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* ── 다크모드 토글 ──────────────────────────────── */}
-        <TouchableOpacity
-          onPress={toggleTheme}
-          style={[styles.card, { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 }]}
-          activeOpacity={0.7}
-        >
+        {/* ── 다크모드 토글 ── */}
+        <View style={[styles.card, { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 }]}>
           <View style={{
             width: 40, height: 40, borderRadius: 12,
             backgroundColor: isDark ? '#1A1A3A' : '#FFF9E6',
@@ -349,26 +417,20 @@ export default function ProfileScreen() {
             <Text style={{ fontSize: 20 }}>{isDark ? '🌙' : '☀️'}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.text }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>
               {isDark ? '다크 모드' : '라이트 모드'}
             </Text>
-            <Text style={{ fontSize: 12, color: Colors.textSub, marginTop: 2 }}>
+            <Text style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>
               {isDark ? '밝은 화면으로 전환' : '어두운 화면으로 전환'}
             </Text>
           </View>
-          <View style={{
-            width: 51, height: 31, borderRadius: 15.5,
-            backgroundColor: isDark ? Colors.primary : Colors.border,
-            justifyContent: 'center', paddingHorizontal: 2,
-          }}>
-            <View style={{
-              width: 27, height: 27, borderRadius: 13.5,
-              backgroundColor: '#FFFFFF',
-              alignSelf: isDark ? 'flex-end' : 'flex-start',
-              elevation: 3,
-            }} />
-          </View>
-        </TouchableOpacity>
+          <Switch
+            value={isDark}
+            onValueChange={toggleTheme}
+            trackColor={{ false: '#E5E8EB', true: '#0066FF' }}
+            thumbColor='#FFFFFF'
+          />
+        </View>
 
         {/* ── 자산 현황 카드 ───────────────────────────── */}
         <View style={styles.card}>
@@ -446,11 +508,11 @@ export default function ProfileScreen() {
               <Text style={styles.learnLabel}>총 거래</Text>
             </View>
             <View style={[styles.learnItem, styles.learnBorderLeft]}>
-              <Text style={[styles.learnValue, { color: Colors.green }]}>{buyCount}회</Text>
+              <Text style={[styles.learnValue, { color: theme.green }]}>{buyCount}회</Text>
               <Text style={styles.learnLabel}>매수</Text>
             </View>
             <View style={[styles.learnItem, styles.learnBorderLeft]}>
-              <Text style={[styles.learnValue, { color: Colors.red }]}>{sellCount}회</Text>
+              <Text style={[styles.learnValue, { color: theme.red }]}>{sellCount}회</Text>
               <Text style={styles.learnLabel}>매도</Text>
             </View>
           </View>
@@ -468,7 +530,7 @@ export default function ProfileScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <Text style={styles.cardHeader}>🏅 나의 배지</Text>
             <TouchableOpacity onPress={() => navigation.navigate('배지')} activeOpacity={0.7}>
-              <Text style={{ fontSize: 13, color: Colors.primary, fontWeight: '600' }}>전체 보기 →</Text>
+              <Text style={{ fontSize: 13, color: theme.primary, fontWeight: '600' }}>전체 보기 →</Text>
             </TouchableOpacity>
           </View>
           {earnedBadges.length > 0 ? (
@@ -478,14 +540,14 @@ export default function ProfileScreen() {
               ))}
               {earnedBadges.length > 5 && (
                 <View style={{ justifyContent: 'center', paddingLeft: 4 }}>
-                  <Text style={{ fontSize: 13, color: Colors.textSub, fontWeight: '600' }}>
+                  <Text style={{ fontSize: 13, color: theme.textSecondary, fontWeight: '600' }}>
                     +{earnedBadges.length - 5}
                   </Text>
                 </View>
               )}
             </View>
           ) : (
-            <Text style={{ fontSize: 13, color: Colors.textSub }}>아직 획득한 배지가 없어요. 도전해보세요!</Text>
+            <Text style={{ fontSize: 13, color: theme.textSecondary }}>아직 획득한 배지가 없어요. 도전해보세요!</Text>
           )}
         </View>
 
@@ -534,12 +596,12 @@ export default function ProfileScreen() {
         <View style={[styles.card, styles.menuCard]}>
           {/* 알림 설정 */}
           <View style={styles.menuRow}>
-            <Ionicons name="notifications-outline" size={20} color={Colors.text} style={styles.menuIcon} />
+            <Ionicons name="notifications-outline" size={20} color={theme.text} style={styles.menuIcon} />
             <Text style={styles.menuLabel}>알림 설정</Text>
             <Switch
               value={notificationsEnabled}
               onValueChange={handleToggleNotifications}
-              trackColor={{ false: Colors.border, true: Colors.primary }}
+              trackColor={{ false: theme.border, true: theme.primary }}
               thumbColor="#FFFFFF"
             />
           </View>
@@ -551,13 +613,13 @@ export default function ProfileScreen() {
             onPress={() => navigation.navigate('학교반설정')}
             activeOpacity={0.7}
           >
-            <Ionicons name="school-outline" size={20} color={Colors.text} style={styles.menuIcon} />
+            <Ionicons name="school-outline" size={20} color={theme.text} style={styles.menuIcon} />
             <Text style={styles.menuLabel}>
               {schoolInfo
                 ? `${schoolInfo.name} ${schoolInfo.grade} ${schoolInfo.classNum}`
                 : '학교/반 설정'}
             </Text>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textSub} />
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
           </TouchableOpacity>
           <View style={styles.menuDivider} />
 
@@ -567,9 +629,9 @@ export default function ProfileScreen() {
             onPress={() => navigation.navigate('개인정보처리방침')}
             activeOpacity={0.7}
           >
-            <Ionicons name="document-text-outline" size={20} color={Colors.text} style={styles.menuIcon} />
+            <Ionicons name="document-text-outline" size={20} color={theme.text} style={styles.menuIcon} />
             <Text style={styles.menuLabel}>개인정보처리방침</Text>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textSub} />
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
           </TouchableOpacity>
           <View style={styles.menuDivider} />
 
@@ -579,9 +641,9 @@ export default function ProfileScreen() {
             onPress={() => navigation.navigate('서비스이용약관')}
             activeOpacity={0.7}
           >
-            <Ionicons name="reader-outline" size={20} color={Colors.text} style={styles.menuIcon} />
+            <Ionicons name="reader-outline" size={20} color={theme.text} style={styles.menuIcon} />
             <Text style={styles.menuLabel}>서비스 이용약관</Text>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textSub} />
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
           </TouchableOpacity>
           <View style={styles.menuDivider} />
 
@@ -593,13 +655,13 @@ export default function ProfileScreen() {
           >
             <Ionicons name="refresh-circle-outline" size={20} color="#FF3B30" style={styles.menuIcon} />
             <Text style={[styles.menuLabel, { color: '#FF3B30' }]}>계좌 초기화</Text>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textSub} />
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
           </TouchableOpacity>
           <View style={styles.menuDivider} />
 
           {/* 앱 버전 */}
           <View style={styles.menuRow}>
-            <Ionicons name="information-circle-outline" size={20} color={Colors.text} style={styles.menuIcon} />
+            <Ionicons name="information-circle-outline" size={20} color={theme.text} style={styles.menuIcon} />
             <Text style={styles.menuLabel}>앱 버전</Text>
             <Text style={styles.menuValue}>1.0.0</Text>
           </View>
@@ -614,9 +676,9 @@ export default function ProfileScreen() {
             }}
             activeOpacity={0.7}
           >
-            <Ionicons name="help-circle-outline" size={20} color={Colors.text} style={styles.menuIcon} />
+            <Ionicons name="help-circle-outline" size={20} color={theme.text} style={styles.menuIcon} />
             <Text style={styles.menuLabel}>튜토리얼 다시 보기</Text>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textSub} />
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
           </TouchableOpacity>
           <View style={styles.menuDivider} />
 
@@ -626,9 +688,9 @@ export default function ProfileScreen() {
             onPress={() => Linking.openURL('mailto:support@floco.app')}
             activeOpacity={0.7}
           >
-            <Ionicons name="mail-outline" size={20} color={Colors.text} style={styles.menuIcon} />
+            <Ionicons name="mail-outline" size={20} color={theme.text} style={styles.menuIcon} />
             <Text style={styles.menuLabel}>문의하기</Text>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textSub} />
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -651,308 +713,3 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
-  scrollContent: {
-    paddingTop: 16,
-    paddingBottom: 40,
-  },
-
-  // ── Card ──────────────────────────────────────────
-  card: {
-    backgroundColor: Colors.card,
-    borderRadius: 20,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  cardHeader: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 16,
-  },
-
-  // ── Profile ───────────────────────────────────────
-  avatarWrap: {
-    alignSelf: 'center',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  avatarEmoji: {
-    fontSize: 40,
-  },
-  nicknameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  nicknameText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  nicknameInput: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.text,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.primary,
-    minWidth: 120,
-    paddingVertical: 2,
-    textAlign: 'center',
-  },
-  iconBtn: {
-    padding: 4,
-  },
-  emailText: {
-    fontSize: 14,
-    color: Colors.textSub,
-    textAlign: 'center',
-    marginBottom: 14,
-  },
-  typeBadge: {
-    alignSelf: 'center',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  typeBadgeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  verifiedBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#34C75920', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 14 },
-  verifiedText: { color: '#34C759', fontSize: 11, fontWeight: '700', marginLeft: 3 },
-  verifyBtn: { alignSelf: 'center', marginBottom: 14 },
-  verifyBtnText: { color: Colors.primary, fontSize: 13, fontWeight: '600' },
-
-  surveyBtn: {
-    alignSelf: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    marginTop: 4,
-  },
-  surveyBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-
-  // ── Stat grid ─────────────────────────────────────
-  statGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 14,
-  },
-  statBox: {
-    width: '47%',
-    backgroundColor: '#F2F4F6',
-    borderRadius: 12,
-    padding: 12,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: Colors.textSub,
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  returnRateText: {
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-
-  // ── Learn row ─────────────────────────────────────
-  learnRow: {
-    flexDirection: 'row',
-    marginBottom: 14,
-  },
-  learnItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
-    gap: 4,
-  },
-  learnBorderLeft: {
-    borderLeftWidth: 1,
-    borderLeftColor: Colors.border,
-  },
-  learnEmoji: {
-    fontSize: 24,
-  },
-  learnValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.text,
-  },
-  learnLabel: {
-    fontSize: 11,
-    color: Colors.textSub,
-  },
-
-  // ── AI Button ─────────────────────────────────────
-  aiBtn: {
-    backgroundColor: '#191F28',
-    borderRadius: 12,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-  },
-  aiBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-
-  // ── Invite ────────────────────────────────────────
-  inviteCodeBox: {
-    backgroundColor: '#F0F4FF',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  inviteCodeLabel: {
-    color: '#8B95A1',
-    fontSize: 13,
-    marginBottom: 8,
-  },
-  inviteCodeValue: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#0066FF',
-    letterSpacing: 8,
-  },
-  inviteHint: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 12,
-  },
-  inviteHintText: {
-    color: '#8B95A1',
-    fontSize: 13,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-
-  // ── Buttons ───────────────────────────────────────
-  primaryBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 16,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  ghostBtn: {
-    backgroundColor: '#F2F4F6',
-    borderRadius: 16,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  ghostBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-
-  // ── Settings menu ─────────────────────────────────
-  menuCard: {
-    padding: 0,
-    overflow: 'hidden',
-  },
-  menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  menuIcon: {
-    marginRight: 12,
-  },
-  menuLabel: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-    color: Colors.text,
-  },
-  menuValue: {
-    fontSize: 14,
-    color: Colors.textSub,
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: '#F2F4F6',
-    marginLeft: 48,
-  },
-
-  // ── Admin button ──────────────────────────────────
-  adminBtn: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    backgroundColor: '#F0EEFF',
-    borderRadius: 16,
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#C4B5FD',
-  },
-  adminBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#7C3AED',
-  },
-
-  // ── Logout button ─────────────────────────────────
-  logoutBtn: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    backgroundColor: '#FFF0F1',
-    borderRadius: 16,
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FFCDD2',
-  },
-  logoutBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.green,
-  },
-});

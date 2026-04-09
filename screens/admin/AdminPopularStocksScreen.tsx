@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../components/ui';
+import { useTheme } from '../../context/ThemeContext';
 import { fetchAllPortfoliosForAdmin } from '../../lib/adminService';
 import { STOCKS } from '../../store/appStore';
 import StockLogo from '../../components/StockLogo';
@@ -30,6 +31,7 @@ interface ReturnEntry {
 }
 
 export default function AdminPopularStocksScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation();
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -125,7 +127,55 @@ export default function AdminPopularStocksScreen() {
     setRefreshing(false);
   };
 
-  const RANK_COLORS = [Colors.primary, '#FF9500', '#34C759'];
+  const RANK_COLORS = [Colors.primary, '#FF9500', theme.green];
+
+  const styles = StyleSheet.create({
+    safe: { flex: 1, backgroundColor: Colors.bg },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.card,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
+    loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    scroll: { flex: 1 },
+    scrollContent: { padding: 16, gap: 12 },
+    section: {
+      backgroundColor: Colors.card, borderRadius: 12, padding: 16,
+      shadowColor: theme.text, shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+    },
+    sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.text, marginBottom: 14 },
+    stockRow: {
+      flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
+      borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10,
+    },
+    rankNum: { fontSize: 16, fontWeight: '800', width: 24, textAlign: 'center' },
+    stockInfo: { flex: 1 },
+    stockName: { fontSize: 14, fontWeight: '600', color: Colors.text },
+    stockTicker: { fontSize: 12, color: Colors.textSub, marginTop: 2 },
+    stockMeta: { alignItems: 'flex-end', gap: 2 },
+    stockMetaLabel: { fontSize: 10, color: Colors.textSub },
+    stockMetaValue: { fontSize: 13, fontWeight: '700', color: Colors.text },
+    marketBarWrap: { marginBottom: 12 },
+    marketBar: {
+      flexDirection: 'row', height: 20, borderRadius: 10, overflow: 'hidden', backgroundColor: Colors.bg,
+    },
+    marketBarKr: { backgroundColor: Colors.primary },
+    marketBarUs: { backgroundColor: '#FF9500' },
+    marketLegend: { flexDirection: 'row', gap: 20 },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    legendDot: { width: 10, height: 10, borderRadius: 5 },
+    legendText: { fontSize: 13, color: Colors.text, fontWeight: '600' },
+    returnRow: {
+      flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
+      borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10,
+    },
+    returnInfo: { flex: 1 },
+    returnPct: { fontSize: 14, fontWeight: '800' },
+    emptyText: { fontSize: 14, color: Colors.textSub, textAlign: 'center', paddingVertical: 20 },
+  });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -228,50 +278,3 @@ export default function AdminPopularStocksScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.bg },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.card,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 16, gap: 12 },
-  section: {
-    backgroundColor: Colors.card, borderRadius: 12, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
-  },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.text, marginBottom: 14 },
-  stockRow: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10,
-  },
-  rankNum: { fontSize: 16, fontWeight: '800', width: 24, textAlign: 'center' },
-  stockInfo: { flex: 1 },
-  stockName: { fontSize: 14, fontWeight: '600', color: Colors.text },
-  stockTicker: { fontSize: 12, color: Colors.textSub, marginTop: 2 },
-  stockMeta: { alignItems: 'flex-end', gap: 2 },
-  stockMetaLabel: { fontSize: 10, color: Colors.textSub },
-  stockMetaValue: { fontSize: 13, fontWeight: '700', color: Colors.text },
-  marketBarWrap: { marginBottom: 12 },
-  marketBar: {
-    flexDirection: 'row', height: 20, borderRadius: 10, overflow: 'hidden', backgroundColor: Colors.bg,
-  },
-  marketBarKr: { backgroundColor: Colors.primary },
-  marketBarUs: { backgroundColor: '#FF9500' },
-  marketLegend: { flexDirection: 'row', gap: 20 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontSize: 13, color: Colors.text, fontWeight: '600' },
-  returnRow: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 10,
-  },
-  returnInfo: { flex: 1 },
-  returnPct: { fontSize: 14, fontWeight: '800' },
-  emptyText: { fontSize: 14, color: Colors.textSub, textAlign: 'center', paddingVertical: 20 },
-});

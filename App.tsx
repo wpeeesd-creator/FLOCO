@@ -4,7 +4,8 @@
  */
 
 import 'react-native-gesture-handler';
-import React from 'react';
+import * as SplashScreen from 'expo-splash-screen';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
@@ -95,6 +96,10 @@ const navigationStateChange = (state: any) => {
 function AppContent() {
   const { isDark, theme } = useTheme();
 
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
   const navTheme = isDark
     ? {
         ...DarkTheme,
@@ -116,6 +121,7 @@ function AppContent() {
 }
 
 export default function App() {
+  SplashScreen.preventAutoHideAsync().catch(() => {});
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>

@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useAppStore, STOCKS } from '../store/appStore';
 import { Colors, Typography, Button, Card, Toast } from '../components/ui';
 import { validateTradeQty } from '../lib/errorHandler';
+import { useTheme } from '../context/ThemeContext';
 
 export default function TradingScreen() {
   const navigation = useNavigation<any>();
@@ -16,6 +17,7 @@ export default function TradingScreen() {
   const stock = STOCKS.find(s => s.ticker === ticker);
   const { cash, holdings, buyStock, sellStock } = useAppStore();
   const holding = holdings.find(h => h.ticker === ticker);
+  const { theme, isDark } = useTheme();
 
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [qtyStr, setQtyStr] = useState('1');
@@ -129,7 +131,7 @@ export default function TradingScreen() {
               onPress={() => setTradeType(t)}
               activeOpacity={0.85}
             >
-              <Text style={[styles.toggleText, tradeType === t && styles.toggleTextActive]}>
+              <Text style={[styles.toggleText, tradeType === t && { color: theme.bgCard }]}>
                 {t === 'buy' ? '매수' : '매도'}
               </Text>
             </TouchableOpacity>
@@ -201,7 +203,7 @@ export default function TradingScreen() {
                 <Text style={styles.balanceLabel}>구매 후 남은 금액</Text>
                 <Text style={[
                   styles.balanceRemain,
-                  { color: isInsufficient ? '#F04452' : Colors.text },
+                  { color: isInsufficient ? theme.red : Colors.text },
                 ]}>
                   {isInsufficient ? '−' : ''}{fmt(Math.abs(remainingCash))}
                 </Text>
@@ -210,7 +212,7 @@ export default function TradingScreen() {
 
             {isInsufficient && (
               <View style={styles.warningBanner}>
-                <Text style={styles.warningText}>잔액이 부족해요. 수량을 줄여주세요.</Text>
+                <Text style={[styles.warningText, { color: theme.red }]}>잔액이 부족해요. 수량을 줄여주세요.</Text>
               </View>
             )}
           </Card>
@@ -226,7 +228,7 @@ export default function TradingScreen() {
                 <Text style={styles.balanceLabel}>매도 후 남은 수량</Text>
                 <Text style={[
                   styles.balanceRemain,
-                  { color: (holding?.qty ?? 0) < qty ? '#F04452' : Colors.text },
+                  { color: (holding?.qty ?? 0) < qty ? theme.red : Colors.text },
                 ]}>
                   {Math.max(0, (holding?.qty ?? 0) - qty)}주
                 </Text>
@@ -235,7 +237,7 @@ export default function TradingScreen() {
 
             {(holding?.qty ?? 0) < qty && (
               <View style={styles.warningBanner}>
-                <Text style={styles.warningText}>보유 수량이 부족해요. 수량을 줄여주세요.</Text>
+                <Text style={[styles.warningText, { color: theme.red }]}>보유 수량이 부족해요. 수량을 줄여주세요.</Text>
               </View>
             )}
           </Card>
@@ -312,7 +314,6 @@ const styles = StyleSheet.create({
   toggleBuyActive: { backgroundColor: Colors.green },
   toggleSellActive: { backgroundColor: Colors.red },
   toggleText: { fontSize: 15, fontWeight: '600', color: Colors.textSub },
-  toggleTextActive: { color: '#FFFFFF' },
 
   // Card shared
   card: { marginHorizontal: 16, marginBottom: 12 },
@@ -407,7 +408,6 @@ const styles = StyleSheet.create({
   warningText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#F04452',
     textAlign: 'center',
   },
 

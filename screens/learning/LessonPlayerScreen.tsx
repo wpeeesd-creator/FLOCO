@@ -14,6 +14,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../components/ui';
+import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAppStore } from '../../store/appStore';
 import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
@@ -36,6 +37,7 @@ type RouteParams = {
 };
 
 export default function LessonPlayerScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const params = (route.params ?? {}) as Partial<RouteParams>;
@@ -114,6 +116,14 @@ export default function LessonPlayerScreen() {
     const lessonKey = `${categoryId}_${levelId}`;
 
     if (user?.id) {
+      // 중복 보상 방지
+      const dedupeSnap = await getDoc(doc(db, 'users', user.id, 'learning', 'data'));
+      const alreadyCompleted = (dedupeSnap.data()?.completedLessons ?? []).includes(lessonKey);
+      if (alreadyCompleted) {
+        Alert.alert('알림', '이미 완료한 레슨이에요. 보상은 한 번만 지급돼요.');
+        return;
+      }
+
       // Save lesson completion + points
       await completeLesson(
         user.id,
@@ -327,7 +337,7 @@ export default function LessonPlayerScreen() {
             <Text style={styles.completionPointsLabel}>획득 포인트</Text>
             <Text style={styles.completionPoints}>⭐ +{earnedPoints.toLocaleString()}</Text>
           </View>
-          <View style={styles.completionStats}>
+          <View style={[styles.completionStats, { backgroundColor: theme.bgCard }]}>
             <Text style={styles.completionStatsText}>
               {correctCount} / {totalLessons} 정답
             </Text>
@@ -346,7 +356,7 @@ export default function LessonPlayerScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Progress header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.bgCard }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.closeBtn}
@@ -354,7 +364,7 @@ export default function LessonPlayerScreen() {
         >
           <Ionicons name="close" size={24} color={Colors.textSub} />
         </TouchableOpacity>
-        <View style={styles.progressBg}>
+        <View style={[styles.progressBg, { backgroundColor: theme.bg }]}>
           <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
         </View>
         <Text style={styles.stepCounter}>
@@ -363,7 +373,7 @@ export default function LessonPlayerScreen() {
       </View>
 
       {/* Hearts */}
-      <View style={styles.heartsRow}>
+      <View style={[styles.heartsRow, { backgroundColor: theme.bgCard }]}>
         {[0, 1, 2].map((i) => (
           <Text key={i} style={styles.heartIcon}>
             {i < hearts ? '❤️' : '🖤'}
@@ -422,6 +432,7 @@ type LearnCardProps = {
 };
 
 function LearnCard({ lesson, onNext }: LearnCardProps) {
+  const { theme, isDark } = useTheme();
   return (
     <View style={styles.flex}>
       <ScrollView
@@ -432,9 +443,9 @@ function LearnCard({ lesson, onNext }: LearnCardProps) {
         <Text style={styles.learnTitle}>{lesson.title}</Text>
         <Text style={styles.learnContent}>{lesson.content}</Text>
       </ScrollView>
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { backgroundColor: theme.bgCard }]}>
         <TouchableOpacity style={styles.primaryBtn} onPress={onNext} activeOpacity={0.85}>
-          <Text style={styles.primaryBtnText}>계속</Text>
+          <Text style={[styles.primaryBtnText, { color: theme.bgCard }]}>계속</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -450,6 +461,7 @@ type FeedbackBarProps = {
 };
 
 function FeedbackBar({ isCorrect, feedbackOpacity, explanation, onNext }: FeedbackBarProps) {
+  const { theme, isDark } = useTheme();
   return (
     <Animated.View
       style={[
@@ -480,7 +492,7 @@ function FeedbackBar({ isCorrect, feedbackOpacity, explanation, onNext }: Feedba
         onPress={onNext}
         activeOpacity={0.85}
       >
-        <Text style={styles.feedbackNextBtnText}>다음</Text>
+        <Text style={[styles.feedbackNextBtnText, { color: theme.bgCard }]}>다음</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -508,6 +520,7 @@ function QuizCard({
   onSelectAnswer,
   onNext,
 }: QuizCardProps) {
+  const { theme, isDark } = useTheme();
   return (
     <View style={styles.flex}>
       <ScrollView
@@ -520,7 +533,7 @@ function QuizCard({
             const isSelected = selectedAnswer === index;
             const isAnswerCorrect = index === lesson.answer;
             let borderColor = Colors.border;
-            let bgColor = '#FFFFFF';
+            let bgColor = theme.bgCard;
 
             if (isAnswered) {
               if (isAnswerCorrect) {
@@ -584,6 +597,7 @@ function FillBlankCard({
   onSelectAnswer,
   onNext,
 }: FillBlankCardProps) {
+  const { theme, isDark } = useTheme();
   const questionParts = lesson.question.split('___');
   const selectedText = selectedAnswer !== null ? lesson.options[selectedAnswer] : null;
 
@@ -611,7 +625,7 @@ function FillBlankCard({
             const isSelected = selectedAnswer === index;
             const isAnswerCorrect = option === lesson.answer;
             let borderColor = Colors.border;
-            let bgColor = '#FFFFFF';
+            let bgColor = theme.bgCard;
 
             if (isAnswered) {
               if (isAnswerCorrect) {
@@ -671,6 +685,7 @@ function MatchingCard({
   onTermTap,
   onDefTap,
 }: MatchingCardProps) {
+  const { theme, isDark } = useTheme();
   return (
     <View style={styles.flex}>
       <ScrollView
@@ -690,6 +705,7 @@ function MatchingCard({
                   key={index}
                   style={[
                     styles.matchingCard,
+                    { backgroundColor: theme.bgCard },
                     isMatched && styles.matchingCardMatched,
                     isSelected && styles.matchingCardSelected,
                   ]}
@@ -719,6 +735,7 @@ function MatchingCard({
                   key={shuffledIndex}
                   style={[
                     styles.matchingCard,
+                    { backgroundColor: theme.bgCard },
                     isMatched && styles.matchingCardMatched,
                     selectedTerm !== null && !isMatched && styles.matchingCardHighlightable,
                   ]}
@@ -779,7 +796,6 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
     gap: 12,
-    backgroundColor: '#FFFFFF',
   },
   closeBtn: {
     padding: 4,
@@ -787,7 +803,6 @@ const styles = StyleSheet.create({
   progressBg: {
     flex: 1,
     height: 8,
-    backgroundColor: '#F2F4F6',
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -810,7 +825,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
     paddingBottom: 8,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
     gap: 4,
@@ -853,7 +867,6 @@ const styles = StyleSheet.create({
     right: 0,
     padding: 16,
     paddingBottom: 28,
-    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
@@ -866,7 +879,6 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
 
   // Question
@@ -881,7 +893,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   optionBtn: {
-    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: Colors.border,
     borderRadius: 16,
@@ -924,7 +935,6 @@ const styles = StyleSheet.create({
   feedbackNextBtnText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
 
   // FillBlank
@@ -952,7 +962,6 @@ const styles = StyleSheet.create({
   },
   chipBtn: {
     width: (SCREEN_WIDTH - 48 - 10) / 2,
-    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: Colors.border,
     borderRadius: 12,
@@ -986,7 +995,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   matchingCard: {
-    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: Colors.border,
     borderRadius: 12,
@@ -1052,7 +1060,6 @@ const styles = StyleSheet.create({
     color: '#F59E0B',
   },
   completionStats: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',

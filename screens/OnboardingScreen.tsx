@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
+import { useTheme } from '../context/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -21,45 +22,38 @@ interface Slide {
   color: string;
 }
 
-const slides: Slide[] = [
-  {
-    id: '1',
-    emoji: '💰',
-    title: '가상 100만원으로\n투자 시작',
-    description: '실제 돈 없이 100만원으로\n주식 투자를 경험해보세요',
-    color: '#0066FF',
-  },
-  {
-    id: '2',
-    emoji: '📚',
-    title: '배우면서\n자산 늘리기',
-    description: '학습을 완료하면 가상 자산이\n자동으로 늘어나요',
-    color: '#34C759',
-  },
-  {
-    id: '3',
-    emoji: '🏆',
-    title: '친구들과\n수익률 경쟁',
-    description: '친구를 초대하고\n랭킹 1위를 노려보세요',
-    color: '#FF9500',
-  },
-  {
-    id: '4',
-    emoji: '🤖',
-    title: 'AI가 분석하는\n내 투자 유형',
-    description: '10가지 질문으로\n나만의 투자 스타일을 찾아요',
-    color: '#FF2D55',
-  },
-];
-
 interface OnboardingScreenProps {
   onComplete: () => void;
 }
 
 export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList<Slide>>(null);
+
+  const slides: Slide[] = [
+    { id: '1', emoji: '💰', title: '가상 100만원으로\n투자 시작', description: '실제 돈 없이 100만원으로\n주식 투자를 경험해보세요', color: theme.primary },
+    { id: '2', emoji: '📚', title: '배우면서\n자산 늘리기', description: '학습을 완료하면 가상 자산이\n자동으로 늘어나요', color: theme.green },
+    { id: '3', emoji: '🏆', title: '친구들과\n수익률 경쟁', description: '친구를 초대하고\n랭킹 1위를 노려보세요', color: '#FF9500' },
+    { id: '4', emoji: '🤖', title: 'AI가 분석하는\n내 투자 유형', description: '10가지 질문으로\n나만의 투자 스타일을 찾아요', color: '#FF2D55' },
+  ];
+
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.bgCard },
+    slide: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+    skipBtn: { position: 'absolute', top: 20, right: 24, padding: 8 },
+    skipText: { color: theme.textSecondary, fontSize: 15, fontWeight: '500' },
+    emojiCircle: { width: 160, height: 160, borderRadius: 80, justifyContent: 'center', alignItems: 'center', marginBottom: 40 },
+    emoji: { fontSize: 80 },
+    title: { fontSize: 28, fontWeight: '700', color: theme.text, textAlign: 'center', lineHeight: 38, marginBottom: 16 },
+    description: { fontSize: 16, color: theme.textSecondary, textAlign: 'center', lineHeight: 24 },
+    bottom: { paddingHorizontal: 24 },
+    dots: { flexDirection: 'row', justifyContent: 'center', marginBottom: 24, gap: 8 },
+    dot: { height: 8, borderRadius: 4 },
+    nextBtn: { borderRadius: 16, height: 56, justifyContent: 'center', alignItems: 'center' },
+    nextText: { color: theme.bgCard, fontSize: 17, fontWeight: '700' },
+  });
 
   const handleNext = () => {
     if (currentIndex < slides.length - 1) {
@@ -148,75 +142,3 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  slide: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  skipBtn: {
-    position: 'absolute',
-    top: 20,
-    right: 24,
-    padding: 8,
-  },
-  skipText: {
-    color: '#8B95A1',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  emojiCircle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  emoji: {
-    fontSize: 80,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#191F28',
-    textAlign: 'center',
-    lineHeight: 38,
-    marginBottom: 16,
-  },
-  description: {
-    fontSize: 16,
-    color: '#8B95A1',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  bottom: {
-    paddingHorizontal: 24,
-  },
-  dots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 24,
-    gap: 8,
-  },
-  dot: {
-    height: 8,
-    borderRadius: 4,
-  },
-  nextBtn: {
-    borderRadius: 16,
-    height: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  nextText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-});

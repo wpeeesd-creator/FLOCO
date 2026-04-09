@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../components/ui';
+import { useTheme } from '../../context/ThemeContext';
 import { getAllUserProfiles, getAllPortfolios } from '../../lib/firestoreService';
 
 // ── 더미 주간 데이터 생성 ──────────────────────
@@ -29,6 +30,7 @@ const WEEKLY_SIGNUPS = generateWeeklyDummy(20);
 const WEEKLY_TRADES = generateWeeklyDummy(50);
 
 export default function AdminStatsScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation();
   const [userCount, setUserCount] = useState(0);
   const [tradeCount, setTradeCount] = useState(0);
@@ -61,10 +63,10 @@ export default function AdminStatsScreen() {
   const onRefresh = () => { setRefreshing(true); loadData(); };
 
   const mainStats = [
-    { label: '전체 유저', value: `${userCount}명`, color: '#0066FF', emoji: '👥' },
+    { label: '전체 유저', value: `${userCount}명`, color: theme.primary, emoji: '👥' },
     { label: '총 거래 건수', value: `${tradeCount}건`, color: '#FF9500', emoji: '📈' },
     { label: '총 거래금액', value: `₩${Math.round(tradeAmount / 10000)}만`, color: '#5856D6', emoji: '💰' },
-    { label: '유저당 평균 거래', value: `${avgTrades}건`, color: '#34C759', emoji: '📊' },
+    { label: '유저당 평균 거래', value: `${avgTrades}건`, color: theme.green, emoji: '📊' },
   ];
 
   if (loading) {
@@ -80,7 +82,7 @@ export default function AdminStatsScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* 헤더 */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.bgCard }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </TouchableOpacity>
@@ -99,7 +101,7 @@ export default function AdminStatsScreen() {
         <Text style={styles.sectionTitle}>주요 지표</Text>
         <View style={styles.statsGrid}>
           {mainStats.map((s) => (
-            <View key={s.label} style={[styles.statCard, { borderLeftColor: s.color }]}>
+            <View key={s.label} style={[styles.statCard, { borderLeftColor: s.color, backgroundColor: theme.bgCard, shadowColor: theme.text }]}>
               <Text style={styles.statEmoji}>{s.emoji}</Text>
               <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
               <Text style={styles.statLabel}>{s.label}</Text>
@@ -109,19 +111,19 @@ export default function AdminStatsScreen() {
 
         {/* 최근 7일 가입자 차트 */}
         <Text style={styles.sectionTitle}>📅 최근 7일 가입자</Text>
-        <View style={styles.chartCard}>
-          <BarChart data={WEEKLY_SIGNUPS} color="#0066FF" />
+        <View style={[styles.chartCard, { backgroundColor: theme.bgCard, shadowColor: theme.text }]}>
+          <BarChart data={WEEKLY_SIGNUPS} color={theme.primary} />
         </View>
 
         {/* 최근 7일 거래량 차트 */}
         <Text style={styles.sectionTitle}>📈 최근 7일 거래량</Text>
-        <View style={styles.chartCard}>
+        <View style={[styles.chartCard, { backgroundColor: theme.bgCard, shadowColor: theme.text }]}>
           <BarChart data={WEEKLY_TRADES} color="#FF9500" />
         </View>
 
         {/* 유저 활동 요약 */}
         <Text style={styles.sectionTitle}>유저 활동 요약</Text>
-        <View style={styles.summaryCard}>
+        <View style={[styles.summaryCard, { backgroundColor: theme.bgCard, shadowColor: theme.text }]}>
           <SummaryRow label="전체 가입자" value={`${userCount}명`} />
           <View style={styles.summaryDivider} />
           <SummaryRow label="오늘 활성 유저" value={`${Math.floor(userCount * 0.3)}명`} sub="(추정)" />
@@ -178,7 +180,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -201,11 +202,9 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: '47%',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     borderLeftWidth: 4,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
@@ -216,11 +215,9 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: Colors.textSub, fontWeight: '500' },
   // Chart
   chartCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
@@ -243,10 +240,8 @@ const styles = StyleSheet.create({
   barCount: { width: 28, fontSize: 12, fontWeight: '700', color: Colors.text, textAlign: 'right' },
   // Summary
   summaryCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,

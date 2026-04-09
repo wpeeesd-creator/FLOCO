@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Card } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 interface IndexData {
   name: string;
@@ -42,6 +43,7 @@ const SECTOR_DATA = [
 type FilterTab = '전체' | '국내' | '해외' | '원자재';
 
 export default function MarketScreen() {
+  const { theme, isDark } = useTheme();
   const [activeTab, setActiveTab] = useState<FilterTab>('전체');
   const [updatedAt] = useState(new Date());
 
@@ -60,9 +62,9 @@ export default function MarketScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bgCard }}>
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.bgCard }]}>
         <View>
           <Text style={[Typography.h2]}>지표/변동표</Text>
           <Text style={[Typography.caption, { marginTop: 2 }]}>
@@ -72,14 +74,14 @@ export default function MarketScreen() {
       </View>
 
       {/* 필터 탭 */}
-      <View style={styles.filterRow}>
+      <View style={[styles.filterRow, { backgroundColor: theme.bgCard }]}>
         {(['전체', '국내', '해외', '원자재'] as FilterTab[]).map(t => (
           <TouchableOpacity
             key={t}
             style={[styles.filterBtn, activeTab === t && styles.filterBtnActive]}
             onPress={() => setActiveTab(t)}
           >
-            <Text style={[styles.filterText, activeTab === t && styles.filterTextActive]}>{t}</Text>
+            <Text style={[styles.filterText, activeTab === t && styles.filterTextActive, activeTab === t && { color: theme.bgCard }]}>{t}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -113,7 +115,7 @@ export default function MarketScreen() {
           {SECTOR_DATA.map(s => (
             <View
               key={s.name}
-              style={[styles.sectorCard, { borderLeftColor: s.change >= 0 ? Colors.green : Colors.red }]}
+              style={[styles.sectorCard, { borderLeftColor: s.change >= 0 ? Colors.green : Colors.red, backgroundColor: theme.bgCard }]}
             >
               <Text style={styles.sectorEmoji}>{s.emoji}</Text>
               <Text style={styles.sectorName}>{s.name}</Text>
@@ -150,17 +152,17 @@ export default function MarketScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   header: {
-    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff',
+    paddingHorizontal: 16, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  filterRow: { flexDirection: 'row', padding: 12, gap: 8, backgroundColor: '#fff' },
+  filterRow: { flexDirection: 'row', padding: 12, gap: 8 },
   filterBtn: {
     paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
     backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border,
   },
   filterBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   filterText: { fontSize: 13, color: Colors.textSub },
-  filterTextActive: { color: '#fff', fontWeight: '700' },
+  filterTextActive: { fontWeight: '700' },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: Colors.textSub, marginHorizontal: 16, marginTop: 16, marginBottom: 8 },
   card: { marginHorizontal: 16, padding: 0 },
   row: { flexDirection: 'row', alignItems: 'center', padding: 14 },
@@ -170,7 +172,7 @@ const styles = StyleSheet.create({
   idxChange: { fontSize: 12, fontWeight: '700', marginTop: 2 },
   sectorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginHorizontal: 16 },
   sectorCard: {
-    width: '46%', backgroundColor: '#fff', borderRadius: 12, padding: 12,
+    width: '46%', borderRadius: 12, padding: 12,
     borderLeftWidth: 4, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
   sectorEmoji: { fontSize: 22, marginBottom: 4 },

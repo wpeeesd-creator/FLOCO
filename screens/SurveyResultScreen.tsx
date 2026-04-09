@@ -14,6 +14,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 // ── 타입 ──────────────────────────────────────────
 interface InvestmentType {
@@ -127,6 +128,7 @@ const TYPES: Record<string, InvestmentType> = {
 
 // ── 컴포넌트 ──────────────────────────────────────
 export default function SurveyResultScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user } = useAuth();
@@ -146,7 +148,7 @@ export default function SurveyResultScreen() {
       label: TYPES[key]?.title ?? key,
       emoji: TYPES[key]?.emoji ?? '📊',
       percent: Math.round((value / totalScore) * 100),
-      color: TYPES[key]?.color ?? '#8B95A1',
+      color: TYPES[key]?.color ?? theme.textSecondary,
     }))
     .sort((a, b) => b.percent - a.percent);
 
@@ -164,13 +166,68 @@ export default function SurveyResultScreen() {
     }).catch((e) => console.error('투자유형 저장 오류:', e));
   }, [user?.id]);
 
+  const s = StyleSheet.create({
+    safe: { flex: 1, backgroundColor: theme.bg },
+
+    gradientHeader: { paddingTop: 60, paddingBottom: 40, alignItems: 'center' },
+    backBtnAbsolute: { position: 'absolute', top: 16, left: 16, padding: 8 },
+    headerEmoji: { fontSize: 80 },
+    headerTitle: { color: theme.bgCard, fontSize: 26, fontWeight: '800', marginTop: 16, textAlign: 'center' },
+    headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 4 },
+    mbtiBadge: { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, marginTop: 12 },
+    mbtiText: { color: theme.bgCard, fontWeight: '700', fontSize: 13 },
+
+    card: { backgroundColor: theme.bgCard, marginHorizontal: 16, marginTop: 12, borderRadius: 20, padding: 20 },
+    cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 14 },
+
+    descText: { fontSize: 15, color: Colors.text, lineHeight: 26 },
+
+    scoreRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+    scoreLabel: { fontSize: 13, color: Colors.text },
+    scorePct: { fontSize: 13, fontWeight: '700' },
+    barBg: { height: 8, backgroundColor: theme.bg, borderRadius: 4 },
+    barFill: { height: 8, borderRadius: 4 },
+
+    secondBadge: { borderRadius: 12, padding: 12, marginTop: 8, flexDirection: 'row', alignItems: 'center' },
+    secondTitle: { fontWeight: '700', fontSize: 14 },
+    secondSub: { color: Colors.textSub, fontSize: 12 },
+
+    listItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
+    numCircle: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginRight: 10, marginTop: 1 },
+    numText: { color: theme.bgCard, fontSize: 11, fontWeight: '700' },
+    listText: { flex: 1, fontSize: 14, color: Colors.text, lineHeight: 22 },
+
+    strategyText: { fontSize: 14, color: Colors.text, lineHeight: 24, marginBottom: 16 },
+    ratioLabel: { fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 8 },
+    ratioBadge: { borderRadius: 12, padding: 12 },
+    ratioText: { fontWeight: '700', fontSize: 14 },
+
+    chipLabel: { fontSize: 13, color: Colors.textSub, marginBottom: 8 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    chip: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+    chipText: { fontWeight: '700', fontSize: 13 },
+
+    quoteCard: { backgroundColor: theme.bgCard, marginHorizontal: 16, marginTop: 12, borderRadius: 20, padding: 20, borderLeftWidth: 4 },
+    quoteAuthor: { fontSize: 14, fontWeight: '700', marginBottom: 8 },
+    quoteText: { fontSize: 14, color: Colors.text, fontStyle: 'italic', lineHeight: 22 },
+
+    warningCard: { backgroundColor: '#FFF8E7', marginHorizontal: 16, marginTop: 12, borderRadius: 20, padding: 16, borderLeftWidth: 4, borderLeftColor: '#FF9500' },
+    warningText: { fontSize: 13, color: Colors.text, lineHeight: 20 },
+
+    btnWrap: { marginHorizontal: 16, marginTop: 20, gap: 12 },
+    primaryBtn: { borderRadius: 16, height: 56, justifyContent: 'center', alignItems: 'center' },
+    primaryBtnText: { color: theme.bgCard, fontSize: 16, fontWeight: '700' },
+    ghostBtn: { backgroundColor: theme.bg, borderRadius: 16, height: 48, justifyContent: 'center', alignItems: 'center' },
+    ghostBtnText: { color: Colors.textSub, fontSize: 15 },
+  });
+
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Gradient Header */}
         <LinearGradient colors={[...type.gradient]} style={s.gradientHeader}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtnAbsolute}>
-            <Text style={{ color: '#FFFFFF', fontSize: 22 }}>{'<'}</Text>
+            <Text style={{ color: theme.bgCard, fontSize: 22 }}>{'<'}</Text>
           </TouchableOpacity>
           <Text style={s.headerEmoji}>{type.emoji}</Text>
           <Text style={s.headerTitle}>{type.title}</Text>
@@ -250,7 +307,7 @@ export default function SurveyResultScreen() {
           <View style={s.chipRow}>
             {type.recommend.domestic.map((stock) => (
               <View key={stock} style={[s.chip, { backgroundColor: '#F0F4FF' }]}>
-                <Text style={[s.chipText, { color: '#0066FF' }]}>{stock}</Text>
+                <Text style={[s.chipText, { color: theme.primary }]}>{stock}</Text>
               </View>
             ))}
           </View>
@@ -301,58 +358,3 @@ export default function SurveyResultScreen() {
   );
 }
 
-// ── 스타일 ────────────────────────────────────────
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F2F4F6' },
-
-  gradientHeader: { paddingTop: 60, paddingBottom: 40, alignItems: 'center' },
-  backBtnAbsolute: { position: 'absolute', top: 16, left: 16, padding: 8 },
-  headerEmoji: { fontSize: 80 },
-  headerTitle: { color: '#FFF', fontSize: 26, fontWeight: '800', marginTop: 16, textAlign: 'center' },
-  headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 4 },
-  mbtiBadge: { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, marginTop: 12 },
-  mbtiText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
-
-  card: { backgroundColor: '#FFF', marginHorizontal: 16, marginTop: 12, borderRadius: 20, padding: 20 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 14 },
-
-  descText: { fontSize: 15, color: Colors.text, lineHeight: 26 },
-
-  scoreRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  scoreLabel: { fontSize: 13, color: Colors.text },
-  scorePct: { fontSize: 13, fontWeight: '700' },
-  barBg: { height: 8, backgroundColor: '#F2F4F6', borderRadius: 4 },
-  barFill: { height: 8, borderRadius: 4 },
-
-  secondBadge: { borderRadius: 12, padding: 12, marginTop: 8, flexDirection: 'row', alignItems: 'center' },
-  secondTitle: { fontWeight: '700', fontSize: 14 },
-  secondSub: { color: Colors.textSub, fontSize: 12 },
-
-  listItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
-  numCircle: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginRight: 10, marginTop: 1 },
-  numText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
-  listText: { flex: 1, fontSize: 14, color: Colors.text, lineHeight: 22 },
-
-  strategyText: { fontSize: 14, color: Colors.text, lineHeight: 24, marginBottom: 16 },
-  ratioLabel: { fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 8 },
-  ratioBadge: { borderRadius: 12, padding: 12 },
-  ratioText: { fontWeight: '700', fontSize: 14 },
-
-  chipLabel: { fontSize: 13, color: Colors.textSub, marginBottom: 8 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  chipText: { fontWeight: '700', fontSize: 13 },
-
-  quoteCard: { backgroundColor: '#FFF', marginHorizontal: 16, marginTop: 12, borderRadius: 20, padding: 20, borderLeftWidth: 4 },
-  quoteAuthor: { fontSize: 14, fontWeight: '700', marginBottom: 8 },
-  quoteText: { fontSize: 14, color: Colors.text, fontStyle: 'italic', lineHeight: 22 },
-
-  warningCard: { backgroundColor: '#FFF8E7', marginHorizontal: 16, marginTop: 12, borderRadius: 20, padding: 16, borderLeftWidth: 4, borderLeftColor: '#FF9500' },
-  warningText: { fontSize: 13, color: Colors.text, lineHeight: 20 },
-
-  btnWrap: { marginHorizontal: 16, marginTop: 20, gap: 12 },
-  primaryBtn: { borderRadius: 16, height: 56, justifyContent: 'center', alignItems: 'center' },
-  primaryBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
-  ghostBtn: { backgroundColor: '#F2F4F6', borderRadius: 16, height: 48, justifyContent: 'center', alignItems: 'center' },
-  ghostBtnText: { color: Colors.textSub, fontSize: 15 },
-});

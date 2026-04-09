@@ -94,7 +94,9 @@ export const fetchSinglePrice = async (
       `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${yahooTicker}&fields=${QUOTE_FIELDS}`,
       { headers: YAHOO_HEADERS_V7 },
     );
-    const data = await res.json();
+    const text = await res.text();
+    if (!text || text.trim() === '') return null;
+    const data = JSON.parse(text);
     const item = data.quoteResponse?.result?.[0];
     if (item?.regularMarketPrice) {
       console.log(`✅ 가격 (${ticker}): ${isKR ? Math.round(item.regularMarketPrice) : item.regularMarketPrice}`);
@@ -110,7 +112,9 @@ export const fetchSinglePrice = async (
       `https://query2.finance.yahoo.com/v8/finance/chart/${yahooTicker}?interval=1d&range=5d`,
       { headers: YAHOO_HEADERS_V8 },
     );
-    const data = await res.json();
+    const text = await res.text();
+    if (!text || text.trim() === '') return null;
+    const data = JSON.parse(text);
     const meta = data.chart?.result?.[0]?.meta;
     if (meta?.regularMarketPrice) {
       const price = isKR ? Math.round(meta.regularMarketPrice) : meta.regularMarketPrice;

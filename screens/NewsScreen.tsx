@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import {
   fetchAllNews, fetchKRNews, fetchUSNews,
   formatNewsTime, type NewsItem,
@@ -15,6 +16,7 @@ import {
 type NewsTab = '전체' | '국내' | '미국';
 
 export default function NewsScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const [tab, setTab] = useState<NewsTab>('전체');
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -87,7 +89,7 @@ export default function NewsScreen() {
             style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
             activeOpacity={0.7}
           >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
+            <Text style={[styles.tabText, tab === t && styles.tabTextActive, tab === t && { color: theme.bgCard }]}>
               {t === '국내' ? '🇰🇷 국내' : t === '미국' ? '🇺🇸 미국' : '전체'}
             </Text>
           </TouchableOpacity>
@@ -133,7 +135,7 @@ const styles = StyleSheet.create({
   },
   tabBtnActive: { backgroundColor: Colors.primary },
   tabText: { color: Colors.textSub, fontWeight: '600', fontSize: 13 },
-  tabTextActive: { color: '#FFFFFF' },
+  tabTextActive: {},
   newsCard: {
     backgroundColor: Colors.card, marginHorizontal: 16, marginTop: 8,
     borderRadius: 16, padding: 16,

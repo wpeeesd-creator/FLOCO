@@ -13,10 +13,12 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { COURSES, LEVEL_COLOR } from '../data/learningContent';
 import { Colors, Typography, Button } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 type Phase = 'lesson' | 'quiz' | 'result';
 
 export default function LessonScreen() {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -39,7 +41,7 @@ export default function LessonScreen() {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <Text style={{ fontSize: 16, color: '#8E8E93' }}>코스를 찾을 수 없어요</Text>
           <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 16 }}>
-            <Text style={{ color: '#0066FF', fontSize: 15, fontWeight: '600' }}>돌아가기</Text>
+            <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '600' }}>돌아가기</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -107,6 +109,67 @@ export default function LessonScreen() {
     }
     setPhase('result');
   }
+
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.bg },
+    header: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      paddingHorizontal: 16, paddingBottom: 16,
+    },
+    backBtn: { padding: 4 },
+    backText: { fontSize: 22, color: theme.bgCard, fontWeight: '600' },
+    headerTitle: { fontSize: 16, fontWeight: '700', color: theme.bgCard },
+    headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
+    progressBg: { height: 4, backgroundColor: Colors.border },
+    progressFill: { height: '100%' },
+    content: { padding: 20, paddingBottom: 100 },
+    pageEmoji: { fontSize: 52, textAlign: 'center', marginBottom: 12 },
+    pageTitle: { fontSize: 22, fontWeight: '800', color: Colors.text, textAlign: 'center', marginBottom: 16 },
+    pageContent: { fontSize: 16, lineHeight: 26, color: Colors.text },
+    bottomBar: {
+      position: 'absolute', bottom: 0, left: 0, right: 0,
+      padding: 16, paddingBottom: 30, backgroundColor: theme.bgCard,
+      borderTopWidth: 1, borderTopColor: Colors.border,
+    },
+    quizBadge: {
+      alignSelf: 'flex-start', backgroundColor: '#EEF6FF',
+      borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 16,
+    },
+    quizBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
+    question: { fontSize: 18, fontWeight: '700', color: Colors.text, lineHeight: 26, marginBottom: 20 },
+    oxRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
+    oxBtn: {
+      flex: 1, aspectRatio: 1, borderRadius: 16, borderWidth: 2,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    oxText: { fontSize: 56, fontWeight: '900' },
+    optionBtn: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      backgroundColor: theme.bgCard, borderRadius: 12, borderWidth: 1.5,
+      padding: 14,
+    },
+    optionNum: {
+      width: 28, height: 28, borderRadius: 14,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    optionNumText: { color: theme.bgCard, fontSize: 13, fontWeight: '800' },
+    optionText: { flex: 1, fontSize: 15, color: Colors.text },
+    explanationBox: {
+      marginTop: 20, backgroundColor: '#F8F9FA', borderRadius: 12,
+      padding: 16, borderLeftWidth: 4,
+    },
+    explanationTitle: { fontSize: 15, fontWeight: '800', color: Colors.text, marginBottom: 6 },
+    explanationText: { fontSize: 14, lineHeight: 22, color: Colors.textSub },
+    resultMsgBox: {
+      backgroundColor: '#F0F7FF', borderRadius: 12, padding: 16,
+      marginVertical: 16, width: '100%',
+    },
+    resultMsg: { fontSize: 15, color: Colors.primary, textAlign: 'center', fontWeight: '600' },
+    rewardBox: {
+      backgroundColor: '#EBF5FF', borderRadius: 12, padding: 16,
+      alignItems: 'center', marginTop: 12, width: '100%',
+    },
+  });
 
   if (phase === 'lesson') {
     return (
@@ -183,10 +246,10 @@ export default function LessonScreen() {
               {(['O', 'X'] as const).map(opt => {
                 const sel = selected === opt;
                 const correct = currentQuiz.answer === opt;
-                let bg = '#fff';
+                let bg = theme.bgCard;
                 if (answered) {
                   if (correct) bg = '#E8FFF0';
-                  else if (sel) bg = '#FFF0F0';
+                  else if (sel) bg = theme.redLight;
                 }
                 return (
                   <TouchableOpacity
@@ -211,11 +274,11 @@ export default function LessonScreen() {
               {(currentQuiz.options ?? []).map(opt => {
                 const sel = selected === opt.id;
                 const correct = currentQuiz.answer === opt.id;
-                let bg = '#fff';
+                let bg = theme.bgCard;
                 let borderColor = Colors.border;
                 if (answered) {
                   if (correct) { bg = '#E8FFF0'; borderColor = Colors.green; }
-                  else if (sel) { bg = '#FFF0F0'; borderColor = Colors.red; }
+                  else if (sel) { bg = theme.redLight; borderColor = Colors.red; }
                 } else if (sel) {
                   borderColor = color;
                 }
@@ -276,7 +339,7 @@ export default function LessonScreen() {
       <Text style={[Typography.body1, { color: Colors.textSub, marginTop: 4 }]}>정답률 {pct}%</Text>
       <View style={styles.rewardBox}>
         <Text style={{ fontSize: 13, color: '#8E8E93' }}>퀴즈 보상</Text>
-        <Text style={{ fontSize: 24, fontWeight: '800', color: '#0066FF' }}>
+        <Text style={{ fontSize: 24, fontWeight: '800', color: theme.primary }}>
           +₩{calculateReward(score, total).toLocaleString()}
         </Text>
       </View>
@@ -301,63 +364,3 @@ export default function LessonScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingBottom: 16,
-  },
-  backBtn: { padding: 4 },
-  backText: { fontSize: 22, color: '#fff', fontWeight: '600' },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
-  progressBg: { height: 4, backgroundColor: Colors.border },
-  progressFill: { height: '100%' },
-  content: { padding: 20, paddingBottom: 100 },
-  pageEmoji: { fontSize: 52, textAlign: 'center', marginBottom: 12 },
-  pageTitle: { fontSize: 22, fontWeight: '800', color: Colors.text, textAlign: 'center', marginBottom: 16 },
-  pageContent: { fontSize: 16, lineHeight: 26, color: Colors.text },
-  bottomBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: 16, paddingBottom: 30, backgroundColor: '#fff',
-    borderTopWidth: 1, borderTopColor: Colors.border,
-  },
-  quizBadge: {
-    alignSelf: 'flex-start', backgroundColor: '#EEF6FF',
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 16,
-  },
-  quizBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
-  question: { fontSize: 18, fontWeight: '700', color: Colors.text, lineHeight: 26, marginBottom: 20 },
-  oxRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
-  oxBtn: {
-    flex: 1, aspectRatio: 1, borderRadius: 16, borderWidth: 2,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  oxText: { fontSize: 56, fontWeight: '900' },
-  optionBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5,
-    padding: 14,
-  },
-  optionNum: {
-    width: 28, height: 28, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  optionNumText: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  optionText: { flex: 1, fontSize: 15, color: Colors.text },
-  explanationBox: {
-    marginTop: 20, backgroundColor: '#F8F9FA', borderRadius: 12,
-    padding: 16, borderLeftWidth: 4,
-  },
-  explanationTitle: { fontSize: 15, fontWeight: '800', color: Colors.text, marginBottom: 6 },
-  explanationText: { fontSize: 14, lineHeight: 22, color: Colors.textSub },
-  resultMsgBox: {
-    backgroundColor: '#F0F7FF', borderRadius: 12, padding: 16,
-    marginVertical: 16, width: '100%',
-  },
-  resultMsg: { fontSize: 15, color: Colors.primary, textAlign: 'center', fontWeight: '600' },
-  rewardBox: {
-    backgroundColor: '#EBF5FF', borderRadius: 12, padding: 16,
-    alignItems: 'center', marginTop: 12, width: '100%',
-  },
-});

@@ -9,21 +9,24 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { createPost, getUserProfile, type PostCategory } from '../../lib/firestoreService';
 import { STOCKS } from '../../store/appStore';
 
 const POST_CATEGORIES: Exclude<PostCategory, '전체'>[] = ['투자인증', '분석', '질문', '자유'];
 
-const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  투자인증: { bg: '#FFF0F1', text: Colors.green,   border: Colors.green },
-  분석:     { bg: '#EBF2FF', text: Colors.red,     border: Colors.red },
-  질문:     { bg: '#F0F4FF', text: Colors.primary, border: Colors.primary },
-  자유:     { bg: '#F5F5F5', text: Colors.textSub, border: Colors.border },
-};
 
 export default function CreatePostScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
+
+  const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+    투자인증: { bg: '#FFF0F1', text: Colors.green,   border: Colors.green },
+    분석:     { bg: theme.primaryLight, text: Colors.red, border: Colors.red },
+    질문:     { bg: '#F0F4FF', text: Colors.primary, border: Colors.primary },
+    자유:     { bg: theme.bg, text: Colors.textSub, border: Colors.border },
+  };
 
   const [selectedCategory, setSelectedCategory] = useState<Exclude<PostCategory, '전체'> | null>(null);
   const [content, setContent] = useState('');
@@ -205,7 +208,7 @@ export default function CreatePostScreen() {
             {selectedTickers.length > 0 && (
               <View style={styles.selectedTickersRow}>
                 {selectedTickers.map((ticker) => (
-                  <View key={ticker} style={styles.selectedChip}>
+                  <View key={ticker} style={[styles.selectedChip, { backgroundColor: theme.primaryLight }]}>
                     <Text style={styles.selectedChipText}>#{ticker}</Text>
                     <TouchableOpacity
                       onPress={() => removeTicker(ticker)}
@@ -229,9 +232,9 @@ export default function CreatePostScreen() {
             activeOpacity={0.85}
           >
             {submitting ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={theme.bgCard} />
             ) : (
-              <Text style={styles.submitButtonText}>게시하기</Text>
+              <Text style={[styles.submitButtonText, { color: theme.bgCard }]}>게시하기</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -390,7 +393,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#EBF2FF',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 20,
@@ -422,6 +424,5 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
 });

@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import { subscribeGlobalStats, type GlobalStats } from '../lib/adminService';
 import { getAllUserProfiles, getAllPortfolios } from '../lib/firestoreService';
 import { seedCommunityPosts } from '../lib/seedCommunity';
@@ -34,6 +35,7 @@ const QUICK_MENUS = [
 ] as const;
 
 export default function AdminScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
   const [stats, setStats] = useState<GlobalStats | null>(null);
@@ -98,13 +100,117 @@ export default function AdminScreen() {
   };
 
   const statCards = [
-    { emoji: '👥', label: '전체 유저 수', value: `${userCount}명`, color: '#0066FF' },
-    { emoji: '🟢', label: '현재 접속자', value: `${stats?.activeToday ?? 0}명`, color: '#34C759' },
+    { emoji: '👥', label: '전체 유저 수', value: `${userCount}명`, color: theme.primary },
+    { emoji: '🟢', label: '현재 접속자', value: `${stats?.activeToday ?? 0}명`, color: theme.green },
     { emoji: '📈', label: '오늘 거래 횟수', value: `${stats?.totalTrades ?? tradeCount}건`, color: '#FF9500' },
     { emoji: '💰', label: '오늘 총 거래금액', value: `₩${Math.round(stats?.totalTradeAmount ?? tradeAmount).toLocaleString()}`, color: '#FF9500' },
     { emoji: '📚', label: '오늘 학습 완료', value: `${stats?.totalLessonsCompleted ?? 0}건`, color: '#5856D6' },
     { emoji: '🚨', label: '미처리 신고', value: `${stats?.pendingReports ?? 0}건`, color: '#FF3B30' },
   ];
+
+  const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: Colors.bg },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: theme.bgCard,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.text },
+    headerBadge: {
+      backgroundColor: '#EAF4FF',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 20,
+    },
+    headerBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
+    scrollContent: { padding: 16, paddingBottom: 40 },
+    sectionTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: Colors.text,
+      marginBottom: 10,
+      marginTop: 8,
+    },
+    // Stats grid
+    statsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginBottom: 16,
+    },
+    statCard: {
+      width: '47%',
+      backgroundColor: theme.bgCard,
+      borderRadius: 16,
+      padding: 14,
+      borderLeftWidth: 4,
+      shadowColor: theme.text,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    statEmoji: { fontSize: 22, marginBottom: 6 },
+    statValue: { fontSize: 20, fontWeight: '700', marginBottom: 2 },
+    statLabel: { fontSize: 11, color: Colors.textSub, fontWeight: '500' },
+    // Quick menu grid
+    quickGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginBottom: 16,
+    },
+    quickCard: {
+      width: '30%',
+      backgroundColor: theme.bgCard,
+      borderRadius: 14,
+      paddingVertical: 16,
+      paddingHorizontal: 8,
+      alignItems: 'center',
+      gap: 6,
+      shadowColor: theme.text,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    quickEmoji: { fontSize: 24 },
+    quickLabel: { fontSize: 11, fontWeight: '600', color: Colors.text, textAlign: 'center' },
+    // Activity feed
+    activityCard: {
+      backgroundColor: theme.bgCard,
+      borderRadius: 16,
+      padding: 4,
+      shadowColor: theme.text,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    activityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      gap: 10,
+    },
+    activityIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    activityText: { flex: 1, fontSize: 13, color: Colors.text, fontWeight: '500' },
+    activityTime: { fontSize: 11, color: Colors.textSub },
+    activityDivider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 14 },
+  });
 
   if (loading) {
     return (
@@ -183,7 +289,7 @@ export default function AdminScreen() {
           onPress={seedSamplePosts}
           disabled={isSeeding}
           style={{
-            backgroundColor: isSeeding ? '#A0D8A8' : '#34C759',
+            backgroundColor: isSeeding ? '#A0D8A8' : theme.green,
             borderRadius: 12,
             padding: 16,
             marginTop: 16,
@@ -191,7 +297,7 @@ export default function AdminScreen() {
           }}
           activeOpacity={0.7}
         >
-          <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>
+          <Text style={{ color: theme.bgCard, fontWeight: 'bold', fontSize: 15 }}>
             {isSeeding ? '생성 중...' : '💬 커뮤니티 샘플 글 생성 (1회만)'}
           </Text>
         </TouchableOpacity>
@@ -199,107 +305,3 @@ export default function AdminScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.text },
-  headerBadge: {
-    backgroundColor: '#EAF4FF',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  headerBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
-  scrollContent: { padding: 16, paddingBottom: 40 },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 10,
-    marginTop: 8,
-  },
-  // Stats grid
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 16,
-  },
-  statCard: {
-    width: '47%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statEmoji: { fontSize: 22, marginBottom: 6 },
-  statValue: { fontSize: 20, fontWeight: '700', marginBottom: 2 },
-  statLabel: { fontSize: 11, color: Colors.textSub, fontWeight: '500' },
-  // Quick menu grid
-  quickGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 16,
-  },
-  quickCard: {
-    width: '30%',
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  quickEmoji: { fontSize: 24 },
-  quickLabel: { fontSize: 11, fontWeight: '600', color: Colors.text, textAlign: 'center' },
-  // Activity feed
-  activityCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  activityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10,
-  },
-  activityIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activityText: { flex: 1, fontSize: 13, color: Colors.text, fontWeight: '500' },
-  activityTime: { fontSize: 11, color: Colors.textSub },
-  activityDivider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 14 },
-});

@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore, STOCKS } from '../store/appStore';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Typography, Card, ReturnBadge, Badge, XpBar, Hearts, Streak } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 type MyTab = 'portfolio' | 'trades' | 'achievements';
 
@@ -21,6 +22,7 @@ const ACHIEVEMENTS = [
 ];
 
 export default function MyPageScreen() {
+  const { theme, isDark } = useTheme();
   const { cash, holdings, trades, xp, level, streak, hearts, completedLessons, floPoints, achievements, getTotalValue, getReturnRate } = useAppStore();
   const { user: currentUser, logout } = useAuth();
   const [tab, setTab] = useState<MyTab>('portfolio');
@@ -41,10 +43,10 @@ export default function MyPageScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.bgCard }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#0066FF" />
-          <Text style={{ fontSize: 14, color: '#8B95A1', marginTop: 12 }}>내 정보를 불러오는 중...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={{ fontSize: 14, color: theme.textSecondary, marginTop: 12 }}>내 정보를 불러오는 중...</Text>
         </View>
       </SafeAreaView>
     );
@@ -74,8 +76,67 @@ export default function MyPageScreen() {
   const safeCompletedLessons = completedLessons ?? [];
   const safeAchievements = achievements ?? [];
 
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.bg },
+    header: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      paddingHorizontal: 16, paddingBottom: 14,
+      backgroundColor: theme.bgCard, borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.text },
+    headerSub: { fontSize: 12, color: Colors.textSub, marginTop: 2 },
+    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    logoutBtn: { backgroundColor: Colors.card, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+    logoutText: { fontSize: 11, fontWeight: '600', color: Colors.textSub },
+    profileCard: {
+      flexDirection: 'row', alignItems: 'center', gap: 14,
+      backgroundColor: theme.bgCard, margin: 16, borderRadius: 16, padding: 16,
+      shadowColor: theme.text, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    },
+    avatarBox: { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+    avatarText: { color: theme.bgCard, fontSize: 20, fontWeight: '700' },
+    levelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+    levelText: { fontSize: 16, fontWeight: '700', color: Colors.primary },
+    assetCard: {
+      backgroundColor: Colors.navy, marginHorizontal: 16, borderRadius: 16, padding: 20, gap: 16,
+      shadowColor: theme.text, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 6,
+    },
+    assetMain: { gap: 6 },
+    assetLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
+    assetValue: { color: theme.bgCard, fontSize: 28, fontWeight: '700', fontFamily: 'Courier', letterSpacing: -0.5 },
+    assetRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    assetProfit: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
+    assetGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    assetItem: { width: '45%' },
+    assetItemLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
+    assetItemValue: { color: theme.bgCard, fontSize: 13, fontWeight: '700', marginTop: 2 },
+    tabBar: {
+      flexDirection: 'row', backgroundColor: theme.bgCard,
+      marginHorizontal: 16, marginTop: 16, borderRadius: 12, padding: 4,
+    },
+    tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
+    tabBtnActive: { backgroundColor: Colors.primary },
+    tabText: { fontSize: 12, fontWeight: '600', color: Colors.textSub },
+    tabTextActive: { color: theme.bgCard },
+    tabContent: { padding: 16, gap: 8 },
+    holdingCard: { padding: 14 },
+    holdingTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+    holdingLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    holdingStats: { flexDirection: 'row', justifyContent: 'space-between' },
+    tradeCard: { padding: 12 },
+    tradeTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+    tradeLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    tradeStats: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    achCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+    achCardLocked: { opacity: 0.6 },
+    achEmoji: { fontSize: 28 },
+    empty: { alignItems: 'center', paddingVertical: 40, gap: 8 },
+    emptyEmoji: { fontSize: 40 },
+    emptyText: { fontSize: 15, color: Colors.textSub, fontWeight: '500' },
+  });
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bgCard }}>
     <View style={styles.container}>
       {/* 헤더 */}
       <View style={[styles.header, { paddingTop: 12 }]}>
@@ -266,61 +327,3 @@ export default function MyPageScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingBottom: 14,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.text },
-  headerSub: { fontSize: 12, color: Colors.textSub, marginTop: 2 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logoutBtn: { backgroundColor: Colors.card, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  logoutText: { fontSize: 11, fontWeight: '600', color: Colors.textSub },
-  profileCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: '#fff', margin: 16, borderRadius: 16, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-  },
-  avatarBox: { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontSize: 20, fontWeight: '700' },
-  levelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  levelText: { fontSize: 16, fontWeight: '700', color: Colors.primary },
-  assetCard: {
-    backgroundColor: Colors.navy, marginHorizontal: 16, borderRadius: 16, padding: 20, gap: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 6,
-  },
-  assetMain: { gap: 6 },
-  assetLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
-  assetValue: { color: '#fff', fontSize: 28, fontWeight: '700', fontFamily: 'Courier', letterSpacing: -0.5 },
-  assetRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  assetProfit: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
-  assetGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  assetItem: { width: '45%' },
-  assetItemLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
-  assetItemValue: { color: '#fff', fontSize: 13, fontWeight: '700', marginTop: 2 },
-  tabBar: {
-    flexDirection: 'row', backgroundColor: '#fff',
-    marginHorizontal: 16, marginTop: 16, borderRadius: 12, padding: 4,
-  },
-  tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
-  tabBtnActive: { backgroundColor: Colors.primary },
-  tabText: { fontSize: 12, fontWeight: '600', color: Colors.textSub },
-  tabTextActive: { color: '#fff' },
-  tabContent: { padding: 16, gap: 8 },
-  holdingCard: { padding: 14 },
-  holdingTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  holdingLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  holdingStats: { flexDirection: 'row', justifyContent: 'space-between' },
-  tradeCard: { padding: 12 },
-  tradeTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  tradeLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  tradeStats: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  achCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  achCardLocked: { opacity: 0.6 },
-  achEmoji: { fontSize: 28 },
-  empty: { alignItems: 'center', paddingVertical: 40, gap: 8 },
-  emptyEmoji: { fontSize: 40 },
-  emptyText: { fontSize: 15, color: Colors.textSub, fontWeight: '500' },
-});

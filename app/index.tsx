@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import RootNavigator from '../navigation/RootNavigator';
 import { OfflineBanner } from '../hooks/useNetworkStatus';
+import { useTheme } from '../context/ThemeContext';
 
 let checkVersion: () => void = () => {};
 try {
@@ -47,6 +48,7 @@ function BrandedLoading() {
 }
 
 export default function AppIndex() {
+  const { isDark } = useTheme();
   const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
@@ -106,7 +108,7 @@ export default function AppIndex() {
     <View style={{ flex: 1 }}>
       <NavigationIndependentTree>
         <NavigationContainer>
-          <StatusBar style="dark" translucent backgroundColor="transparent" />
+          <StatusBar style={isDark ? 'light' : 'dark'} translucent backgroundColor="transparent" />
           <OfflineBanner />
           <RootNavigator />
         </NavigationContainer>

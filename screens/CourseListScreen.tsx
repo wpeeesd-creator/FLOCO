@@ -8,6 +8,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import {
   learningContent, CATEGORY_META,
   type CategoryId, type DuoLevel,
@@ -15,6 +16,7 @@ import {
 import { getLearningData } from '../lib/learningService';
 
 export default function CourseListScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user } = useAuth();
@@ -42,8 +44,8 @@ export default function CourseListScreen() {
     const isCompleted = completedLessons.includes(`${categoryId}_${level.id}`);
     const isLocked = index > 0 && !completedLessons.includes(`${categoryId}_${levels[index - 1].id}`);
 
-    const cardBorderColor = isCompleted ? '#34C759' : isLocked ? '#E5E8EB' : borderColor;
-    const iconBg = isCompleted ? '#E8FFF0' : isLocked ? '#F2F4F6' : (meta?.color?.[0] ?? Colors.primary) + '20';
+    const cardBorderColor = isCompleted ? theme.green : isLocked ? theme.borderStrong : borderColor;
+    const iconBg = isCompleted ? '#E8FFF0' : isLocked ? theme.bg : (meta?.color?.[0] ?? Colors.primary) + '20';
 
     return (
       <TouchableOpacity
@@ -80,7 +82,7 @@ export default function CourseListScreen() {
                 style={[
                   styles.progressBarFill,
                   {
-                    backgroundColor: isCompleted ? '#34C759' : isLocked ? '#E5E8EB' : (meta?.color?.[0] ?? Colors.primary),
+                    backgroundColor: isCompleted ? theme.green : isLocked ? theme.borderStrong : (meta?.color?.[0] ?? Colors.primary),
                     width: isCompleted ? '100%' : '0%',
                   },
                 ]}
@@ -88,12 +90,50 @@ export default function CourseListScreen() {
             </View>
           </View>
           {!isLocked && (
-            <Ionicons name="chevron-forward" size={20} color={isCompleted ? '#34C759' : (meta?.color?.[0] ?? Colors.primary)} />
+            <Ionicons name="chevron-forward" size={20} color={isCompleted ? theme.green : (meta?.color?.[0] ?? Colors.primary)} />
           )}
         </View>
       </TouchableOpacity>
     );
   }
+
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.bg },
+    header: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: '#F0F2F5',
+    },
+    backBtn: { padding: 4 },
+    headerEmoji: { fontSize: 22 },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, flex: 1 },
+    list: { padding: 16, gap: 12 },
+    card: {
+      backgroundColor: theme.bgCard,
+      borderRadius: 20,
+      borderLeftWidth: 4,
+      padding: 16,
+      shadowColor: theme.text,
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    cardLocked: { opacity: 0.6 },
+    cardRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    iconCircle: {
+      width: 56, height: 56, borderRadius: 28,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    iconEmoji: { fontSize: 24 },
+    cardContent: { flex: 1 },
+    levelTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+    lockedText: { color: Colors.textMuted ?? '#9CA3AF' },
+    levelSub: { fontSize: 13, color: Colors.textSub ?? '#6B7280', marginTop: 2 },
+    progressBarBg: {
+      height: 4, backgroundColor: '#F0F2F5', borderRadius: 2, marginTop: 8, overflow: 'hidden',
+    },
+    progressBarFill: { height: 4, borderRadius: 2 },
+  });
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -109,7 +149,7 @@ export default function CourseListScreen() {
       {loading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={{ fontSize: 14, color: '#8B95A1', marginTop: 12 }}>강좌를 불러오는 중...</Text>
+          <Text style={{ fontSize: 14, color: theme.textSecondary, marginTop: 12 }}>강좌를 불러오는 중...</Text>
         </View>
       ) : (
         <FlatList
@@ -123,40 +163,3 @@ export default function CourseListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#F0F2F5',
-  },
-  backBtn: { padding: 4 },
-  headerEmoji: { fontSize: 22 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, flex: 1 },
-  list: { padding: 16, gap: 12 },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    borderLeftWidth: 4,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  cardLocked: { opacity: 0.6 },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  iconCircle: {
-    width: 56, height: 56, borderRadius: 28,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  iconEmoji: { fontSize: 24 },
-  cardContent: { flex: 1 },
-  levelTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
-  lockedText: { color: Colors.textMuted ?? '#9CA3AF' },
-  levelSub: { fontSize: 13, color: Colors.textSub ?? '#6B7280', marginTop: 2 },
-  progressBarBg: {
-    height: 4, backgroundColor: '#F0F2F5', borderRadius: 2, marginTop: 8, overflow: 'hidden',
-  },
-  progressBarFill: { height: 4, borderRadius: 2 },
-});

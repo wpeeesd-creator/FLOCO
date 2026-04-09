@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppStore } from '../store/appStore';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 
 // ── 배지 정의 ──────────────────────────────────────────────────────────────
 interface BadgeDef {
@@ -106,6 +107,7 @@ export const BADGE_DEFINITIONS: BadgeDef[] = [
 
 // ── 컴포넌트 ──────────────────────────────────────────────────────────────
 export default function BadgeScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const { holdings, trades, completedLessons, streak, getTotalValue, getReturnRate } = useAppStore();
 
@@ -165,8 +167,9 @@ export default function BadgeScreen() {
 
 // ── 배지 카드 ─────────────────────────────────────────────────────────────
 function BadgeCard({ badge, earned }: { badge: BadgeDef; earned: boolean }) {
+  const { theme } = useTheme();
   return (
-    <View style={[styles.badgeCard, !earned && styles.badgeCardLocked]}>
+    <View style={[styles.badgeCard, { shadowColor: theme.text }, !earned && styles.badgeCardLocked]}>
       <Text style={styles.badgeEmoji}>{badge.emoji}</Text>
       <Text style={styles.badgeTitle} numberOfLines={1}>{badge.title}</Text>
       <Text style={styles.badgeDesc} numberOfLines={2}>{badge.description}</Text>
@@ -230,7 +233,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },

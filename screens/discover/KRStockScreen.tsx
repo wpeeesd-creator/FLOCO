@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import StockLogo from '../../components/StockLogo';
 import { useWishlist } from '../../hooks/useWishlist';
+import { useTheme } from '../../context/ThemeContext';
 
 // ── 섹터 ──────────────────────────────────
 
@@ -70,6 +71,7 @@ const INDICES = [
 // ── 컴포넌트 ──────────────────────────────
 
 export default function KRStockScreen() {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const [sector, setSector] = useState<Sector>('전체');
   const [refreshing, setRefreshing] = useState(false);
@@ -84,8 +86,56 @@ export default function KRStockScreen() {
     ? KR_STOCKS
     : KR_STOCKS.filter(s => s.sector === sector);
 
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.bgCard },
+    header: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
+    },
+    backBtn: { padding: 4 },
+    backText: { fontSize: 22, color: theme.primary, fontWeight: '600' },
+    headerTitle: { fontSize: 17, fontWeight: '700', color: '#191919' },
+    descBox: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
+    descTitle: { fontSize: 22, fontWeight: '800', color: '#191919', marginBottom: 6 },
+    descText: { fontSize: 14, color: '#8E8E93', lineHeight: 20 },
+    indexRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
+    indexCard: { borderRadius: 14, padding: 16, width: 150, gap: 6 },
+    indexLabel: { fontSize: 13, fontWeight: '600', color: '#191919' },
+    indexValue: { fontSize: 22, fontWeight: '800', color: '#191919', fontFamily: 'Courier' },
+    indexChange: { fontSize: 14, fontWeight: '700' },
+    sectorRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 6 },
+    sectorBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F8F9FA' },
+    sectorBtnActive: { backgroundColor: theme.primary },
+    sectorText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
+    sectorTextActive: { color: theme.bgCard, fontWeight: '700' },
+    countRow: { paddingHorizontal: 20, paddingBottom: 8 },
+    countText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
+    listCard: {
+      marginHorizontal: 16, backgroundColor: theme.bgCard, borderRadius: 16,
+      overflow: 'hidden', borderWidth: 1, borderColor: '#F2F2F7',
+    },
+    stockRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14 },
+    stockBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
+    logoCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+    stockName: { fontSize: 15, fontWeight: '700', color: '#191919' },
+    stockTicker: { fontSize: 12, color: '#8E8E93', marginTop: 2 },
+    stockPrice: { fontSize: 15, fontWeight: '700', color: '#191919', fontFamily: 'Courier' },
+    changeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginTop: 3 },
+    changeText: { fontSize: 12, fontWeight: '700' },
+    eduBox: {
+      marginHorizontal: 16, marginTop: 24, backgroundColor: '#F8FAFC',
+      borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#E2E8F0',
+    },
+    eduTitle: { fontSize: 17, fontWeight: '800', color: '#191919', marginBottom: 4 },
+    eduDesc: { fontSize: 13, color: '#8E8E93', marginBottom: 16, lineHeight: 18 },
+    eduItem: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+    eduBullet: { fontSize: 16, marginTop: 1 },
+    eduItemTitle: { fontSize: 14, fontWeight: '700', color: '#191919', marginBottom: 2 },
+    eduItemText: { fontSize: 13, color: '#64748B', lineHeight: 18 },
+  });
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bgCard }}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -99,7 +149,7 @@ export default function KRStockScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 30 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0066FF" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
         >
           {/* Description */}
           <View style={styles.descBox}>
@@ -218,58 +268,3 @@ export default function KRStockScreen() {
   );
 }
 
-// ── 스타일 ──────────────────────────────────
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F2F2F7',
-  },
-  backBtn: { padding: 4 },
-  backText: { fontSize: 22, color: '#0066FF', fontWeight: '600' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#191919' },
-
-  descBox: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  descTitle: { fontSize: 22, fontWeight: '800', color: '#191919', marginBottom: 6 },
-  descText: { fontSize: 14, color: '#8E8E93', lineHeight: 20 },
-
-  indexRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
-  indexCard: { borderRadius: 14, padding: 16, width: 150, gap: 6 },
-  indexLabel: { fontSize: 13, fontWeight: '600', color: '#191919' },
-  indexValue: { fontSize: 22, fontWeight: '800', color: '#191919', fontFamily: 'Courier' },
-  indexChange: { fontSize: 14, fontWeight: '700' },
-
-  sectorRow: { paddingHorizontal: 16, paddingBottom: 8, gap: 6 },
-  sectorBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F8F9FA' },
-  sectorBtnActive: { backgroundColor: '#0066FF' },
-  sectorText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
-  sectorTextActive: { color: '#FFFFFF', fontWeight: '700' },
-
-  countRow: { paddingHorizontal: 20, paddingBottom: 8 },
-  countText: { fontSize: 13, color: '#8E8E93', fontWeight: '500' },
-
-  listCard: {
-    marginHorizontal: 16, backgroundColor: '#FFFFFF', borderRadius: 16,
-    overflow: 'hidden', borderWidth: 1, borderColor: '#F2F2F7',
-  },
-  stockRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14 },
-  stockBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
-  logoCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  stockName: { fontSize: 15, fontWeight: '700', color: '#191919' },
-  stockTicker: { fontSize: 12, color: '#8E8E93', marginTop: 2 },
-  stockPrice: { fontSize: 15, fontWeight: '700', color: '#191919', fontFamily: 'Courier' },
-  changeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginTop: 3 },
-  changeText: { fontSize: 12, fontWeight: '700' },
-
-  eduBox: {
-    marginHorizontal: 16, marginTop: 24, backgroundColor: '#F8FAFC',
-    borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#E2E8F0',
-  },
-  eduTitle: { fontSize: 17, fontWeight: '800', color: '#191919', marginBottom: 4 },
-  eduDesc: { fontSize: 13, color: '#8E8E93', marginBottom: 16, lineHeight: 18 },
-  eduItem: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  eduBullet: { fontSize: 16, marginTop: 1 },
-  eduItemTitle: { fontSize: 14, fontWeight: '700', color: '#191919', marginBottom: 2 },
-  eduItemText: { fontSize: 13, color: '#64748B', lineHeight: 18 },
-});

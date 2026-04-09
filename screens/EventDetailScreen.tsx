@@ -15,6 +15,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import { joinEvent, type AppEvent } from '../lib/adminService';
 
 // ── 타입 ──────────────────────────────────────────
@@ -57,6 +58,7 @@ const RANK_MEDALS = ['🥇', '🥈', '🥉'];
 
 // ── 메인 화면 ─────────────────────────────────────
 export default function EventDetailScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user } = useAuth();
@@ -141,6 +143,247 @@ export default function EventDetailScreen() {
       setIsJoined(false);
     }
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: Colors.bg,
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 16,
+    },
+    errorText: {
+      fontSize: 16,
+      color: Colors.textSub,
+    },
+    backBtnLarge: {
+      backgroundColor: Colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    backBtnLargeText: {
+      color: theme.bgCard,
+      fontWeight: '700',
+      fontSize: 15,
+    },
+    // 헤더
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: Colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    backBtn: {
+      padding: 4,
+    },
+    headerTitle: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '700',
+      color: Colors.text,
+      textAlign: 'center',
+      marginHorizontal: 8,
+    },
+    headerRight: {
+      width: 32,
+    },
+    scrollContent: {
+      paddingBottom: 40,
+    },
+    // 내 순위 카드
+    myRankCard: {
+      backgroundColor: Colors.primary,
+      borderRadius: 20,
+      margin: 16,
+      padding: 24,
+      alignItems: 'center',
+      gap: 6,
+    },
+    myRankLabel: {
+      fontSize: 13,
+      color: 'rgba(255,255,255,0.6)',
+      fontWeight: '600',
+    },
+    myRankRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 6,
+    },
+    myRankNumber: {
+      fontSize: 40,
+      fontWeight: '700',
+      color: theme.bgCard,
+      lineHeight: 48,
+    },
+    myRankTotal: {
+      fontSize: 16,
+      color: 'rgba(255,255,255,0.7)',
+      marginBottom: 6,
+    },
+    myRankDeadline: {
+      fontSize: 13,
+      color: 'rgba(255,255,255,0.5)',
+    },
+    // 이벤트 정보 카드
+    infoCard: {
+      backgroundColor: Colors.card,
+      borderRadius: 20,
+      marginHorizontal: 16,
+      marginBottom: 12,
+      padding: 20,
+      gap: 12,
+    },
+    infoDesc: {
+      fontSize: 14,
+      color: Colors.textSub,
+      lineHeight: 22,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    typeBadge: {
+      backgroundColor: Colors.bg,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 20,
+    },
+    typeBadgeText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: Colors.primary,
+    },
+    infoPeriod: {
+      fontSize: 13,
+      color: Colors.textSub,
+    },
+    // 보상 카드
+    rewardCard: {
+      backgroundColor: Colors.card,
+      borderRadius: 20,
+      marginHorizontal: 16,
+      marginBottom: 12,
+      padding: 20,
+      gap: 10,
+    },
+    sectionTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: Colors.text,
+      marginBottom: 4,
+    },
+    rewardRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border,
+    },
+    rewardEmoji: {
+      fontSize: 20,
+      width: 28,
+      textAlign: 'center',
+    },
+    rewardRankText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: Colors.textSub,
+      width: 28,
+    },
+    rewardAmount: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: '700',
+      color: Colors.text,
+      textAlign: 'right',
+    },
+    // 순위표
+    leaderboardHeader: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: Colors.text,
+      marginHorizontal: 16,
+      marginTop: 8,
+      marginBottom: 10,
+    },
+    loadingContainer: {
+      paddingVertical: 32,
+      alignItems: 'center',
+    },
+    emptyLeaderboard: {
+      paddingVertical: 32,
+      alignItems: 'center',
+    },
+    emptyText: {
+      fontSize: 14,
+      color: Colors.textMuted,
+    },
+    leaderboardRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: Colors.card,
+      borderRadius: 16,
+      marginHorizontal: 16,
+      marginBottom: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 10,
+    },
+    leaderboardRowMine: {
+      borderWidth: 2,
+      borderColor: Colors.primary,
+    },
+    leaderboardRank: {
+      fontSize: 18,
+      width: 32,
+      textAlign: 'center',
+    },
+    leaderboardEmoji: {
+      fontSize: 20,
+    },
+    leaderboardName: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: '600',
+      color: Colors.text,
+    },
+    leaderboardScore: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: Colors.primary,
+    },
+    // 참여 버튼
+    joinBtnContainer: {
+      marginHorizontal: 16,
+      marginTop: 20,
+    },
+    joinBtn: {
+      backgroundColor: Colors.primary,
+      borderRadius: 16,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    joinBtnJoined: {
+      backgroundColor: Colors.border,
+    },
+    joinBtnText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.bgCard,
+    },
+    joinBtnTextJoined: {
+      color: Colors.textSub,
+    },
+  });
 
   if (!event) {
     return (
@@ -267,244 +510,3 @@ export default function EventDetailScreen() {
   );
 }
 
-// ── 스타일 ────────────────────────────────────────
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
-  errorText: {
-    fontSize: 16,
-    color: Colors.textSub,
-  },
-  backBtnLarge: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  backBtnLargeText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  // 헤더
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  backBtn: {
-    padding: 4,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-    textAlign: 'center',
-    marginHorizontal: 8,
-  },
-  headerRight: {
-    width: 32,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  // 내 순위 카드
-  myRankCard: {
-    backgroundColor: Colors.primary,
-    borderRadius: 20,
-    margin: 16,
-    padding: 24,
-    alignItems: 'center',
-    gap: 6,
-  },
-  myRankLabel: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.6)',
-    fontWeight: '600',
-  },
-  myRankRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 6,
-  },
-  myRankNumber: {
-    fontSize: 40,
-    fontWeight: '700',
-    color: '#fff',
-    lineHeight: 48,
-  },
-  myRankTotal: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.7)',
-    marginBottom: 6,
-  },
-  myRankDeadline: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.5)',
-  },
-  // 이벤트 정보 카드
-  infoCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 20,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 20,
-    gap: 12,
-  },
-  infoDesc: {
-    fontSize: 14,
-    color: Colors.textSub,
-    lineHeight: 22,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  typeBadge: {
-    backgroundColor: Colors.bg,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  typeBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  infoPeriod: {
-    fontSize: 13,
-    color: Colors.textSub,
-  },
-  // 보상 카드
-  rewardCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 20,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 20,
-    gap: 10,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  rewardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  rewardEmoji: {
-    fontSize: 20,
-    width: 28,
-    textAlign: 'center',
-  },
-  rewardRankText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textSub,
-    width: 28,
-  },
-  rewardAmount: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
-    textAlign: 'right',
-  },
-  // 순위표
-  leaderboardHeader: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 10,
-  },
-  loadingContainer: {
-    paddingVertical: 32,
-    alignItems: 'center',
-  },
-  emptyLeaderboard: {
-    paddingVertical: 32,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: Colors.textMuted,
-  },
-  leaderboardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 10,
-  },
-  leaderboardRowMine: {
-    borderWidth: 2,
-    borderColor: Colors.primary,
-  },
-  leaderboardRank: {
-    fontSize: 18,
-    width: 32,
-    textAlign: 'center',
-  },
-  leaderboardEmoji: {
-    fontSize: 20,
-  },
-  leaderboardName: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  leaderboardScore: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  // 참여 버튼
-  joinBtnContainer: {
-    marginHorizontal: 16,
-    marginTop: 20,
-  },
-  joinBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  joinBtnJoined: {
-    backgroundColor: Colors.border,
-  },
-  joinBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  joinBtnTextJoined: {
-    color: Colors.textSub,
-  },
-});

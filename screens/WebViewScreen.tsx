@@ -8,8 +8,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
 
 export default function WebViewScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { url, title } = route.params ?? {};
@@ -17,32 +19,32 @@ export default function WebViewScreen() {
 
   if (!url) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: '#8B95A1', fontSize: 15 }}>URL이 없어요</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.bgCard, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: theme.textSecondary, fontSize: 15 }}>URL이 없어요</Text>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 16 }}>
-          <Text style={{ color: '#0066FF', fontSize: 15, fontWeight: '600' }}>돌아가기</Text>
+          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '600' }}>돌아가기</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bgCard }}>
       {/* 헤더 */}
       <View style={{
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: theme.bgCard,
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E8EB',
+        borderBottomColor: theme.borderStrong,
       }}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Ionicons name="close" size={24} color="#191F28" />
+          <Ionicons name="close" size={24} color={theme.text} />
         </TouchableOpacity>
         <Text
           style={{
@@ -50,7 +52,7 @@ export default function WebViewScreen() {
             marginLeft: 12,
             fontSize: 15,
             fontWeight: 'bold',
-            color: '#191F28',
+            color: theme.text,
           }}
           numberOfLines={1}
         >
@@ -60,7 +62,7 @@ export default function WebViewScreen() {
           onPress={() => Linking.openURL(url)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Ionicons name="open-outline" size={22} color="#0066FF" />
+          <Ionicons name="open-outline" size={22} color={theme.primary} />
         </TouchableOpacity>
       </View>
 
@@ -85,10 +87,10 @@ export default function WebViewScreen() {
           bottom: 0,
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.bgCard,
         }}>
-          <ActivityIndicator color="#0066FF" size="large" />
-          <Text style={{ color: '#8B95A1', fontSize: 13, marginTop: 12 }}>
+          <ActivityIndicator color={theme.primary} size="large" />
+          <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 12 }}>
             페이지 로딩 중...
           </Text>
         </View>

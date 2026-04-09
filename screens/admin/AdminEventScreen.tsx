@@ -12,6 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../components/ui';
+import { useTheme } from '../../context/ThemeContext';
 import {
   getEvents, createEvent, deleteEvent,
   type AppEvent, type EventType,
@@ -23,11 +24,6 @@ const TYPE_LABELS: Record<EventType, string> = {
   learning_streak: '학습 스트릭',
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  active: '#34C759',
-  upcoming: '#FF9500',
-  ended: Colors.textSub,
-};
 
 const STATUS_LABELS: Record<string, string> = {
   active: '진행중',
@@ -36,7 +32,14 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function AdminEventScreen() {
+  const { theme } = useTheme();
   const navigation = useNavigation();
+
+  const STATUS_COLORS: Record<string, string> = {
+    active: theme.green,
+    upcoming: '#FF9500',
+    ended: Colors.textSub,
+  };
   const [events, setEvents] = useState<AppEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -158,6 +161,83 @@ export default function AdminEventScreen() {
   const formatDate = (ts: number) => new Date(ts).toLocaleDateString('ko-KR');
 
   const EVENT_TYPES: EventType[] = ['profit_rate', 'trade_count', 'learning_streak'];
+
+  const styles = StyleSheet.create({
+    safe: { flex: 1, backgroundColor: Colors.bg },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.card,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
+    createBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    scroll: { flex: 1 },
+    scrollContent: { padding: 16, gap: 12 },
+    loadingWrap: { paddingVertical: 40, alignItems: 'center' },
+
+    // 생성 폼
+    createForm: {
+      backgroundColor: Colors.card, borderRadius: 12, padding: 16,
+      shadowColor: theme.text, shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+      gap: 4,
+    },
+    formTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 10 },
+    inputLabel: { fontSize: 12, fontWeight: '600', color: Colors.textSub, marginBottom: 4, marginTop: 8 },
+    textInput: {
+      borderWidth: 1, borderColor: Colors.border, borderRadius: 8,
+      paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: Colors.text,
+      backgroundColor: Colors.bg,
+    },
+    textArea: { minHeight: 72, textAlignVertical: 'top' },
+    typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+    typePill: {
+      paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
+      borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.bg,
+    },
+    typePillActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '15' },
+    typePillText: { fontSize: 12, fontWeight: '600', color: Colors.textSub },
+    typePillTextActive: { color: Colors.primary },
+    dateRow: { flexDirection: 'row', gap: 10 },
+    dateField: { flex: 1 },
+    rewardRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+    rewardField: { flex: 1 },
+    rewardRankLabel: { fontSize: 12, fontWeight: '600', color: Colors.text, marginBottom: 4 },
+    createSubmitBtn: {
+      backgroundColor: Colors.primary, borderRadius: 10, paddingVertical: 14,
+      alignItems: 'center', marginTop: 16,
+    },
+    createSubmitText: { color: theme.bgCard, fontSize: 16, fontWeight: '700' },
+
+    // 이벤트 카드
+    eventCard: {
+      backgroundColor: Colors.card, borderRadius: 12, padding: 16,
+      shadowColor: theme.text, shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+      gap: 6,
+    },
+    eventCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+    statusBadgeText: { fontSize: 12, fontWeight: '700' },
+    deleteBtn: { padding: 6 },
+    eventTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+    eventDesc: { fontSize: 13, color: Colors.textSub, lineHeight: 18 },
+    typeBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: Colors.primary + '15', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+    },
+    typeBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.primary },
+    eventPeriod: { fontSize: 12, color: Colors.textSub },
+    eventFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+    participantText: { fontSize: 13, color: Colors.textSub },
+    rewardText: { fontSize: 13, fontWeight: '700', color: Colors.text },
+
+    // 빈 상태
+    emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 8 },
+    emptyEmoji: { fontSize: 36 },
+    emptyText: { fontSize: 15, color: Colors.textSub, fontWeight: '500' },
+  });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -294,7 +374,7 @@ export default function AdminEventScreen() {
                 disabled={creating}
               >
                 {creating ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={theme.bgCard} />
                 ) : (
                   <Text style={styles.createSubmitText}>이벤트 생성</Text>
                 )}
@@ -363,79 +443,3 @@ export default function AdminEventScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.bg },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.card,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
-  createBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 16, gap: 12 },
-  loadingWrap: { paddingVertical: 40, alignItems: 'center' },
-
-  // 생성 폼
-  createForm: {
-    backgroundColor: Colors.card, borderRadius: 12, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
-    gap: 4,
-  },
-  formTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 10 },
-  inputLabel: { fontSize: 12, fontWeight: '600', color: Colors.textSub, marginBottom: 4, marginTop: 8 },
-  textInput: {
-    borderWidth: 1, borderColor: Colors.border, borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: Colors.text,
-    backgroundColor: Colors.bg,
-  },
-  textArea: { minHeight: 72, textAlignVertical: 'top' },
-  typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  typePill: {
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
-    borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.bg,
-  },
-  typePillActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '15' },
-  typePillText: { fontSize: 12, fontWeight: '600', color: Colors.textSub },
-  typePillTextActive: { color: Colors.primary },
-  dateRow: { flexDirection: 'row', gap: 10 },
-  dateField: { flex: 1 },
-  rewardRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  rewardField: { flex: 1 },
-  rewardRankLabel: { fontSize: 12, fontWeight: '600', color: Colors.text, marginBottom: 4 },
-  createSubmitBtn: {
-    backgroundColor: Colors.primary, borderRadius: 10, paddingVertical: 14,
-    alignItems: 'center', marginTop: 16,
-  },
-  createSubmitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
-  // 이벤트 카드
-  eventCard: {
-    backgroundColor: Colors.card, borderRadius: 12, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
-    gap: 6,
-  },
-  eventCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  statusBadgeText: { fontSize: 12, fontWeight: '700' },
-  deleteBtn: { padding: 6 },
-  eventTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
-  eventDesc: { fontSize: 13, color: Colors.textSub, lineHeight: 18 },
-  typeBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.primary + '15', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-  },
-  typeBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.primary },
-  eventPeriod: { fontSize: 12, color: Colors.textSub },
-  eventFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  participantText: { fontSize: 13, color: Colors.textSub },
-  rewardText: { fontSize: 13, fontWeight: '700', color: Colors.text },
-
-  // 빈 상태
-  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 8 },
-  emptyEmoji: { fontSize: 36 },
-  emptyText: { fontSize: 15, color: Colors.textSub, fontWeight: '500' },
-});

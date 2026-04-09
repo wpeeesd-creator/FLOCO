@@ -12,6 +12,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import { useTheme } from '../context/ThemeContext';
 import { validateEmail, validatePassword, validateName } from '../lib/errorHandler';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
@@ -23,6 +24,7 @@ const EXPO_CLIENT_ID = '572965735174-3hrl5qope4q11o5eqphlmf28rn41fehf.apps.googl
 type Mode = 'login' | 'register';
 
 export default function AuthScreen() {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
@@ -95,6 +97,63 @@ export default function AuthScreen() {
     }
     // 성공 시 App.tsx의 onAuthStateChanged가 자동으로 화면 전환
   }
+
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.bg },
+    scroll: { flexGrow: 1, justifyContent: 'center', padding: 24, paddingBottom: 40 },
+    logoArea: { alignItems: 'center', marginBottom: 40, gap: 8 },
+    logoCircle: {
+      width: 76, height: 76, borderRadius: 38,
+      backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
+      shadowColor: Colors.primary, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8,
+    },
+    logoText: { color: theme.bgCard, fontSize: 34, fontWeight: '800' },
+    appName: { fontSize: 26, fontWeight: '800', color: Colors.text, letterSpacing: -0.5 },
+    appSub: { fontSize: 13, color: Colors.textSub },
+    tabRow: {
+      flexDirection: 'row', backgroundColor: '#EEF2F7',
+      borderRadius: 12, padding: 4, marginBottom: 24,
+    },
+    tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
+    tabBtnActive: {
+      backgroundColor: theme.bgCard,
+      shadowColor: theme.text, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
+    },
+    tabText: { fontSize: 15, fontWeight: '600', color: Colors.textSub },
+    tabTextActive: { color: Colors.primary },
+    form: { gap: 16 },
+    inputGroup: { gap: 6 },
+    label: { fontSize: 13, fontWeight: '600', color: Colors.textSub },
+    hint: { fontSize: 11, fontWeight: '400', color: Colors.textMuted },
+    input: {
+      backgroundColor: theme.bgCard, borderRadius: 12, padding: 14,
+      fontSize: 15, borderWidth: 1.5, borderColor: Colors.border,
+    },
+    errorBox: {
+      backgroundColor: theme.redLight, borderRadius: 10, padding: 12,
+      borderWidth: 1, borderColor: '#FFD0D0',
+    },
+    errorText: { fontSize: 13, color: Colors.red, fontWeight: '600' },
+    submitBtn: {
+      backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 16,
+      alignItems: 'center', marginTop: 4,
+      shadowColor: Colors.primary, shadowOpacity: 0.35, shadowRadius: 12, elevation: 5,
+    },
+    submitBtnDisabled: { opacity: 0.65 },
+    submitText: { color: theme.bgCard, fontSize: 16, fontWeight: '700' },
+    dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+    dividerText: { fontSize: 12, color: Colors.textMuted },
+    googleBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      backgroundColor: theme.bgCard, borderRadius: 14, paddingVertical: 14,
+      borderWidth: 1.5, borderColor: Colors.border, gap: 10,
+    },
+    googleIcon: { fontSize: 16, fontWeight: '800', color: '#4285F4' },
+    googleText: { fontSize: 15, fontWeight: '600', color: Colors.text },
+    infoBox: { backgroundColor: '#EAF4FF', borderRadius: 10, padding: 12, alignItems: 'center', gap: 4 },
+    infoText: { fontSize: 12, color: Colors.primary },
+  });
 
   return (
     <KeyboardAvoidingView
@@ -219,72 +278,3 @@ export default function AuthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 24, paddingBottom: 40 },
-
-  logoArea: { alignItems: 'center', marginBottom: 40, gap: 8 },
-  logoCircle: {
-    width: 76, height: 76, borderRadius: 38,
-    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
-    shadowColor: Colors.primary, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8,
-  },
-  logoText: { color: '#fff', fontSize: 34, fontWeight: '800' },
-  appName: { fontSize: 26, fontWeight: '800', color: Colors.text, letterSpacing: -0.5 },
-  appSub: { fontSize: 13, color: Colors.textSub },
-
-  tabRow: {
-    flexDirection: 'row', backgroundColor: '#EEF2F7',
-    borderRadius: 12, padding: 4, marginBottom: 24,
-  },
-  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  tabBtnActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
-  },
-  tabText: { fontSize: 15, fontWeight: '600', color: Colors.textSub },
-  tabTextActive: { color: Colors.primary },
-
-  form: { gap: 16 },
-  inputGroup: { gap: 6 },
-  label: { fontSize: 13, fontWeight: '600', color: Colors.textSub },
-  hint: { fontSize: 11, fontWeight: '400', color: Colors.textMuted },
-  input: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 14,
-    fontSize: 15, borderWidth: 1.5, borderColor: Colors.border,
-  },
-
-  errorBox: {
-    backgroundColor: '#FFF0F0', borderRadius: 10, padding: 12,
-    borderWidth: 1, borderColor: '#FFD0D0',
-  },
-  errorText: { fontSize: 13, color: Colors.red, fontWeight: '600' },
-
-  submitBtn: {
-    backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 16,
-    alignItems: 'center', marginTop: 4,
-    shadowColor: Colors.primary, shadowOpacity: 0.35, shadowRadius: 12, elevation: 5,
-  },
-  submitBtnDisabled: { opacity: 0.65 },
-  submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
-  dividerText: { fontSize: 12, color: Colors.textMuted },
-
-  googleBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#fff', borderRadius: 14, paddingVertical: 14,
-    borderWidth: 1.5, borderColor: Colors.border, gap: 10,
-  },
-  googleIcon: {
-    fontSize: 16, fontWeight: '800', color: '#4285F4',
-  },
-  googleText: { fontSize: 15, fontWeight: '600', color: Colors.text },
-
-  infoBox: {
-    backgroundColor: '#EAF4FF', borderRadius: 10, padding: 12,
-    alignItems: 'center', gap: 4,
-  },
-  infoText: { fontSize: 12, color: Colors.primary },
-});

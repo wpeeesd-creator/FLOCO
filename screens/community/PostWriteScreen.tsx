@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { createPost, getUserProfile } from '../../lib/firestoreService';
 import { STOCKS } from '../../store/appStore';
 
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export default function PostWriteScreen({ navigation }: Props) {
+  const { theme, isDark } = useTheme();
   const { user } = useAuth();
 
   const [selectedTags, setSelectedTags] = useState<WriteTag[]>([]);
@@ -60,6 +62,73 @@ export default function PostWriteScreen({ navigation }: Props) {
   const removeTicker = useCallback((ticker: string) => {
     setSelectedTickers((prev) => prev.filter((t) => t !== ticker));
   }, []);
+
+  const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: Colors.bg },
+    flex: { flex: 1 },
+    header: {
+      flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card,
+      paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600', color: Colors.text },
+    postButton: { width: 44, height: 36, alignItems: 'center', justifyContent: 'center' },
+    postButtonDisabled: { opacity: 0.4 },
+    postButtonText: { fontSize: 16, fontWeight: '700', color: Colors.primary },
+    postButtonTextDisabled: { color: Colors.textMuted },
+    scrollContent: { paddingBottom: 40 },
+    section: { backgroundColor: Colors.card, marginBottom: 8, padding: 20 },
+    sectionLabel: {
+      fontSize: 13, fontWeight: '700', color: Colors.textSub, marginBottom: 12,
+      textTransform: 'uppercase', letterSpacing: 0.5,
+    },
+    tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    tagPill: {
+      paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+      borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.bg,
+    },
+    tagPillSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    tagPillText: { fontSize: 13, fontWeight: '600', color: Colors.textSub },
+    tagPillTextSelected: { color: theme.bgCard },
+    titleInput: { fontSize: 18, fontWeight: '700', color: Colors.text, padding: 0 },
+    contentInput: {
+      fontSize: 15, color: Colors.text, lineHeight: 24, minHeight: 200,
+      textAlignVertical: 'top', padding: 0,
+    },
+    tickerSearchContainer: {
+      flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bg,
+      borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+      gap: 8, marginBottom: 10, borderWidth: 1, borderColor: Colors.border,
+    },
+    tickerSearchInput: { flex: 1, fontSize: 14, color: Colors.text, padding: 0 },
+    searchResults: {
+      backgroundColor: Colors.card, borderRadius: 10, borderWidth: 1,
+      borderColor: Colors.border, overflow: 'hidden', marginBottom: 10,
+    },
+    searchResultItem: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 14, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: Colors.border,
+    },
+    searchResultItemSelected: { backgroundColor: '#F0F4FF' },
+    searchResultLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    searchResultTicker: { fontSize: 14, fontWeight: '700', color: Colors.text },
+    searchResultName: { fontSize: 13, color: Colors.textSub },
+    searchResultRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    searchResultMarket: {
+      fontSize: 12, color: Colors.textMuted, backgroundColor: Colors.bg,
+      paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+    },
+    selectedTickersRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+    selectedChip: {
+      flexDirection: 'row', alignItems: 'center', gap: 5,
+      backgroundColor: theme.primaryLight,
+      paddingHorizontal: 10, paddingVertical: 6,
+      borderRadius: 20, borderWidth: 1, borderColor: '#C5D9FF',
+    },
+    selectedChipText: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
+  });
 
   const canSubmit = selectedTags.length > 0 && content.trim().length > 0 && !submitting;
 
@@ -252,193 +321,3 @@ export default function PostWriteScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
-  flex: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 17,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  postButton: {
-    width: 44,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  postButtonDisabled: {
-    opacity: 0.4,
-  },
-  postButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  postButtonTextDisabled: {
-    color: Colors.textMuted,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  section: {
-    backgroundColor: Colors.card,
-    marginBottom: 8,
-    padding: 20,
-  },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.textSub,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  tagPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.bg,
-  },
-  tagPillSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  tagPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSub,
-  },
-  tagPillTextSelected: {
-    color: '#FFFFFF',
-  },
-  titleInput: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text,
-    padding: 0,
-  },
-  contentInput: {
-    fontSize: 15,
-    color: Colors.text,
-    lineHeight: 24,
-    minHeight: 200,
-    textAlignVertical: 'top',
-    padding: 0,
-  },
-  tickerSearchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.bg,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  tickerSearchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: Colors.text,
-    padding: 0,
-  },
-  searchResults: {
-    backgroundColor: Colors.card,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  searchResultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  searchResultItemSelected: {
-    backgroundColor: '#F0F4FF',
-  },
-  searchResultLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  searchResultTicker: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  searchResultName: {
-    fontSize: 13,
-    color: Colors.textSub,
-  },
-  searchResultRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  searchResultMarket: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    backgroundColor: Colors.bg,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  selectedTickersRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 4,
-  },
-  selectedChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#EBF2FF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#C5D9FF',
-  },
-  selectedChipText: {
-    fontSize: 13,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-});
