@@ -1283,10 +1283,9 @@ function TradeSheet({
         });
         useAppStore.setState({ cash: newBalance, holdings: newPortfolio.map(p => ({ ticker: p.ticker, qty: p.quantity, avgPrice: p.avgPrice })) });
 
-        const currentNotifs = Array.isArray(userData?.notifications)
-          ? userData.notifications : [];
-
-        await saveNotif(userId!, currentNotifs, {
+        const latestSnap = await getDoc(doc(db, 'users', userId!));
+        const latestNotifs = latestSnap.data()?.notifications ?? [];
+        await saveNotif(userId!, latestNotifs, {
           type: 'trade',
           title: '✅ 매수 완료',
           body: `${stock.name} ${isKR ? quantity : quantity.toFixed(4)}주 @ ${isKR ? `${Math.round(fixedPrice).toLocaleString()}원` : `$${fixedPrice.toFixed(2)}`}`,
@@ -1332,10 +1331,9 @@ function TradeSheet({
         });
         useAppStore.setState({ cash: newBalance, holdings: newPortfolio.map(p => ({ ticker: p.ticker, qty: p.quantity, avgPrice: p.avgPrice })) });
 
-        const currentNotifs = Array.isArray(userData?.notifications)
-          ? userData.notifications : [];
-
-        await saveNotif(userId!, currentNotifs, {
+        const latestSnap2 = await getDoc(doc(db, 'users', userId!));
+        const latestNotifs2 = latestSnap2.data()?.notifications ?? [];
+        await saveNotif(userId!, latestNotifs2, {
           type: 'trade',
           title: '✅ 매도 완료',
           body: `${stock.name} ${isKR ? quantity : quantity.toFixed(4)}주 @ ${isKR ? `${Math.round(fixedPrice).toLocaleString()}원` : `$${fixedPrice.toFixed(2)}`}`,

@@ -49,7 +49,12 @@ export default function WrongAnswerScreen() {
         </View>
         <TouchableOpacity
           style={styles.studyLink}
-          onPress={() => navigation.navigate('학습메인')}
+          onPress={() => {
+            const parts = item.id.split('_');
+            const categoryId = parts[0];
+            const lessonId = parts.length >= 2 ? `${parts[0]}_${parts[1]}` : parts[0];
+            navigation.navigate('LessonPlayer', { lessonId, categoryId });
+          }}
         >
           <Text style={styles.studyLinkText}>학습하러 가기 →</Text>
         </TouchableOpacity>

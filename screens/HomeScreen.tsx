@@ -171,6 +171,7 @@ export default function HomeScreen() {
     const pnlRate = (h.avgPrice ?? 0) > 0
       ? ((livePrice - (h.avgPrice ?? 0)) / (h.avgPrice ?? 0)) * 100
       : 0;
+    console.log('종목:', h.ticker, '평균매수가:', h.avgPrice, '현재가:', livePrice, '수익률:', pnlRate.toFixed(2));
     return { ...h, stock: { ...stock, price: livePrice }, evalAmt, pnlAmt, pnlRate };
   }).filter(Boolean) as Array<{
     ticker: string; qty: number; avgPrice: number;
@@ -1047,14 +1048,14 @@ export default function HomeScreen() {
 
               {/* 수익금 + 수익률 */}
               <View style={styles.profitRow}>
-                <Text style={[styles.profitAmt, { color: isUp ? theme.green : theme.red }]}>
+                <Text style={[styles.profitAmt, { color: isUp ? theme.red : theme.blue }]}>
                   {isUp ? '+' : ''}{Math.round(profit).toLocaleString()}원
                 </Text>
                 <View style={[
                   styles.profitRateBadge,
                   { backgroundColor: isUp ? Colors.greenBg : Colors.redBg },
                 ]}>
-                  <Text style={[styles.profitRateText, { color: isUp ? theme.green : theme.red }]}>
+                  <Text style={[styles.profitRateText, { color: isUp ? theme.red : theme.blue }]}>
                     {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{profitRate.toFixed(2)}%
                   </Text>
                 </View>
@@ -1161,14 +1162,14 @@ export default function HomeScreen() {
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>수익금</Text>
-                <Text style={[styles.summaryValue, { color: summaryUp ? theme.green : theme.red }]}>
+                <Text style={[styles.summaryValue, { color: summaryUp ? theme.red : theme.blue }]}>
                   {summaryUp ? '+' : ''}{Math.round(summaryPnl).toLocaleString()}원
                 </Text>
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>수익률</Text>
-                <Text style={[styles.summaryValue, { color: summaryUp ? theme.green : theme.red }]}>
+                <Text style={[styles.summaryValue, { color: summaryUp ? theme.red : theme.blue }]}>
                   {summaryUp ? '+' : ''}{summaryRate.toFixed(2)}%
                 </Text>
               </View>
@@ -1256,7 +1257,7 @@ export default function HomeScreen() {
                             ? `${Math.round(h.evalAmt).toLocaleString()}원`
                             : `$${h.evalAmt.toFixed(2)}`}
                         </Text>
-                        <Text style={[styles.holdingPnl, { color: hUp ? theme.green : theme.red }]}>
+                        <Text style={[styles.holdingPnl, { color: hUp ? theme.red : theme.blue }]}>
                           {hUp ? '+' : ''}
                           {h.stock.krw
                             ? `${Math.round(h.pnlAmt).toLocaleString()}원`
@@ -1404,7 +1405,7 @@ export default function HomeScreen() {
                             <Text style={styles.holdingEval}>
                               {isKR ? `₩${Math.round(displayPrice).toLocaleString()}` : `$${displayPrice.toFixed(2)}`}
                             </Text>
-                            <Text style={[styles.holdingPnl, { color: sUp ? theme.green : theme.red }]}>
+                            <Text style={[styles.holdingPnl, { color: sUp ? theme.red : theme.blue }]}>
                               {sUp ? '+' : ''}{displayChange.toFixed(2)}%
                             </Text>
                           </>

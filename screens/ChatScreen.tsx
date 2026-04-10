@@ -85,6 +85,7 @@ export default function ChatScreen() {
 
     try {
       const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
+      console.log('API Key 로드됨:', apiKey.substring(0, 20));
       console.log('API Key 존재 여부:', !!apiKey);
 
       if (!apiKey || apiKey === 'dummy') {

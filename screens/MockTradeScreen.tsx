@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, FlatList,
@@ -8,11 +8,26 @@ import { useNavigation } from '@react-navigation/native';
 import { useAppStore, STOCKS } from '../store/appStore';
 import StockLogo from '../components/StockLogo';
 import { useTheme } from '../context/ThemeContext';
+import { fetchSinglePrice } from '../utils/priceService';
 
 export default function MockTradeScreen() {
   const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const { holdings } = useAppStore();
+
+  const [prices, setPrices] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const loadPrices = async () => {
+      const result: Record<string, number> = {};
+      for (const s of STOCKS) {
+        const data = await fetchSinglePrice(s.ticker, s.isKR ?? false);
+        if (data?.price) result[s.ticker] = data.price;
+      }
+      setPrices(result);
+    };
+    loadPrices();
+  }, []);
 
   // Top 100 by absolute change (simulating popularity)
   const top100 = [...STOCKS]
@@ -132,7 +147,7 @@ export default function MockTradeScreen() {
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={styles.stockPrice}>
-                      {s.krw ? `₩${s.price.toLocaleString()}` : `$${s.price.toFixed(2)}`}
+                      {s.krw ? `₩${(prices[s.ticker] ?? s.price).toLocaleString()}` : `$${(prices[s.ticker] ?? s.price).toFixed(2)}`}
                     </Text>
                     <View style={[styles.changeBadge, { backgroundColor: sUp ? '#FFF0F1' : '#EBF2FF' }]}>
                       <Text style={[styles.changeText, { color: sUp ? '#FF3B30' : '#3182F6' }]}>
