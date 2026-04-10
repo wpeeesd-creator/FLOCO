@@ -4,7 +4,7 @@ import {
   ActivityIndicator, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { collection, query, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
@@ -44,6 +44,7 @@ export default function RankingScreen() {
     // 인덱스 없이도 작동하는 단순 쿼리
     const q = query(
       collection(db, 'users'),
+      where('role', '==', 'user'),
       limit(100),
     );
 
