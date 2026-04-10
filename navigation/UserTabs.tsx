@@ -127,6 +127,7 @@ function LearnNavigator() {
     <LearnStack.Navigator id="LearnStack" screenOptions={{ headerShown: false }}>
       <LearnStack.Screen name="학습메인" component={LearningScreen} />
       <LearnStack.Screen name="레슨플레이어" component={LessonPlayerScreen} />
+      <LearnStack.Screen name="LessonPlayer" component={LessonPlayerScreen} options={{ headerShown: false }} />
       <LearnStack.Screen name="코스목록" component={CourseListScreen} />
       <LearnStack.Screen name="레슨" component={LessonScreen} />
       <LearnStack.Screen name="레슨상세" component={LessonDetailScreen} />

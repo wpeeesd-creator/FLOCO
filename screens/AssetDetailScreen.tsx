@@ -3,7 +3,7 @@
  * 총 자산 현황, 자산 구성 바, 시장별 평가금, 보유 종목
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
 } from 'react-native';
@@ -14,11 +14,27 @@ import { useAppStore, STOCKS } from '../store/appStore';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
 import StockLogo from '../components/StockLogo';
+import { fetchSinglePrice } from '../utils/priceService';
 
 export default function AssetDetailScreen() {
   const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
   const { holdings, cash, getTotalValue, getReturnRate } = useAppStore();
+
+  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const load = async () => {
+      const result: Record<string, number> = {};
+      for (const h of holdings) {
+        const isKR = !h.ticker.includes('.');
+        const data = await fetchSinglePrice(h.ticker, isKR);
+        if (data?.price) result[h.ticker] = data.price;
+      }
+      setLivePrices(result);
+    };
+    load();
+  }, []);
 
   // ── 데이터 계산 ──────────────────────────────
   const totalValue = getTotalValue?.() ?? 1_000_000;
@@ -40,9 +56,9 @@ export default function AssetDetailScreen() {
   const holdingsData = safeHoldings.map(h => {
     const stock = STOCKS.find(s => s.ticker === h.ticker);
     if (!stock) return null;
-    const evalAmt = (stock.price ?? 0) * (h.qty ?? 0);
+    const evalAmt = (livePrices[h.ticker] ?? stock.price ?? 0) * (h.qty ?? 0);
     const pnlRate = (h.avgPrice ?? 0) > 0
-      ? (((stock.price ?? 0) - (h.avgPrice ?? 0)) / (h.avgPrice ?? 0)) * 100
+      ? (((livePrices[h.ticker] ?? stock.price ?? 0) - (h.avgPrice ?? 0)) / (h.avgPrice ?? 0)) * 100
       : 0;
     return { ...h, stock, evalAmt, pnlRate };
   }).filter(Boolean).sort((a: any, b: any) => b.evalAmt - a.evalAmt);
