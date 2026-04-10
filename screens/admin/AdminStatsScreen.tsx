@@ -5,14 +5,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  RefreshControl, ActivityIndicator,
+  RefreshControl, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { Colors } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
 import { getAllUserProfiles, getAllPortfolios } from '../../lib/firestoreService';
+
+interface AdminUser {
+  uid: string;
+  email: string;
+  name: string;
+  balance: number;
+  totalAsset: number;
+}
 
 // ── 더미 주간 데이터 생성 ──────────────────────
 function generateWeeklyDummy(maxVal: number): { date: string; count: number }[] {
@@ -38,18 +48,26 @@ export default function AdminStatsScreen() {
   const [avgTrades, setAvgTrades] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [users, setUsers] = useState<AdminUser[]>([]);
 
   const loadData = useCallback(async () => {
     try {
-      const [users, portfolios] = await Promise.all([
+      const [userProfiles, portfolios] = await Promise.all([
         getAllUserProfiles(),
         getAllPortfolios(),
       ]);
       const allTrades = portfolios.flatMap(p => p.trades ?? []);
-      setUserCount(users.length);
+      setUserCount(userProfiles.length);
       setTradeCount(allTrades.length);
       setTradeAmount(allTrades.reduce((sum, t) => sum + (t.price * t.qty), 0));
-      setAvgTrades(users.length > 0 ? Math.round(allTrades.length / users.length) : 0);
+      setAvgTrades(userProfiles.length > 0 ? Math.round(allTrades.length / userProfiles.length) : 0);
+      setUsers(userProfiles.map((u: any) => ({
+        uid: u.uid,
+        email: u.email ?? '',
+        name: u.name ?? u.displayName ?? u.email ?? '알 수 없음',
+        balance: u.balance ?? 1_000_000,
+        totalAsset: u.totalAsset ?? 1_000_000,
+      })));
     } catch {
       // silent
     } finally {
@@ -57,6 +75,44 @@ export default function AdminStatsScreen() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleEditBalance = (user: AdminUser) => {
+    Alert.prompt(
+      '잔액 수정',
+      `${user.email} 새 잔액 입력`,
+      async (value) => {
+        if (!value || isNaN(Number(value))) return;
+        await updateDoc(doc(db, 'users', user.uid), { balance: Number(value) });
+        setUsers(prev => prev.map(u => u.uid === user.uid ? { ...u, balance: Number(value) } : u));
+        Alert.alert('완료', '잔액이 수정됐습니다.');
+      },
+      'plain-text',
+      String(user.balance),
+      'numeric',
+    );
+  };
+
+  const handleResetAll = () => {
+    Alert.alert('전체 초기화', '모든 유저 데이터를 초기화합니다. 계속할까요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '초기화',
+        style: 'destructive',
+        onPress: async () => {
+          for (const user of users) {
+            await updateDoc(doc(db, 'users', user.uid), {
+              balance: 1_000_000,
+              totalAsset: 1_000_000,
+              portfolio: [],
+              transactions: [],
+            });
+          }
+          setUsers(prev => prev.map(u => ({ ...u, balance: 1_000_000, totalAsset: 1_000_000 })));
+          Alert.alert('완료', '전체 초기화가 완료됐습니다.');
+        },
+      },
+    ]);
+  };
 
   useEffect(() => { loadData(); }, []);
 
@@ -87,7 +143,13 @@ export default function AdminStatsScreen() {
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>실시간 통계</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          onPress={handleResetAll}
+          style={styles.resetBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.resetBtnText}>전체 초기화</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -132,6 +194,39 @@ export default function AdminStatsScreen() {
           <View style={styles.summaryDivider} />
           <SummaryRow label="총 거래 금액" value={`₩${Math.round(tradeAmount).toLocaleString()}`} />
         </View>
+
+        {/* 전체 유저 리스트 */}
+        <Text style={styles.sectionTitle}>👤 전체 유저 ({users.length}명)</Text>
+        {users.map((user) => {
+          const returnRate = ((user.totalAsset - 1_000_000) / 1_000_000) * 100;
+          const isUp = returnRate >= 0;
+          return (
+            <View key={user.uid} style={[styles.userCard, { backgroundColor: theme.bgCard, shadowColor: theme.text }]}>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName} numberOfLines={1}>{user.name}</Text>
+                <Text style={styles.userEmail} numberOfLines={1}>{user.email}</Text>
+                <View style={styles.userStatsRow}>
+                  <Text style={styles.userStatLabel}>총 자산</Text>
+                  <Text style={styles.userStatValue}>₩{Math.round(user.totalAsset).toLocaleString()}</Text>
+                  <Text style={[styles.userReturnRate, { color: isUp ? '#34C759' : '#FF3B30' }]}>
+                    {isUp ? '+' : ''}{returnRate.toFixed(2)}%
+                  </Text>
+                </View>
+                <View style={styles.userStatsRow}>
+                  <Text style={styles.userStatLabel}>현금 잔액</Text>
+                  <Text style={styles.userStatValue}>₩{Math.round(user.balance).toLocaleString()}</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => handleEditBalance(user)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.editBtnText}>잔액{'\n'}수정</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );
@@ -259,4 +354,40 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 14, color: Colors.textSub },
   summaryValue: { fontSize: 15, fontWeight: '700', color: Colors.text },
   summarySub: { fontSize: 11, color: Colors.textSub },
+  // Reset button
+  resetBtn: {
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  resetBtnText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  // User list
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  userInfo: { flex: 1, gap: 3 },
+  userName: { fontSize: 14, fontWeight: '700', color: Colors.text },
+  userEmail: { fontSize: 12, color: Colors.textSub },
+  userStatsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  userStatLabel: { fontSize: 12, color: Colors.textSub, width: 48 },
+  userStatValue: { fontSize: 13, fontWeight: '600', color: Colors.text },
+  userReturnRate: { fontSize: 12, fontWeight: '700' },
+  editBtn: {
+    backgroundColor: '#EAF4FF',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+  editBtnText: { fontSize: 11, fontWeight: '700', color: Colors.primary, textAlign: 'center' },
 });
