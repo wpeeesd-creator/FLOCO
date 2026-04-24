@@ -8,7 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -94,26 +94,21 @@ const navigationStateChange = (state: any) => {
 };
 
 function AppContent() {
-  const { isDark, theme } = useTheme();
+  const { theme } = useTheme();
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
   }, []);
 
-  const navTheme = isDark
-    ? {
-        ...DarkTheme,
-        colors: { ...DarkTheme.colors, background: theme.bg, card: theme.bgCard, text: theme.text, border: theme.border },
-      }
-    : {
-        ...DefaultTheme,
-        colors: { ...DefaultTheme.colors, background: theme.bg, card: theme.bgCard, text: theme.text, border: theme.border },
-      };
+  const navTheme = {
+    ...DefaultTheme,
+    colors: { ...DefaultTheme.colors, background: theme.bg, card: theme.bgCard, text: theme.text, border: theme.border },
+  };
 
   return (
     <AuthProvider>
       <NavigationContainer theme={navTheme} onStateChange={navigationStateChange}>
-        <StatusBar style={isDark ? 'light' : 'dark'} translucent backgroundColor="transparent" />
+        <StatusBar style="dark" translucent backgroundColor="transparent" />
         <RootNavigator />
       </NavigationContainer>
     </AuthProvider>

@@ -7,8 +7,6 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  GoogleAuthProvider,
-  signInWithCredential,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { app, db } from '../lib/firebase';
@@ -36,7 +34,6 @@ type AuthActions = {
   setLoading: (loading: boolean) => void;
   login: (email: string, password: string) => Promise<AuthResult>;
   register: (email: string, password: string, name: string) => Promise<AuthResult>;
-  loginWithGoogle: (idToken: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   initAuthListener: () => () => void;
 };
@@ -118,20 +115,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       // ── 구글 로그인 ──
-      loginWithGoogle: async (idToken) => {
-        const auth = getAuth(app);
-        try {
-          const credential = GoogleAuthProvider.credential(idToken);
-          const cred = await signInWithCredential(auth, credential);
-          const name = cred.user.displayName ?? cred.user.email?.split('@')[0] ?? '사용자';
-          const userData = await fetchOrCreateUser(cred.user.uid, cred.user.email ?? '', name);
-          set({ user: userData, isAuthenticated: true });
-          return { success: true, message: '구글 로그인 완료' };
-        } catch (e: any) {
-          return { success: false, message: translateError(e.code ?? '') };
-        }
-      },
-
       // ── 로그아웃 ──
       logout: async () => {
         const auth = getAuth(app);

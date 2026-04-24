@@ -1,7 +1,7 @@
 /**
  * 종목 검색 화면
  * - 티커/종목명 실시간 필터링
- * - 검색창 포커스 시 머니몽 말풍선 표시
+ * - 검색창 포커스 시 주니몽 말풍선 표시
  * - 선택 시 종목 상세 페이지로 이동
  */
 
@@ -17,7 +17,7 @@ import type { Stock } from '../store/appStore';
 import { Colors, Typography, EmptyState } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
 
-// ── 머니몽 말풍선 ──────────────────────────────
+// ── 주니몽 말풍선 ──────────────────────────────
 const MONEYMONG_TIPS = [
   "어떤 종목이 궁금해? 같이 찾아보자!",
   "티커나 이름으로 검색해봐!",
@@ -120,7 +120,7 @@ export default function SearchScreen() {
         )}
       </View>
 
-      {/* 머니몽 말풍선 */}
+      {/* 주니몽 말풍선 */}
       <MoneymongBubble visible={focused && query.length === 0} />
 
       {/* 결과 목록 */}
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   },
   clearBtn: { fontSize: 14, color: Colors.textMuted, padding: 4 },
 
-  // ── 머니몽 말풍선 ──
+  // ── 주니몽 말풍선 ──
   bubbleWrap: {
     alignItems: 'center', paddingVertical: 8,
   },

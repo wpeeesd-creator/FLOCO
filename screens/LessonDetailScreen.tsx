@@ -30,7 +30,7 @@ export default function LessonDetailScreen() {
 
   if (!lesson) {
     return (
-      <View style={styles.container}>
+      <View style={{ flex: 1, backgroundColor: Colors.bg, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <Text style={Typography.h2}>레슨을 찾을 수 없어요</Text>
         <Button title="돌아가기" onPress={() => navigation.goBack()} />
       </View>

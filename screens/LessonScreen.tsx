@@ -37,13 +37,11 @@ export default function LessonScreen() {
 
   if (!course) {
     return (
-      <View style={styles.container}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ fontSize: 16, color: '#8E8E93' }}>코스를 찾을 수 없어요</Text>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 16 }}>
-            <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '600' }}>돌아가기</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={{ flex: 1, backgroundColor: Colors.bg, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Text style={{ fontSize: 16, color: '#8E8E93' }}>코스를 찾을 수 없어요</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 16 }}>
+          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '600' }}>돌아가기</Text>
+        </TouchableOpacity>
       </View>
     );
   }

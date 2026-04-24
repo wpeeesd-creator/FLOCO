@@ -7,6 +7,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Modal,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ── 토스증권 컬러 시스템 ────────────────────────
 export const Colors = {
@@ -210,7 +211,7 @@ export function XpBar({ current, max, showLabel = true }: XpBarProps) {
         </View>
       )}
       <View style={styles.xpBarBg}>
-        <View style={[styles.xpBarFill, { width: `${pct}%` as any }]} />
+        <View style={[styles.xpBarFill, { width: `${pct}%` as `${number}%` }]} />
       </View>
     </View>
   );
@@ -246,13 +247,22 @@ interface BottomSheetProps {
 }
 
 export function BottomSheet({ visible, onClose, children, title }: BottomSheetProps) {
+  const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.bsOverlay} activeOpacity={1} onPress={onClose} />
-      <View style={styles.bsContainer}>
-        <View style={styles.bsHandle} />
-        {title && <Text style={styles.bsTitle}>{title}</Text>}
-        {children}
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <View style={styles.bsWrapper}>
+        {/* 딤 오버레이 — 터치로 닫기 */}
+        <TouchableOpacity
+          style={[StyleSheet.absoluteFill, styles.bsOverlay]}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        {/* 시트 본체 */}
+        <View style={[styles.bsContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+          <View style={styles.bsHandle} />
+          {title && <Text style={styles.bsTitle}>{title}</Text>}
+          {children}
+        </View>
       </View>
     </Modal>
   );
@@ -371,10 +381,11 @@ const styles = StyleSheet.create({
   xpBarFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 3 },
   hearts: { flexDirection: 'row', gap: 2 },
   streak: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  bsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  bsWrapper: { flex: 1, justifyContent: 'flex-end' },
+  bsOverlay: { backgroundColor: 'rgba(0,0,0,0.4)' },
   bsContainer: {
     backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: 20, paddingBottom: 34, maxHeight: '80%',
+    padding: 20, maxHeight: '80%',
   },
   bsHandle: { width: 36, height: 4, backgroundColor: Colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   bsTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: 16, textAlign: 'center' },

@@ -85,30 +85,19 @@ export default function ChatScreen() {
 
     try {
       const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
-      console.log('API Key 로드됨:', apiKey.substring(0, 20));
-      console.log('API Key 존재 여부:', !!apiKey);
-
-      if (!apiKey || apiKey === 'dummy') {
-        setMessages([...newMessages, {
-          role: 'assistant',
-          content: '머니몽 AI가 준비 중이에요! 🐾\n관리자에게 API 키 설정을 요청해주세요.',
-        }]);
-        setLoading(false);
-        return;
-      }
 
       const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey ?? '',
+          'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 1024,
-          system: `당신은 FLOCO 앱의 AI 투자 어시스턴트 "머니몽"입니다.
+          max_tokens: 500,
+          system: `당신은 FLOCO 앱의 AI 투자 어시스턴트 "주니몽"입니다.
 청소년 모의투자 앱에서 사용자의 투자를 도와주는 친근한 AI예요.
 
 ${stock ? `=== 현재 보고 있는 종목 (실시간 데이터) ===
@@ -269,7 +258,7 @@ ${ownedQty > 0 ? `평균매수가: ${Math.round(avgPrice).toLocaleString()}원
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={0}
         >
           {/* Messages */}
@@ -283,7 +272,7 @@ ${ownedQty > 0 ? `평균매수가: ${Math.round(avgPrice).toLocaleString()}원
             {showSuggestions && (
               <View style={styles.welcomeBox}>
                 <Text style={styles.welcomeEmoji}>🐾</Text>
-                <Text style={styles.welcomeTitle}>머니몽이 도와줄게!</Text>
+                <Text style={styles.welcomeTitle}>주니몽이 도와줄게!</Text>
                 {stock ? (
                   <>
                     <Text style={styles.welcomeDesc}>
@@ -345,7 +334,7 @@ ${ownedQty > 0 ? `평균매수가: ${Math.round(avgPrice).toLocaleString()}원
                 ]}
               >
                 {msg.role === 'assistant' && (
-                  <Text style={styles.aiLabel}>🐾 머니몽</Text>
+                  <Text style={styles.aiLabel}>🐾 주니몽</Text>
                 )}
                 <Text style={[
                   styles.bubbleText,
@@ -359,7 +348,7 @@ ${ownedQty > 0 ? `평균매수가: ${Math.round(avgPrice).toLocaleString()}원
             {/* Loading */}
             {loading && (
               <View style={[styles.bubble, styles.aiBubble]}>
-                <Text style={styles.aiLabel}>🐾 머니몽</Text>
+                <Text style={styles.aiLabel}>🐾 주니몽</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <ActivityIndicator size="small" color={theme.primary} />
                   <Text style={styles.aiBubbleText}>생각하는 중...</Text>

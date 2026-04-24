@@ -55,14 +55,22 @@ const YAHOO_HEADERS_V8 = {
 
 const QUOTE_FIELDS = 'regularMarketPrice,regularMarketChangePercent,regularMarketChange,regularMarketOpen,regularMarketDayHigh,regularMarketDayLow,regularMarketVolume,regularMarketPreviousClose,fiftyTwoWeekHigh,fiftyTwoWeekLow,trailingPE,priceToBook,marketState';
 
-const toPriceData = (item: any, isKR: boolean): PriceData => ({
-  price: isKR
-    ? Math.round(item.regularMarketPrice ?? 0)
-    : item.regularMarketPrice ?? 0,
-  change: parseFloat((item.regularMarketChangePercent ?? 0).toFixed(2)),
-  changeAmount: isKR
-    ? Math.round(item.regularMarketChange ?? 0)
-    : parseFloat((item.regularMarketChange ?? 0).toFixed(2)),
+const toPriceData = (item: any, isKR: boolean): PriceData => {
+  const v7Price = item.regularMarketPrice ?? 0;
+  const v7Prev = item.regularMarketPreviousClose ?? v7Price;
+  // Yahoo가 계산한 값을 우선 사용, 없으면 직접 계산
+  const changeAmount = item.regularMarketChange != null
+    ? parseFloat(item.regularMarketChange.toFixed(2))
+    : parseFloat((v7Price - v7Prev).toFixed(2));
+  const change = item.regularMarketChangePercent != null
+    ? parseFloat(item.regularMarketChangePercent.toFixed(2))
+    : (v7Prev > 0
+      ? parseFloat(((v7Price - v7Prev) / v7Prev * 100).toFixed(2))
+      : 0);
+  return {
+  price: isKR ? Math.round(v7Price) : v7Price,
+  change,
+  changeAmount,
   open: isKR ? Math.round(item.regularMarketOpen ?? 0) : item.regularMarketOpen ?? 0,
   high: isKR ? Math.round(item.regularMarketDayHigh ?? 0) : item.regularMarketDayHigh ?? 0,
   low: isKR ? Math.round(item.regularMarketDayLow ?? 0) : item.regularMarketDayLow ?? 0,
@@ -76,7 +84,8 @@ const toPriceData = (item: any, isKR: boolean): PriceData => ({
   pbr: item.priceToBook?.toFixed(1) ?? '-',
   marketState: item.marketState ?? 'CLOSED',
   isKR,
-});
+  };
+};
 
 // ══════════════════════════════════════════════════
 //  단일 종목 가격 (v7 → v8 fallback)
@@ -106,23 +115,33 @@ export const fetchSinglePrice = async (
     console.log(`v7 실패 (${ticker}), v8 시도`);
   }
 
-  // v8 fallback
+  // v8 fallback — range=2d로 전일 종가 정확히 확보
   try {
     const res = await fetch(
-      `https://query2.finance.yahoo.com/v8/finance/chart/${yahooTicker}?interval=1d&range=5d`,
+      `https://query2.finance.yahoo.com/v8/finance/chart/${yahooTicker}?interval=1d&range=2d`,
       { headers: YAHOO_HEADERS_V8 },
     );
     const text = await res.text();
     if (!text || text.trim() === '') return null;
     const data = JSON.parse(text);
-    const meta = data.chart?.result?.[0]?.meta;
+    const result = data.chart?.result?.[0];
+    const meta = result?.meta;
     if (meta?.regularMarketPrice) {
       const price = isKR ? Math.round(meta.regularMarketPrice) : meta.regularMarketPrice;
-      const prev = meta.previousClose ?? meta.chartPreviousClose ?? price;
+
+      // 전일 종가: 차트 데이터의 첫 번째 캔들 close 사용 (2d 범위이므로 전일 데이터)
+      const closes = result?.indicators?.quote?.[0]?.close ?? [];
+      let prev = meta.chartPreviousClose ?? meta.previousClose ?? price;
+      if (closes.length >= 2 && closes[0] != null) {
+        // 첫 번째 캔들 = 전일, 두 번째 = 당일
+        prev = closes[0];
+      }
+      if (isKR) prev = Math.round(prev);
+
       const change = prev > 0
         ? parseFloat(((price - prev) / prev * 100).toFixed(2))
         : 0;
-      console.log(`✅ v8 가격 (${ticker}): ${price}`);
+      console.log(`✅ v8 가격 (${ticker}): ${price}, 전일종가: ${prev}, 등락: ${change}%`);
       return {
         price,
         change,
@@ -149,6 +168,22 @@ export const fetchSinglePrice = async (
 
 // 하위 호환 alias
 export const fetchYahooPrice = fetchSinglePrice;
+
+// ══════════════════════════════════════════════════
+//  환율 조회 (Yahoo Finance KRW=X, 실패 시 고정값)
+// ══════════════════════════════════════════════════
+
+export const getExchangeRate = async (): Promise<number> => {
+  try {
+    const res = await fetch(
+      'https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d&range=1d'
+    );
+    const data = await res.json();
+    return data?.chart?.result?.[0]?.meta?.regularMarketPrice ?? 1380;
+  } catch {
+    return 1380;
+  }
+};
 
 // ══════════════════════════════════════════════════
 //  다중 종목 가격 (v7 → 개별 v8 fallback)
@@ -317,6 +352,9 @@ export const usePrices = (
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // 티커 목록이 같은 수지만 다른 종목으로 바뀌어도 재조회하기 위해 key 사용
+  const stocksKey = stocks.map(s => s.ticker).join(',');
+
   const load = async (force = false) => {
     if (!force && Date.now() - lastFetchTime < CACHE_TTL) {
       setPrices({ ...globalPriceCache });
@@ -341,7 +379,9 @@ export const usePrices = (
     load();
     const interval = setInterval(() => load(true), CACHE_TTL);
     return () => clearInterval(interval);
-  }, [stocks.length]);
+    // stocksKey: 티커 목록 변경 시 재조회 (stocks.length만으론 부족)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stocksKey]);
 
   return { prices, isLoading, lastUpdated, refresh: () => load(true) };
 };

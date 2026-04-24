@@ -34,6 +34,7 @@ type RouteParams = {
   levelId: string;
   lessons: DuoLesson[];
   levelTitle: string;
+  focusQuestionIndex?: number;
 };
 
 export default function LessonPlayerScreen() {
@@ -45,11 +46,15 @@ export default function LessonPlayerScreen() {
   const levelId = params.levelId ?? '';
   const lessons = params.lessons ?? [];
   const levelTitle = params.levelTitle ?? '';
+  const focusQuestionIndex = params.focusQuestionIndex;
   const { user } = useAuth();
   const appStoreCash = useAppStore((s) => s.cash);
 
-  // Core state
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // Core state — start from focusQuestionIndex if navigating from 오답노트
+  const initialIndex = (typeof focusQuestionIndex === 'number' && focusQuestionIndex >= 0 && focusQuestionIndex < lessons.length)
+    ? focusQuestionIndex
+    : 0;
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
@@ -66,7 +71,7 @@ export default function LessonPlayerScreen() {
   // Animations
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const feedbackOpacity = useRef(new Animated.Value(0)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(lessons.length > 0 ? initialIndex / lessons.length : 0)).current;
 
   // Edge case: empty lessons
   if (!lessons || lessons.length === 0) {

@@ -14,7 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -24,7 +24,7 @@ import { fetchStockNews } from '../lib/newsService';
 import StockLogo from '../components/StockLogo';
 import Svg, { Line as SvgLine, Rect, Path, Text as SvgText, G } from 'react-native-svg';
 import {
-  fetchSinglePrice, fetchChartData,
+  fetchSinglePrice, fetchChartData, getExchangeRate,
   CHART_PERIODS,
   type CandleData, type ChartPeriod, type PriceData,
 } from '../utils/priceService';
@@ -34,7 +34,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ── 디자인 토큰 (테마 적응형) ──────────────────────────
 function useDS() {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   return useMemo(() => ({
     bg: theme.stockBg,
     card: theme.stockCard,
@@ -46,12 +46,12 @@ function useDS() {
     text: theme.stockText,
     textSub: theme.textSecondary,
     textMuted: theme.textTertiary,
-    textDim: theme.mode === 'dark' ? '#444444' : '#B0B8C1',
+    textDim: isDark ? '#444444' : '#B0B8C1',
     border: theme.stockBorder,
     borderLight: theme.borderStrong,
     overlay: theme.overlay,
     radius: 12,
-  }), [theme]);
+  }), [theme, isDark]);
 }
 
 
@@ -219,6 +219,7 @@ export default function StockDetailScreen() {
   const { cash, holdings } = useAppStore();
   const DS = useDS();
   const s = useMemo(() => createMainStyles(DS), [DS]);
+  const insets = useSafeAreaInsets();
 
   const stock = STOCKS.find(s => s.ticker === ticker);
 
@@ -291,7 +292,7 @@ export default function StockDetailScreen() {
   const [selectedTab, setSelectedTab] = useState<TabName>('차트');
   const [chartData, setChartData] = useState<CandleData[]>([]);
   const [financialData, setFinancialData] = useState<any>(null);
-  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('3mo');
+  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('1d');
   const [chartType, setChartType] = useState<'line' | 'candle'>('candle');
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError, setChartError] = useState<string | null>(null);
@@ -299,6 +300,7 @@ export default function StockDetailScreen() {
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const isFavorite = wishlist.some((w: any) => w.ticker === ticker);
   const [showChartModal, setShowChartModal] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState(1380);
 
   // 현재가 (Yahoo Finance)
   const livePrice = quote?.price ?? 0;
@@ -307,6 +309,7 @@ export default function StockDetailScreen() {
   const isPositive = liveChange >= 0;
   const changeColor = isPositive ? DS.rise : DS.fall;
   const hasPrice = quote !== null && livePrice > 0;
+  const livePriceKRW = isKR ? livePrice : Math.round(livePrice * exchangeRate);
 
   const fmt = (n: number) => isKR
     ? `${Math.round(n).toLocaleString()}원`
@@ -322,7 +325,6 @@ export default function StockDetailScreen() {
       const data = await fetchSinglePrice(ticker, isKR);
       if (data) {
         setQuote(data);
-        console.log(`✅ 상세화면 가격 (${ticker}): ${data.price}`);
       } else {
         setPriceError('주가 데이터 없음');
       }
@@ -339,6 +341,12 @@ export default function StockDetailScreen() {
     const interval = setInterval(loadStockData, 30000);
     return () => clearInterval(interval);
   }, [loadStockData]);
+
+  useEffect(() => {
+    if (!isKR) {
+      getExchangeRate().then(setExchangeRate);
+    }
+  }, [isKR]);
 
   // ── 차트 로드 ──────────────────────────────────
   const loadChartData = useCallback(async () => {
@@ -360,33 +368,84 @@ export default function StockDetailScreen() {
     loadChartData();
   }, [loadChartData]);
 
-  // ── 재무 데이터 로드 ──────────────────────────────
+  // ── 재무 데이터 로드 (확장) ──────────────────────
+  const fmtBig = (n: number | null | undefined, kr: boolean): string => {
+    if (n == null || n === 0) return '-';
+    if (kr) {
+      if (n >= 1e12) return `${(n / 1e12).toFixed(1)}조원`;
+      if (n >= 1e8) return `${Math.round(n / 1e8).toLocaleString()}억원`;
+      if (n >= 1e4) return `${Math.round(n / 1e4).toLocaleString()}만원`;
+      return `${Math.round(n).toLocaleString()}원`;
+    }
+    if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
+    if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+    if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+    return `$${n.toLocaleString()}`;
+  };
+  const fmtPct = (n: number | null | undefined): string => (n != null ? `${(n * 100).toFixed(2)}%` : '-');
+
   useEffect(() => {
     const loadFinancial = async () => {
       try {
         const yt = isKR ? `${ticker}.KS` : ticker;
+        const fields = 'longName,sector,industry,country,fullTimeEmployees,marketCap,sharesOutstanding,floatShares,trailingPE,forwardPE,priceToBook,priceToSalesTrailing12Months,trailingEps,bookValue,enterpriseValue,enterpriseToEbitda,dividendYield,dividendRate,payoutRatio,beta,fiftyTwoWeekHigh,fiftyTwoWeekLow,fiftyDayAverage,twoHundredDayAverage,averageVolume,totalRevenue,grossProfits,operatingCashflow,freeCashflow,totalDebt,totalCash,returnOnEquity,returnOnAssets,profitMargins,operatingMargins,targetMeanPrice,targetHighPrice,targetLowPrice,recommendationKey,numberOfAnalystOpinions';
         const res = await fetch(
-          `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${yt}&fields=trailingPE,forwardPE,priceToBook,priceToSalesTrailing12Months,trailingEps,bookValue,marketCap,dividendYield,beta,averageVolume`,
+          `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${yt}&fields=${fields}`,
           { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', Accept: 'application/json' } },
         );
         const data = await res.json();
-        const item = data.quoteResponse?.result?.[0];
-        if (item) {
+        const it = data.quoteResponse?.result?.[0];
+        if (it) {
           setFinancialData({
-            per: item.trailingPE?.toFixed(2) ?? '-',
-            forwardPER: item.forwardPE?.toFixed(2) ?? '-',
-            pbr: item.priceToBook?.toFixed(2) ?? '-',
-            psr: item.priceToSalesTrailing12Months?.toFixed(2) ?? '-',
-            eps: item.trailingEps ? (isKR ? `${Math.round(item.trailingEps).toLocaleString()}원` : `$${item.trailingEps.toFixed(2)}`) : '-',
-            bps: item.bookValue ? (isKR ? `${Math.round(item.bookValue).toLocaleString()}원` : `$${item.bookValue.toFixed(2)}`) : '-',
-            marketCap: item.marketCap ? (isKR ? `${(item.marketCap / 1e12).toFixed(2)}조원` : `$${(item.marketCap / 1e9).toFixed(2)}B`) : '-',
-            dividendYield: item.dividendYield ? `${(item.dividendYield * 100).toFixed(2)}%` : '-',
-            beta: item.beta?.toFixed(2) ?? '-',
-            avgVolume: item.averageVolume?.toLocaleString() ?? '-',
+            // 기본
+            longName: it.longName ?? null,
+            sector: it.sector ?? null,
+            industry: it.industry ?? null,
+            country: it.country ?? null,
+            employees: it.fullTimeEmployees ?? null,
+            // 시가총액
+            marketCap: it.marketCap ?? null,
+            sharesOutstanding: it.sharesOutstanding ?? null,
+            floatShares: it.floatShares ?? null,
+            // 밸류에이션
+            per: it.trailingPE ?? null,
+            forwardPE: it.forwardPE ?? null,
+            pbr: it.priceToBook ?? null,
+            psr: it.priceToSalesTrailing12Months ?? null,
+            eps: it.trailingEps ?? null,
+            bps: it.bookValue ?? null,
+            ev: it.enterpriseValue ?? null,
+            evEbitda: it.enterpriseToEbitda ?? null,
+            // 배당
+            dividendYield: it.dividendYield ?? null,
+            dividendRate: it.dividendRate ?? null,
+            payoutRatio: it.payoutRatio ?? null,
+            beta: it.beta ?? null,
+            // 이평
+            fiftyDay: it.fiftyDayAverage ?? null,
+            twoHundredDay: it.twoHundredDayAverage ?? null,
+            avgVolume: it.averageVolume ?? null,
+            // 재무
+            revenue: it.totalRevenue ?? null,
+            grossProfit: it.grossProfits ?? null,
+            opCashflow: it.operatingCashflow ?? null,
+            freeCashflow: it.freeCashflow ?? null,
+            totalDebt: it.totalDebt ?? null,
+            totalCash: it.totalCash ?? null,
+            roe: it.returnOnEquity ?? null,
+            roa: it.returnOnAssets ?? null,
+            profitMargin: it.profitMargins ?? null,
+            opMargin: it.operatingMargins ?? null,
+            // 애널리스트
+            targetMean: it.targetMeanPrice ?? null,
+            targetHigh: it.targetHighPrice ?? null,
+            targetLow: it.targetLowPrice ?? null,
+            recommendation: it.recommendationKey ?? null,
+            analystCount: it.numberOfAnalystOpinions ?? null,
           });
         }
       } catch (e) {
-        console.error('재무 데이터 오류:', e);
+        console.warn('재무 데이터 오류:', e);
       }
     };
     loadFinancial();
@@ -413,7 +472,7 @@ export default function StockDetailScreen() {
   //  RENDER
   // ──────────────────────────────────────────────
   return (
-    <View style={{ flex: 1, backgroundColor: DS.bg, paddingTop: 59 }}>
+    <View style={{ flex: 1, backgroundColor: DS.bg, paddingTop: insets.top }}>
       {/* ── 상단 헤더 ── */}
       <View style={s.header}>
         <TouchableOpacity
@@ -471,9 +530,22 @@ export default function StockDetailScreen() {
         {priceLoading ? (
           <ActivityIndicator size="small" />
         ) : hasPrice ? (
-          <Text style={{ color: changeColor, fontSize: 13 }}>
-            {fmt(livePrice)} {isPositive ? '+' : ''}{liveChange.toFixed(2)}%
-          </Text>
+          <>
+            <Text style={{ color: changeColor, fontSize: 13 }}>
+              {fmt(livePrice)}{!isKR && livePrice > 0 ? ` (₩${Math.round(livePrice * exchangeRate).toLocaleString()})` : ''} 오늘 {isPositive ? '+' : ''}{liveChange.toFixed(2)}%
+            </Text>
+            {ownedStock && (() => {
+              const myRate = ownedStock.avgPrice > 0
+                ? ((livePriceKRW - ownedStock.avgPrice) / ownedStock.avgPrice * 100)
+                : 0;
+              const myUp = myRate >= 0;
+              return (
+                <Text style={{ color: myUp ? DS.rise : DS.fall, fontSize: 12, marginTop: 1 }}>
+                  내 수익 {myUp ? '+' : ''}{myRate.toFixed(2)}%
+                </Text>
+              );
+            })()}
+          </>
         ) : null}
       </View>
 
@@ -517,12 +589,28 @@ export default function StockDetailScreen() {
                   <Text style={{ color: changeColor, fontSize: 32, fontWeight: 'bold' }}>
                     {fmt(livePrice)}
                   </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                  {!isKR && livePrice > 0 && (
+                    <Text style={{ color: DS.textSub, fontSize: 14, marginTop: 2 }}>
+                      ≈ ₩{Math.round(livePrice * exchangeRate).toLocaleString()}
+                    </Text>
+                  )}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
                     <Text style={{ color: changeColor, fontSize: 16 }}>
-                      {isPositive ? '▲' : '▼'}{' '}
+                      오늘 {isPositive ? '▲' : '▼'}{' '}
                       {Math.abs(liveChangeAmount).toLocaleString()}
                       {'  '}{isPositive ? '+' : ''}{liveChange.toFixed(2)}%
                     </Text>
+                    {ownedStock && (() => {
+                      const myRate = ownedStock.avgPrice > 0
+                        ? ((livePriceKRW - ownedStock.avgPrice) / ownedStock.avgPrice * 100)
+                        : 0;
+                      const myUp = myRate >= 0;
+                      return (
+                        <Text style={{ color: myUp ? DS.rise : DS.fall, fontSize: 14, marginLeft: 10 }}>
+                          / 내 수익 {myUp ? '+' : ''}{myRate.toFixed(2)}%
+                        </Text>
+                      );
+                    })()}
                   </View>
                 </>
               ) : (
@@ -548,31 +636,8 @@ export default function StockDetailScreen() {
               ))}
             </View>
 
-            <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 16 }}>
-              {CHART_PERIODS.map(p => (
-                <TouchableOpacity
-                  key={p.key}
-                  onPress={() => setChartPeriod(p.key)}
-                  style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 8,
-                    borderRadius: 6,
-                    backgroundColor: chartPeriod === p.key ? DS.text : 'transparent',
-                  }}
-                >
-                  <Text style={{
-                    color: chartPeriod === p.key ? DS.bg : DS.textMuted,
-                    fontWeight: chartPeriod === p.key ? 'bold' : 'normal',
-                    fontSize: 14,
-                  }}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
             {/* SVG 차트 */}
-            <View style={{ position: 'relative' }}>
+            <View>
               {chartLoading ? (
                 <View style={{ height: 300, justifyContent: 'center', alignItems: 'center' }}>
                   <ActivityIndicator color={DS.text} />
@@ -619,7 +684,31 @@ export default function StockDetailScreen() {
               )}
             </View>
 
-            {/* 머니몽 AI 버튼 — 차트 바로 아래 */}
+            {/* 기간 선택 버튼 — 차트 아래 */}
+            <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginTop: 8, marginBottom: 16 }}>
+              {CHART_PERIODS.map(p => (
+                <TouchableOpacity
+                  key={p.key}
+                  onPress={() => setChartPeriod(p.key)}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 6,
+                    backgroundColor: chartPeriod === p.key ? DS.text : 'transparent',
+                  }}
+                >
+                  <Text style={{
+                    color: chartPeriod === p.key ? DS.bg : DS.textMuted,
+                    fontWeight: chartPeriod === p.key ? 'bold' : 'normal',
+                    fontSize: 14,
+                  }}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* 주니몽 AI 버튼 — 차트 바로 아래 */}
             <TouchableOpacity
               onPress={() => navigation.navigate('AI분석', {
                 ticker,
@@ -636,7 +725,7 @@ export default function StockDetailScreen() {
               <Text style={{ fontSize: 20, marginRight: 8 }}>🤖</Text>
               <View>
                 <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 14 }}>
-                  머니몽에게 물어보기
+                  주니몽에게 물어보기
                 </Text>
                 <Text style={{ color: DS.textMuted, fontSize: 11 }}>
                   {stock.name} 실시간 분석
@@ -692,12 +781,14 @@ export default function StockDetailScreen() {
                 <View style={[s.infoCard, { padding: 20, marginHorizontal: 0 }]}>
                   <Text style={{ color: DS.textSub, fontSize: 13 }}>내 주식</Text>
                   <Text style={{ color: DS.text, fontSize: 28, fontWeight: 'bold', marginTop: 4 }}>
-                    {hasPrice ? fmt(livePrice * ownedStock.quantity) : '-'}
+                    {hasPrice ? `${(livePriceKRW * ownedStock.quantity).toLocaleString()}원` : '-'}
                   </Text>
                   {(() => {
                     if (!hasPrice) return <Text style={{ color: DS.textMuted, fontSize: 16, marginTop: 4 }}>가격 로딩 중...</Text>;
-                    const profitAmt = (livePrice - ownedStock.avgPrice) * ownedStock.quantity;
-                    const profitRate = ((livePrice - ownedStock.avgPrice) / ownedStock.avgPrice * 100);
+                    const profitAmt = (livePriceKRW - ownedStock.avgPrice) * ownedStock.quantity;
+                    const profitRate = ownedStock.avgPrice > 0
+                      ? ((livePriceKRW - ownedStock.avgPrice) / ownedStock.avgPrice * 100)
+                      : 0;
                     const profitColor = profitAmt >= 0 ? DS.rise : DS.fall;
                     return (
                       <Text style={{ color: profitColor, fontSize: 16, marginTop: 4 }}>
@@ -711,10 +802,10 @@ export default function StockDetailScreen() {
                 <View style={{ marginTop: 16 }}>
                   {[
                     { label: '보유수량', value: `${ownedStock.quantity}주` },
-                    { label: '평균매수가', value: fmt(ownedStock.avgPrice) },
-                    { label: '현재가', value: hasPrice ? fmt(livePrice) : '-' },
-                    { label: '평가금액', value: hasPrice ? fmt(livePrice * ownedStock.quantity) : '-' },
-                    { label: '매입금액', value: fmt(ownedStock.avgPrice * ownedStock.quantity) },
+                    { label: '평균매수가', value: `${Math.round(ownedStock.avgPrice).toLocaleString()}원` },
+                    { label: '현재가', value: hasPrice ? `${livePriceKRW.toLocaleString()}원` : '-' },
+                    { label: '평가금액', value: hasPrice ? `${(livePriceKRW * ownedStock.quantity).toLocaleString()}원` : '-' },
+                    { label: '매입금액', value: `${(ownedStock.avgPrice * ownedStock.quantity).toLocaleString()}원` },
                   ].map((item, i) => (
                     <View key={i} style={[s.infoRow, { borderBottomWidth: 1, borderBottomColor: DS.border }]}>
                       <Text style={s.infoLabel}>{item.label}</Text>
@@ -737,60 +828,188 @@ export default function StockDetailScreen() {
         {/* ════════════════ 종목정보 탭 ════════════════ */}
         {selectedTab === '종목정보' && (
           <View style={{ padding: 16 }}>
-            {/* 기본 정보 */}
-            <View style={[s.infoCard, { marginHorizontal: 0 }]}>
-              <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>📋 기본 정보</Text>
-              {[
-                { label: '종목명', value: stock.name },
-                { label: '티커', value: stock.ticker },
-                { label: '섹터', value: stock.sector ?? '—' },
-                { label: '시장', value: isKR ? '🇰🇷 한국 코스피/코스닥' : '🇺🇸 미국 나스닥/NYSE' },
-                { label: '시가총액', value: financialData?.marketCap ?? '-' },
-              ].map((item, i, arr) => (
-                <View key={i} style={[s.infoRow, i < arr.length - 1 && s.infoRowBorder]}>
-                  <Text style={s.infoLabel}>{item.label}</Text>
-                  <Text style={s.infoValue}>{item.value}</Text>
-                </View>
-              ))}
-            </View>
-
-            {/* 밸류에이션 */}
-            <View style={[s.infoCard, { marginHorizontal: 0, marginTop: 12 }]}>
-              <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>📊 밸류에이션</Text>
-              {[
-                { label: 'PER (주가수익비율)', value: financialData?.per ? `${financialData.per}배` : '-', desc: 'PER이 낮을수록 저평가' },
-                { label: 'Forward PER', value: financialData?.forwardPER ? `${financialData.forwardPER}배` : '-', desc: '예상 실적 기준 PER' },
-                { label: 'PBR (주가순자산비율)', value: financialData?.pbr ? `${financialData.pbr}배` : '-', desc: '1 미만이면 청산가치 이하' },
-                { label: 'PSR (주가매출비율)', value: financialData?.psr ? `${financialData.psr}배` : '-', desc: '낮을수록 저평가' },
-                { label: 'EPS (주당순이익)', value: financialData?.eps ?? '-', desc: '높을수록 수익성 좋음' },
-                { label: 'BPS (주당순자산)', value: financialData?.bps ?? '-', desc: '기업의 청산 가치' },
-              ].map((item, i, arr) => (
-                <View key={i} style={{ paddingVertical: 10, borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: DS.border }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={s.infoLabel}>{item.label}</Text>
-                    <Text style={[s.infoValue, { fontWeight: 'bold' }]}>{item.value}</Text>
+            {!financialData ? (
+              <View style={[s.infoCard, { marginHorizontal: 0, alignItems: 'center', paddingVertical: 40 }]}>
+                <ActivityIndicator color={'#0066FF'} size="large" />
+                <Text style={{ color: DS.textSub, fontSize: 13, marginTop: 12 }}>종목 정보 불러오는 중...</Text>
+              </View>
+            ) : (
+              <>
+                {/* 섹션 1: 기업 소개 */}
+                {(financialData.sector || financialData.industry || financialData.country) && (
+                  <View style={[s.infoCard, { marginHorizontal: 0 }]}>
+                    <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>🏢 기업 소개</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                      {financialData.sector && (
+                        <View style={{ backgroundColor: '#0066FF' + '15', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
+                          <Text style={{ color: '#0066FF', fontSize: 12, fontWeight: '700' }}>{financialData.sector}</Text>
+                        </View>
+                      )}
+                      {financialData.industry && (
+                        <View style={{ backgroundColor: '#FF950015', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
+                          <Text style={{ color: '#FF9500', fontSize: 12, fontWeight: '700' }}>{financialData.industry}</Text>
+                        </View>
+                      )}
+                    </View>
+                    {[
+                      { label: '종목명', value: financialData.longName ?? stock.name },
+                      { label: '시장', value: isKR ? '🇰🇷 한국' : '🇺🇸 미국' },
+                      financialData.country ? { label: '국가', value: financialData.country } : null,
+                      financialData.employees ? { label: '직원 수', value: `${financialData.employees.toLocaleString()}명` } : null,
+                    ].filter(Boolean).map((item: any, i, arr) => (
+                      <View key={i} style={[s.infoRow, i < arr.length - 1 && s.infoRowBorder]}>
+                        <Text style={s.infoLabel}>{item.label}</Text>
+                        <Text style={s.infoValue}>{item.value}</Text>
+                      </View>
+                    ))}
                   </View>
-                  <Text style={{ color: DS.textDim, fontSize: 11, marginTop: 2 }}>{item.desc}</Text>
-                </View>
-              ))}
-            </View>
+                )}
 
-            {/* 투자 지표 */}
-            <View style={[s.infoCard, { marginHorizontal: 0, marginTop: 12 }]}>
-              <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>📈 투자 지표</Text>
-              {([
-                { label: '배당수익률', value: financialData?.dividendYield ?? '-' },
-                { label: '베타 (변동성)', value: financialData?.beta ? `${financialData.beta} (${parseFloat(financialData.beta) > 1.2 ? '고위험' : parseFloat(financialData.beta) < 0.8 ? '저위험' : '중간'})` : '-' },
-                { label: '52주 최고', value: fmtOrDash(quote?.week52High), color: DS.rise },
-                { label: '52주 최저', value: fmtOrDash(quote?.week52Low), color: DS.fall },
-                { label: '평균 거래량', value: financialData?.avgVolume ?? '-' },
-              ] as Array<{ label: string; value: string; color?: string }>).map((item, i, arr) => (
-                <View key={i} style={[s.infoRow, i < arr.length - 1 && s.infoRowBorder]}>
-                  <Text style={s.infoLabel}>{item.label}</Text>
-                  <Text style={[s.infoValue, item.color ? { color: item.color } : {}]}>{item.value}</Text>
+                {/* 섹션 2: 시가총액 + 52주 레인지 */}
+                <View style={[s.infoCard, { marginHorizontal: 0, marginTop: 12 }]}>
+                  <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>💰 시가총액</Text>
+                  {[
+                    financialData.marketCap ? { label: '시가총액', value: fmtBig(financialData.marketCap, isKR) } : null,
+                    financialData.sharesOutstanding ? { label: '발행주식수', value: `${(financialData.sharesOutstanding / 1e6).toFixed(1)}M주` } : null,
+                    financialData.floatShares ? { label: '유동주식수', value: `${(financialData.floatShares / 1e6).toFixed(1)}M주` } : null,
+                  ].filter(Boolean).map((item: any, i, arr) => (
+                    <View key={i} style={[s.infoRow, i < arr.length - 1 && s.infoRowBorder]}>
+                      <Text style={s.infoLabel}>{item.label}</Text>
+                      <Text style={[s.infoValue, { fontWeight: 'bold' }]}>{item.value}</Text>
+                    </View>
+                  ))}
+                  {/* 52주 레인지 바 */}
+                  {quote?.week52Low != null && quote?.week52High != null && livePrice > 0 && (
+                    <View style={{ marginTop: 14 }}>
+                      <Text style={{ color: DS.textSub, fontSize: 12, marginBottom: 6 }}>52주 범위</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ color: DS.fall, fontSize: 11, fontWeight: '600', width: 52 }}>{fmtOrDash(quote.week52Low)}</Text>
+                        <View style={{ flex: 1, height: 8, backgroundColor: DS.border, borderRadius: 4, marginHorizontal: 6 }}>
+                          {(() => {
+                            const range = (quote.week52High ?? 1) - (quote.week52Low ?? 0);
+                            const pos = range > 0 ? ((livePrice - (quote.week52Low ?? 0)) / range) * 100 : 50;
+                            return <View style={{ position: 'absolute', left: `${Math.min(Math.max(pos, 2), 98)}%` as any, top: -3, width: 14, height: 14, borderRadius: 7, backgroundColor: '#0066FF', borderWidth: 2, borderColor: '#fff' }} />;
+                          })()}
+                        </View>
+                        <Text style={{ color: DS.rise, fontSize: 11, fontWeight: '600', width: 52, textAlign: 'right' }}>{fmtOrDash(quote.week52High)}</Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
-              ))}
-            </View>
+
+                {/* 섹션 3: 밸류에이션 2x2 그리드 */}
+                {(financialData.per || financialData.forwardPE || financialData.pbr || financialData.psr || financialData.ev || financialData.evEbitda) && (
+                  <View style={[s.infoCard, { marginHorizontal: 0, marginTop: 12 }]}>
+                    <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>📊 밸류에이션</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {[
+                        { label: 'PER', value: financialData.per?.toFixed(2), unit: '배' },
+                        { label: '선행 PER', value: financialData.forwardPE?.toFixed(2), unit: '배' },
+                        { label: 'PBR', value: financialData.pbr?.toFixed(2), unit: '배' },
+                        { label: 'PSR', value: financialData.psr?.toFixed(2), unit: '배' },
+                        { label: 'EV', value: financialData.ev ? fmtBig(financialData.ev, isKR) : null, unit: '' },
+                        { label: 'EV/EBITDA', value: financialData.evEbitda?.toFixed(2), unit: '배' },
+                      ].map((m, i) => (
+                        <View key={i} style={{ width: '48%' as any, backgroundColor: DS.bg, borderRadius: 12, padding: 12 }}>
+                          <Text style={{ color: DS.textSub, fontSize: 12 }}>{m.label}</Text>
+                          <Text style={{ color: DS.text, fontSize: 16, fontWeight: '800', marginTop: 2 }}>
+                            {m.value ? `${m.value}${m.unit}` : 'N/A'}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* 섹션 4: 배당 & 안정성 */}
+                {(financialData.dividendYield || financialData.beta) && (
+                  <View style={[s.infoCard, { marginHorizontal: 0, marginTop: 12 }]}>
+                    <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>🛡️ 배당 & 안정성</Text>
+                    {[
+                      financialData.dividendYield ? { label: '배당수익률', value: fmtPct(financialData.dividendYield) } : null,
+                      financialData.dividendRate ? { label: '주당 배당금', value: isKR ? `${Math.round(financialData.dividendRate).toLocaleString()}원` : `$${financialData.dividendRate.toFixed(2)}` } : null,
+                      financialData.payoutRatio ? { label: '배당성향', value: fmtPct(financialData.payoutRatio) } : null,
+                      financialData.beta ? { label: '베타', value: `${financialData.beta.toFixed(2)} (${financialData.beta > 1.2 ? '높음' : financialData.beta < 0.8 ? '낮음' : '보통'})` } : null,
+                      financialData.fiftyDay ? { label: '50일 이평', value: isKR ? `${Math.round(financialData.fiftyDay).toLocaleString()}` : `$${financialData.fiftyDay.toFixed(2)}` } : null,
+                      financialData.twoHundredDay ? { label: '200일 이평', value: isKR ? `${Math.round(financialData.twoHundredDay).toLocaleString()}` : `$${financialData.twoHundredDay.toFixed(2)}` } : null,
+                    ].filter(Boolean).map((item: any, i, arr) => (
+                      <View key={i} style={[s.infoRow, i < arr.length - 1 && s.infoRowBorder]}>
+                        <Text style={s.infoLabel}>{item.label}</Text>
+                        <Text style={[s.infoValue, { fontWeight: '600' }]}>{item.value}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* 섹션 5: 재무 현황 */}
+                {(financialData.revenue || financialData.roe || financialData.totalCash || financialData.totalDebt) && (
+                  <View style={[s.infoCard, { marginHorizontal: 0, marginTop: 12 }]}>
+                    <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>📑 재무 현황</Text>
+                    {[
+                      financialData.revenue ? { label: '매출액', value: fmtBig(financialData.revenue, isKR) } : null,
+                      financialData.opMargin ? { label: '영업이익률', value: fmtPct(financialData.opMargin) } : null,
+                      financialData.profitMargin ? { label: '순이익률', value: fmtPct(financialData.profitMargin) } : null,
+                      financialData.roe ? { label: 'ROE', value: fmtPct(financialData.roe) } : null,
+                      financialData.roa ? { label: 'ROA', value: fmtPct(financialData.roa) } : null,
+                      financialData.totalCash ? { label: '보유현금', value: fmtBig(financialData.totalCash, isKR) } : null,
+                      financialData.totalDebt ? { label: '총부채', value: fmtBig(financialData.totalDebt, isKR) } : null,
+                      financialData.opCashflow ? { label: '영업현금흐름', value: fmtBig(financialData.opCashflow, isKR) } : null,
+                      financialData.freeCashflow ? { label: '잉여현금흐름', value: fmtBig(financialData.freeCashflow, isKR) } : null,
+                    ].filter(Boolean).map((item: any, i, arr) => (
+                      <View key={i} style={[s.infoRow, i < arr.length - 1 && s.infoRowBorder]}>
+                        <Text style={s.infoLabel}>{item.label}</Text>
+                        <Text style={[s.infoValue, { fontWeight: '600' }]}>{item.value}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* 섹션 6: 애널리스트 의견 */}
+                {financialData.recommendation && (
+                  <View style={[s.infoCard, { marginHorizontal: 0, marginTop: 12 }]}>
+                    <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>🎯 애널리스트 의견</Text>
+                    {/* 투자의견 뱃지 */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                      <View style={{ backgroundColor: financialData.recommendation === 'strong_buy' || financialData.recommendation === 'buy' ? '#34C75920' : financialData.recommendation === 'hold' ? '#FF950020' : '#FF3B3020', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 }}>
+                        <Text style={{ fontWeight: '800', fontSize: 13, color: financialData.recommendation === 'strong_buy' || financialData.recommendation === 'buy' ? '#34C759' : financialData.recommendation === 'hold' ? '#FF9500' : '#FF3B30' }}>
+                          {{ strong_buy: '적극 매수', buy: '매수', hold: '보유', underperform: '비중축소', sell: '매도' }[financialData.recommendation] ?? financialData.recommendation}
+                        </Text>
+                      </View>
+                      {financialData.analystCount && (
+                        <Text style={{ color: DS.textSub, fontSize: 12, marginLeft: 8 }}>({financialData.analystCount}명 분석)</Text>
+                      )}
+                    </View>
+                    {/* 목표주가 레인지 */}
+                    {financialData.targetLow && financialData.targetHigh && (
+                      <View>
+                        <Text style={{ color: DS.textSub, fontSize: 12, marginBottom: 6 }}>목표주가 범위</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text style={{ color: DS.fall, fontSize: 11, fontWeight: '600', width: 52 }}>${financialData.targetLow.toFixed(0)}</Text>
+                          <View style={{ flex: 1, height: 8, backgroundColor: DS.border, borderRadius: 4, marginHorizontal: 6 }}>
+                            {(() => {
+                              const range = financialData.targetHigh - financialData.targetLow;
+                              const pos = range > 0 ? ((livePrice - financialData.targetLow) / range) * 100 : 50;
+                              return <View style={{ position: 'absolute', left: `${Math.min(Math.max(pos, 2), 98)}%` as any, top: -3, width: 14, height: 14, borderRadius: 7, backgroundColor: '#0066FF', borderWidth: 2, borderColor: '#fff' }} />;
+                            })()}
+                          </View>
+                          <Text style={{ color: DS.rise, fontSize: 11, fontWeight: '600', width: 52, textAlign: 'right' }}>${financialData.targetHigh.toFixed(0)}</Text>
+                        </View>
+                        {financialData.targetMean && (
+                          <Text style={{ color: DS.text, fontSize: 13, fontWeight: '700', textAlign: 'center', marginTop: 8 }}>
+                            평균 목표가 ${financialData.targetMean.toFixed(2)}
+                            {livePrice > 0 && (
+                              <Text style={{ color: financialData.targetMean > livePrice ? DS.rise : DS.fall }}>
+                                {' '}({financialData.targetMean > livePrice ? '+' : ''}{(((financialData.targetMean - livePrice) / livePrice) * 100).toFixed(1)}%)
+                              </Text>
+                            )}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                )}
+              </>
+            )}
 
             {/* AI 분석 버튼 */}
             <TouchableOpacity
@@ -813,11 +1032,21 @@ export default function StockDetailScreen() {
           </View>
         )}
 
-        <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* ── 하단 매수/매도 버튼 ── */}
-      <View style={s.bottomBar}>
+      {/* ── 하단 매수/매도 버튼 — flex flow로 하단 고정 ── */}
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 0,
+          backgroundColor: 'white',
+          flexDirection: 'row',
+          borderTopWidth: 1,
+          borderTopColor: DS.border,
+          gap: 12,
+        }}
+      >
         <TouchableOpacity
           onPress={() => openSheet('sell')}
           style={[s.bottomBtn, { backgroundColor: DS.fallLight }]}
@@ -843,7 +1072,7 @@ export default function StockDetailScreen() {
           onRequestClose={() => setShowChartModal(false)}
         >
           <View style={{ flex: 1, backgroundColor: DS.bg }}>
-            <View style={{ flex: 1, paddingTop: 59 }}>
+            <View style={{ flex: 2, paddingTop: insets.top }}>
               {/* 헤더 */}
               <View style={{
                 flexDirection: 'row',
@@ -973,8 +1202,9 @@ export default function StockDetailScreen() {
               </View>
             </View>
 
-            {/* 차트 */}
-            <View style={{ flex: 1, justifyContent: 'center' }}>
+            {/* 차트 영역 — ScrollView로 감싸서 높이 초과 방지 */}
+            <ScrollView style={{ flex: 3 }} showsVerticalScrollIndicator={false}>
+              {/* 1. 라인 차트 */}
               {chartData.length > 0 ? (
                 <LineChart
                   data={{
@@ -986,7 +1216,7 @@ export default function StockDetailScreen() {
                     }]
                   }}
                   width={Dimensions.get('window').width}
-                  height={Dimensions.get('window').height * 0.4}
+                  height={Dimensions.get('window').height * 0.25}
                   withDots={false}
                   withInnerLines={true}
                   withOuterLines={false}
@@ -1005,13 +1235,43 @@ export default function StockDetailScreen() {
                   style={{ paddingRight: 0 }}
                 />
               ) : (
-                <View style={{ alignItems: 'center', padding: 40 }}>
+                <View style={{ height: 200, alignItems: 'center', justifyContent: 'center' }}>
                   <ActivityIndicator color={DS.fall} size="large" />
                   <Text style={{ color: DS.textSub, marginTop: 12 }}>차트 로딩 중...</Text>
                 </View>
               )}
 
-              {/* 거래량 바 */}
+              {/* 2. 기간 선택 버튼 — 독립된 View로 분리 */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 12, borderTopWidth: 1, borderTopColor: DS.border }}>
+                {([
+                  { key: '1d', label: '일' },
+                  { key: '5d', label: '주' },
+                  { key: '1mo', label: '월' },
+                  { key: '1y', label: '년' }
+                ] as const).map(p => (
+                  <TouchableOpacity
+                    key={p.key}
+                    onPress={() => setChartPeriod(p.key)}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      backgroundColor: chartPeriod === p.key ? DS.border : 'transparent',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{
+                      color: chartPeriod === p.key ? DS.text : DS.textSub,
+                      fontSize: 15,
+                      fontWeight: chartPeriod === p.key ? 'bold' : 'normal',
+                    }}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* 3. 거래량 바 — 기간 버튼과 완전히 분리 */}
               {chartData.length > 0 && (
                 <View style={{ height: 60, flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, gap: 1, marginTop: 4 }}>
                   {chartData.slice(-40).map((d: any, i: number) => {
@@ -1030,40 +1290,11 @@ export default function StockDetailScreen() {
                   })}
                 </View>
               )}
-            </View>
+            </ScrollView>
 
-            {/* 기간 선택 + 매수매도 버튼 */}
+            {/* 판매하기 / 구매하기 버튼 */}
             <SafeAreaView style={{ borderTopWidth: 1, borderTopColor: DS.border }}>
-              <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10 }}>
-                {([
-                  { key: '1d', label: '일' },
-                  { key: '5d', label: '주' },
-                  { key: '1mo', label: '월' },
-                  { key: '1y', label: '년' }
-                ] as const).map(p => (
-                  <TouchableOpacity
-                    key={p.key}
-                    onPress={() => setChartPeriod(p.key)}
-                    style={{
-                      flex: 1,
-                      paddingVertical: 8,
-                      borderRadius: 8,
-                      backgroundColor: chartPeriod === p.key ? DS.border : 'transparent',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <Text style={{
-                      color: chartPeriod === p.key ? DS.text : DS.textSub,
-                      fontSize: 15,
-                      fontWeight: chartPeriod === p.key ? 'bold' : 'normal'
-                    }}>
-                      {p.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 8, gap: 12 }}>
+              <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: insets.bottom + 8, gap: 12 }}>
                 <TouchableOpacity
                   onPress={() => {
                     setShowChartModal(false)
@@ -1117,6 +1348,7 @@ export default function StockDetailScreen() {
           userData={userData}
           cash={cash}
           userId={user?.id}
+          exchangeRate={exchangeRate}
           onClose={() => setShowTradeSheet(false)}
         />
       )}
@@ -1136,12 +1368,13 @@ interface TradeSheetProps {
   userData: UserData | null;
   cash: number;
   userId?: string;
+  exchangeRate: number;
   onClose: () => void;
 }
 
 function TradeSheet({
   stock, livePrice, liveChange, isKR, type: initialType,
-  userData, cash, userId, onClose,
+  userData, cash, userId, exchangeRate, onClose,
 }: TradeSheetProps) {
   const { theme } = useTheme();
   const DS = useDS();
@@ -1151,69 +1384,53 @@ function TradeSheet({
   const [quantityText, setQuantityText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // 모든 거래 금액을 KRW로 통일 (해외 주식: USD → KRW 환산)
+  const tradePriceKRW = isKR ? fixedPrice : Math.round(fixedPrice * exchangeRate);
+
   const ownedStock = userData?.portfolio?.find(p => p.ticker === stock.ticker);
   const balance = userData?.balance ?? cash;
   const maxSellQty = ownedStock?.quantity ?? 0;
-  const maxBuyQty = fixedPrice > 0
-    ? (isKR ? Math.floor(balance / (fixedPrice * 1.001)) : parseFloat((balance / (fixedPrice * 1.001)).toFixed(4)))
-    : 0;
+  const maxBuyQty = tradePriceKRW > 0 ? Math.floor(balance / (tradePriceKRW * 1.001)) : 0;
   const maxQty = tradeType === 'buy' ? maxBuyQty : maxSellQty;
-  const totalCost = fixedPrice * quantity * 1.001;
-  const totalReceive = fixedPrice * quantity * 0.999;
+  const totalCost = Math.round(tradePriceKRW * quantity * 1.001);
+  const totalReceive = Math.round(tradePriceKRW * quantity * 0.999);
 
   const isSellDisabled = tradeType === 'sell' && (quantity <= 0 || quantity > maxSellQty || maxSellQty === 0);
-  const isBuyDisabled = tradeType === 'buy' && (quantity <= 0 || balance < fixedPrice * quantity * 1.001);
+  const isBuyDisabled = tradeType === 'buy' && (quantity <= 0 || balance < tradePriceKRW * quantity * 1.001);
   const isButtonDisabled = isSellDisabled || isBuyDisabled || isLoading;
 
   const fmtP = (n: number) => {
     if (!n) return '-';
-    return isKR ? `${Math.round(n).toLocaleString()}원` : `$${n.toFixed(2)}`;
+    return `${Math.round(n).toLocaleString()}원`;
   };
 
   const handleQuantityChange = (text: string) => {
     setQuantityText(text);
-    if (isKR) {
-      const num = parseInt(text.replace(/[^0-9]/g, '')) || 0;
-      if (tradeType === 'sell' && num > maxSellQty) {
-        setQuantity(maxSellQty);
-        setQuantityText(maxSellQty.toString());
-        return;
-      }
-      if (tradeType === 'buy' && num > maxBuyQty) {
-        setQuantity(maxBuyQty);
-        setQuantityText(maxBuyQty.toString());
-        return;
-      }
-      setQuantity(Math.max(0, num));
-    } else {
-      const num = parseFloat(text.replace(/[^0-9.]/g, '')) || 0;
-      if (tradeType === 'sell' && num > maxSellQty) {
-        setQuantity(maxSellQty);
-        setQuantityText(maxSellQty.toFixed(4));
-        return;
-      }
-      if (tradeType === 'buy' && num > maxBuyQty) {
-        setQuantity(maxBuyQty);
-        setQuantityText(maxBuyQty.toFixed(4));
-        return;
-      }
-      setQuantity(Math.max(0, num));
+    const num = parseInt(text.replace(/[^0-9]/g, ''), 10) || 0;
+    if (tradeType === 'sell' && num > maxSellQty) {
+      setQuantity(maxSellQty);
+      setQuantityText(maxSellQty.toString());
+      return;
     }
+    if (tradeType === 'buy' && num > maxBuyQty) {
+      setQuantity(maxBuyQty);
+      setQuantityText(maxBuyQty.toString());
+      return;
+    }
+    setQuantity(Math.max(0, num));
   };
 
   const handleIncrease = () => {
-    const step = isKR ? 1 : 0.1;
-    const newQ = parseFloat((quantity + step).toFixed(4));
+    const newQ = quantity + 1;
     if (newQ > maxQty) return;
     setQuantity(newQ);
-    setQuantityText(isKR ? newQ.toString() : newQ.toFixed(1));
+    setQuantityText(newQ.toString());
   };
 
   const handleDecrease = () => {
-    const step = isKR ? 1 : 0.1;
-    const newQ = Math.max(0, parseFloat((quantity - step).toFixed(4)));
+    const newQ = Math.max(0, quantity - 1);
     setQuantity(newQ);
-    setQuantityText(newQ > 0 ? (isKR ? newQ.toString() : newQ.toFixed(1)) : '');
+    setQuantityText(newQ > 0 ? newQ.toString() : '');
   };
 
   const handlePercentSelect = (pct: number) => {
@@ -1234,10 +1451,11 @@ function TradeSheet({
 
     try {
       setIsLoading(true);
-      const tradePrice = fixedPrice;
+      // 모든 거래는 KRW 기준 (해외 주식: USD → KRW 환산)
+      const tradePrice = tradePriceKRW;
 
       if (tradeType === 'buy') {
-        const cost = isKR ? Math.floor(tradePrice * quantity * 1.001) : tradePrice * quantity * 1.001;
+        const cost = Math.floor(tradePrice * quantity * 1.001);
         if (balance < cost) {
           Alert.alert('잔액 부족', `필요: ${fmtP(cost)}\n보유: ${fmtP(balance)}`);
           return;
@@ -1250,9 +1468,7 @@ function TradeSheet({
                 ? {
                     ...p,
                     quantity: p.quantity + quantity,
-                    avgPrice: isKR
-                      ? Math.round((p.avgPrice * p.quantity + tradePrice * quantity) / (p.quantity + quantity))
-                      : parseFloat(((p.avgPrice * p.quantity + tradePrice * quantity) / (p.quantity + quantity)).toFixed(4)),
+                    avgPrice: Math.round((p.avgPrice * p.quantity + tradePrice * quantity) / (p.quantity + quantity)),
                     price: tradePrice,
                   }
                 : p,
@@ -1277,7 +1493,7 @@ function TradeSheet({
           transactions: arrayUnion({
             type: 'buy', ticker: stock.ticker, stockName: stock.name,
             quantity, price: tradePrice, total: cost,
-            fee: isKR ? Math.floor(tradePrice * quantity * 0.001) : tradePrice * quantity * 0.001,
+            fee: Math.floor(tradePrice * quantity * 0.001),
             createdAt: new Date().toISOString(),
           }),
         });
@@ -1288,11 +1504,11 @@ function TradeSheet({
         await saveNotif(userId!, latestNotifs, {
           type: 'trade',
           title: '✅ 매수 완료',
-          body: `${stock.name} ${isKR ? quantity : quantity.toFixed(4)}주 @ ${isKR ? `${Math.round(fixedPrice).toLocaleString()}원` : `$${fixedPrice.toFixed(2)}`}`,
+          body: `${stock.name} ${isKR ? Math.floor(quantity) : quantity.toFixed(4)}주 @ ₩${tradePrice.toLocaleString()}`,
           ticker: stock.ticker,
           stockName: stock.name,
           quantity,
-          price: fixedPrice,
+          price: tradePrice,
           total: totalCost,
           tradeType: 'buy'
         });
@@ -1303,10 +1519,8 @@ function TradeSheet({
           return;
         }
 
-        const sellAmount = isKR ? Math.floor(tradePrice * quantity * 0.999) : tradePrice * quantity * 0.999;
-        const profit = isKR
-          ? Math.floor((tradePrice - ownedStock.avgPrice) * quantity)
-          : (tradePrice - ownedStock.avgPrice) * quantity;
+        const sellAmount = Math.floor(tradePrice * quantity * 0.999);
+        const profit = Math.floor((tradePrice - ownedStock.avgPrice) * quantity);
 
         const newPortfolio = Math.abs(ownedStock.quantity - quantity) < 0.0001
           ? (userData?.portfolio ?? []).filter(p => p.ticker !== stock.ticker)
@@ -1325,7 +1539,7 @@ function TradeSheet({
             type: 'sell', ticker: stock.ticker, stockName: stock.name,
             quantity, price: tradePrice, avgPrice: ownedStock.avgPrice,
             total: sellAmount, profit,
-            fee: isKR ? Math.floor(tradePrice * quantity * 0.001) : tradePrice * quantity * 0.001,
+            fee: Math.floor(tradePrice * quantity * 0.001),
             createdAt: new Date().toISOString(),
           }),
         });
@@ -1336,11 +1550,11 @@ function TradeSheet({
         await saveNotif(userId!, latestNotifs2, {
           type: 'trade',
           title: '✅ 매도 완료',
-          body: `${stock.name} ${isKR ? quantity : quantity.toFixed(4)}주 @ ${isKR ? `${Math.round(fixedPrice).toLocaleString()}원` : `$${fixedPrice.toFixed(2)}`}`,
+          body: `${stock.name} ${isKR ? Math.floor(quantity) : quantity.toFixed(4)}주 @ ₩${tradePrice.toLocaleString()}`,
           ticker: stock.ticker,
           stockName: stock.name,
           quantity,
-          price: fixedPrice,
+          price: tradePrice,
           total: totalReceive,
           tradeType: 'sell'
         });
@@ -1348,7 +1562,7 @@ function TradeSheet({
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onClose();
-      const qtyStr = isKR ? `${quantity}` : `${quantity.toFixed(4)}`;
+      const qtyStr = isKR ? `${Math.floor(quantity)}` : `${quantity.toFixed(4)}`;
       Alert.alert(
         tradeType === 'buy' ? '매수 완료' : '매도 완료',
         `${stock.name} ${qtyStr}주 ${tradeType === 'buy' ? '매수' : '매도'} 완료!\n체결가: ${fmtP(tradePrice)}`,
@@ -1363,11 +1577,13 @@ function TradeSheet({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity
-        style={{ flex: 1, backgroundColor: DS.overlay }}
-        activeOpacity={1}
-        onPress={onClose}
-      />
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        {/* 딤 오버레이 — 전체 화면 절대 위치 */}
+        <TouchableOpacity
+          style={[StyleSheet.absoluteFill, { backgroundColor: DS.overlay }]}
+          activeOpacity={1}
+          onPress={onClose}
+        />
 
         {/* 시트 본체 */}
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -1434,7 +1650,7 @@ function TradeSheet({
                   <TextInput
                     value={quantityText}
                     onChangeText={handleQuantityChange}
-                    keyboardType="decimal-pad"
+                    keyboardType={isKR ? 'number-pad' : 'decimal-pad'}
                     returnKeyType="done"
                     onSubmitEditing={Keyboard.dismiss}
                     blurOnSubmit
@@ -1470,7 +1686,7 @@ function TradeSheet({
               <View style={{ backgroundColor: DS.cardAlt, borderRadius: 12, padding: 14, marginBottom: 16 }}>
                 {[
                   { label: '체결 가격', value: fmtP(fixedPrice) },
-                  { label: '수량', value: isKR ? `${quantity}주` : `${quantity.toFixed(4)}주` },
+                  { label: '수량', value: isKR ? `${Math.floor(quantity)}주` : `${quantity.toFixed(4)}주` },
                   { label: '수수료 (0.1%)', value: fmtP(fixedPrice * quantity * 0.001) },
                 ].map((item, i, arr) => (
                   <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: DS.border }}>
@@ -1505,8 +1721,8 @@ function TradeSheet({
                       : tradeType === 'buy' && balance < totalCost
                         ? '잔액 부족'
                         : tradeType === 'buy'
-                          ? `${isKR ? quantity : quantity.toFixed(4)}주 매수하기`
-                          : `${isKR ? quantity : quantity.toFixed(4)}주 매도하기`}
+                          ? `${isKR ? Math.floor(quantity) : quantity.toFixed(4)}주 매수하기`
+                          : `${isKR ? Math.floor(quantity) : quantity.toFixed(4)}주 매도하기`}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -1517,6 +1733,7 @@ function TradeSheet({
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -1870,7 +2087,7 @@ function createMainStyles(DS: ReturnType<typeof useDS>) {
   // 하단 바
   bottomBar: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 80,
     left: 0,
     right: 0,
     flexDirection: 'row',

@@ -10,10 +10,68 @@ import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { getLearningData } from '../lib/learningService';
+import {
+  learningContent,
+  CATEGORY_META,
+  type CategoryId,
+  type DuoLesson,
+} from '../data/learningContent';
 
-interface WrongAnswer {
+interface ParsedWrongAnswer {
   id: string;
-  addedAt?: string;
+  categoryId: string;
+  levelId: string;
+  questionIndex: number;
+  categoryTitle: string;
+  levelTitle: string;
+  questionText: string;
+  lessons: DuoLesson[];
+}
+
+/**
+ * 오답 ID 파싱: "vocabulary_vocab_1_0"
+ * → categoryId="vocabulary", levelId="vocab_1", questionIndex=0
+ */
+function parseWrongAnswerId(id: string): ParsedWrongAnswer | null {
+  const parts = id.split('_');
+  if (parts.length < 3) return null;
+
+  const categoryId = parts[0];
+  const questionIndex = parseInt(parts[parts.length - 1], 10);
+  if (isNaN(questionIndex)) return null;
+
+  const levelId = parts.slice(1, -1).join('_');
+
+  const category = learningContent[categoryId as CategoryId];
+  if (!category) return null;
+
+  const level = category.levels.find(l => l.id === levelId);
+  if (!level) return null;
+
+  const lesson = level.lessons[questionIndex];
+  let questionText = '문제 정보 없음';
+  if (lesson) {
+    if (lesson.type === 'quiz' || lesson.type === 'fillblank') {
+      questionText = lesson.question;
+    } else if (lesson.type === 'matching') {
+      questionText = lesson.question || '용어 매칭';
+    } else {
+      questionText = lesson.title || '학습 카드';
+    }
+  }
+
+  const meta = CATEGORY_META[categoryId as CategoryId];
+
+  return {
+    id,
+    categoryId,
+    levelId,
+    questionIndex,
+    categoryTitle: meta?.title ?? categoryId,
+    levelTitle: level.title,
+    questionText,
+    lessons: level.lessons,
+  };
 }
 
 export default function WrongAnswerScreen() {
@@ -21,7 +79,7 @@ export default function WrongAnswerScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
 
-  const [wrongAnswers, setWrongAnswers] = useState<WrongAnswer[]>([]);
+  const [wrongAnswers, setWrongAnswers] = useState<ParsedWrongAnswer[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,13 +87,16 @@ export default function WrongAnswerScreen() {
     getLearningData(user.id)
       .then(data => {
         const ids: string[] = data.wrongAnswers ?? [];
-        setWrongAnswers(ids.map(id => ({ id })));
+        const parsed = ids
+          .map(parseWrongAnswerId)
+          .filter((v): v is ParsedWrongAnswer => v !== null);
+        setWrongAnswers(parsed);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user?.id]);
 
-  function renderItem({ item }: { item: WrongAnswer }) {
+  function renderItem({ item }: { item: ParsedWrongAnswer }) {
     return (
       <View style={styles.card}>
         <View style={styles.cardRow}>
@@ -43,17 +104,20 @@ export default function WrongAnswerScreen() {
             <Text style={styles.iconEmoji}>❓</Text>
           </View>
           <View style={styles.cardContent}>
-            <Text style={styles.idText}>{item.id}</Text>
-            <Text style={styles.subText}>복습이 필요한 문제예요</Text>
+            <Text style={styles.categoryLabel}>{item.categoryTitle} · {item.levelTitle}</Text>
+            <Text style={styles.questionPreview} numberOfLines={2}>{item.questionText}</Text>
           </View>
         </View>
         <TouchableOpacity
           style={styles.studyLink}
           onPress={() => {
-            const parts = item.id.split('_');
-            const categoryId = parts[0];
-            const lessonId = parts.length >= 2 ? `${parts[0]}_${parts[1]}` : parts[0];
-            navigation.navigate('LessonPlayer', { lessonId, categoryId });
+            navigation.navigate('레슨플레이어', {
+              categoryId: item.categoryId,
+              levelId: item.levelId,
+              lessons: item.lessons,
+              levelTitle: item.levelTitle,
+              focusQuestionIndex: item.questionIndex,
+            });
           }}
         >
           <Text style={styles.studyLinkText}>학습하러 가기 →</Text>
@@ -96,8 +160,8 @@ export default function WrongAnswerScreen() {
     },
     iconEmoji: { fontSize: 20 },
     cardContent: { flex: 1 },
-    idText: { fontSize: 14, fontWeight: '600', color: Colors.text },
-    subText: { fontSize: 12, color: Colors.textSub ?? '#6B7280', marginTop: 2 },
+    categoryLabel: { fontSize: 12, fontWeight: '600', color: Colors.primary ?? '#0066FF', marginBottom: 2 },
+    questionPreview: { fontSize: 14, fontWeight: '600', color: Colors.text, lineHeight: 20 },
     studyLink: { marginTop: 10, alignSelf: 'flex-end' },
     studyLinkText: { fontSize: 13, fontWeight: '600', color: Colors.primary ?? '#0066FF' },
     emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
@@ -138,4 +202,3 @@ export default function WrongAnswerScreen() {
     </SafeAreaView>
   );
 }
-

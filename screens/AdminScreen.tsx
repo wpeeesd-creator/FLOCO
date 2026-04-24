@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, FlatList, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, FlatList, TextInput, Platform } from 'react-native';
 import { collection, getDocs, updateDoc, doc, query, orderBy, where } from 'firebase/firestore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../lib/firebase';
 import { useTheme } from '../context/ThemeContext';
 
@@ -17,10 +18,13 @@ type TabType = 'users' | 'trades' | 'control';
 
 export default function AdminScreen() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<TabType>('users');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [trades, setTrades] = useState<any[]>([]);
   const [searchText, setSearchText] = useState('');
+  const [editBalanceUser, setEditBalanceUser] = useState<AdminUser | null>(null);
+  const [editBalanceText, setEditBalanceText] = useState('');
 
   useEffect(() => { loadData(); }, []);
 
@@ -43,20 +47,34 @@ export default function AdminScreen() {
   };
 
   const handleEditBalance = (user: AdminUser) => {
-    Alert.prompt('잔액 수정', `${user.email}`, async (value) => {
-      if (!value || isNaN(Number(value))) return;
-      await updateDoc(doc(db, 'users', user.uid), { balance: Number(value) });
-      Alert.alert('완료', '잔액 수정됐습니다.');
-      loadData();
-    }, 'plain-text', String(user.balance));
+    if (Platform.OS === 'ios') {
+      Alert.prompt('잔액 수정', `${user.email}`, async (value) => {
+        if (!value || isNaN(Number(value))) return;
+        await updateDoc(doc(db, 'users', user.uid), { balance: Number(value) });
+        Alert.alert('완료', '잔액 수정됐습니다.');
+        loadData();
+      }, 'plain-text', String(user.balance));
+    } else {
+      // Android: 인라인 수정 모달 사용
+      setEditBalanceText(String(user.balance));
+      setEditBalanceUser(user);
+    }
+  };
+
+  const confirmEditBalance = async () => {
+    if (!editBalanceUser || isNaN(Number(editBalanceText))) return;
+    await updateDoc(doc(db, 'users', editBalanceUser.uid), { balance: Number(editBalanceText) });
+    Alert.alert('완료', '잔액 수정됐습니다.');
+    setEditBalanceUser(null);
+    loadData();
   };
 
   const handleResetAll = () => {
-    Alert.alert('전체 초기화', '모든 유저를 100만원으로 초기화합니다.', [
+    Alert.alert('전체 초기화', '모든 유저를 1000만원으로 초기화합니다.', [
       { text: '취소', style: 'cancel' },
       { text: '초기화', style: 'destructive', onPress: async () => {
         for (const u of users) {
-          await updateDoc(doc(db, 'users', u.uid), { balance: 1000000, totalAsset: 1000000, portfolio: [], transactions: [] });
+          await updateDoc(doc(db, 'users', u.uid), { balance: 10000000, totalAsset: 10000000, initialBalance: 10000000, portfolio: [], transactions: [] });
         }
         Alert.alert('완료', `${users.length}명 초기화 완료`);
         loadData();
@@ -70,7 +88,34 @@ export default function AdminScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.bg }}>
-      <View style={{ paddingTop: 59, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: theme.bgCard, borderBottomWidth: 1, borderBottomColor: theme.border }}>
+      {/* Android용 잔액 수정 인라인 모달 */}
+      {editBalanceUser && (
+        <View style={{
+          position: 'absolute', inset: 0, zIndex: 100,
+          backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24,
+        }}>
+          <View style={{ backgroundColor: theme.bgCard, borderRadius: 16, padding: 24, width: '100%' }}>
+            <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>잔액 수정</Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 13, marginBottom: 12 }}>{editBalanceUser.email}</Text>
+            <TextInput
+              value={editBalanceText}
+              onChangeText={setEditBalanceText}
+              keyboardType="numeric"
+              style={{ borderWidth: 1, borderColor: theme.borderStrong, borderRadius: 8, padding: 12, color: theme.text, fontSize: 16, marginBottom: 16 }}
+              autoFocus
+            />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity onPress={() => setEditBalanceUser(null)} style={{ flex: 1, padding: 12, borderRadius: 8, backgroundColor: theme.bgInput, alignItems: 'center' }}>
+                <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmEditBalance} style={{ flex: 1, padding: 12, borderRadius: 8, backgroundColor: theme.primary, alignItems: 'center' }}>
+                <Text style={{ color: '#fff', fontWeight: '600' }}>확인</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+      <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: theme.bgCard, borderBottomWidth: 1, borderBottomColor: theme.border }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>🛡️ 관리자</Text>
           <TouchableOpacity onPress={handleResetAll} style={{ backgroundColor: theme.red, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
@@ -101,8 +146,8 @@ export default function AdminScreen() {
                   </Text>
                   <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{u.email}</Text>
                   <Text style={{ color: theme.text, fontSize: 13, marginTop: 4 }}>
-                    총 {u.totalAsset.toLocaleString()}원 · <Text style={{ color: u.totalAsset >= 1000000 ? theme.red : theme.blue }}>
-                      {((u.totalAsset - 1000000) / 1000000 * 100).toFixed(2)}%
+                    총 {u.totalAsset.toLocaleString()}원 · <Text style={{ color: u.totalAsset >= 10000000 ? theme.red : theme.blue }}>
+                      {((u.totalAsset - 10000000) / 10000000 * 100).toFixed(2)}%
                     </Text>
                   </Text>
                   <Text style={{ color: theme.textSecondary, fontSize: 12 }}>현금 {u.balance.toLocaleString()}원</Text>

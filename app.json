@@ -12,25 +12,35 @@
       "resizeMode": "cover",
       "backgroundColor": "#0066FF"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "icon": "./assets/icon.png",
       "supportsTablet": false,
-      "bundleIdentifier": "com.floco.app"
+      "bundleIdentifier": "com.floco.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "프로필 사진 촬영",
+        "NSPhotoLibraryUsageDescription": "프로필 사진 선택",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "3"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#0066FF"
       },
+      "softwareKeyboardLayoutMode": "pan",
       "package": "com.floco.app",
       "versionCode": 1,
       "permissions": [
-        "NOTIFICATIONS",
-        "INTERNET",
-        "ACCESS_NETWORK_STATE",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "android.permission.NOTIFICATIONS",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "extra": {

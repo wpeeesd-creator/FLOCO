@@ -1,5 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+  View, Text, TouchableNativeFeedback, TouchableOpacity,
+  StyleSheet, Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -17,9 +20,10 @@ const TABS = [
 
 export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const paddingBottom = Math.max(insets.bottom, 6);
 
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 6) }]}>
+    <View style={[styles.container, { paddingBottom }]}>
       <View style={styles.separator} />
       <View style={styles.tabRow}>
         {state.routes.map((route, index) => {
@@ -38,6 +42,29 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
             }
           };
 
+          // Android: 물결(Ripple) 효과 / iOS: opacity 효과
+          if (Platform.OS === 'android') {
+            return (
+              <TouchableNativeFeedback
+                key={route.key}
+                onPress={onPress}
+                background={TouchableNativeFeedback.Ripple('rgba(0,102,255,0.12)', true)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isFocused }}
+                accessibilityLabel={meta.label}
+              >
+                <View style={styles.tabBtn}>
+                  <Ionicons
+                    name={isFocused ? meta.iconActive : meta.iconInactive}
+                    size={22}
+                    color={color}
+                  />
+                  <Text style={[styles.label, { color }]}>{meta.label}</Text>
+                </View>
+              </TouchableNativeFeedback>
+            );
+          }
+
           return (
             <TouchableOpacity
               key={route.key}
@@ -46,6 +73,7 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
               style={styles.tabBtn}
               accessibilityRole="button"
               accessibilityState={{ selected: isFocused }}
+              accessibilityLabel={meta.label}
             >
               <Ionicons
                 name={isFocused ? meta.iconActive : meta.iconInactive}
@@ -71,12 +99,15 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
+    // Android 48dp, iOS 49pt 기준 — 60으로 여유 확보
     height: 56,
     alignItems: 'center',
     paddingTop: 4,
   },
   tabBtn: {
     flex: 1,
+    // 최소 터치 영역: Android 48dp / iOS 44pt 준수
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,

@@ -56,10 +56,10 @@ async function fetchOrCreateUser(uid: string, email: string, name: string): Prom
     name,
     nickname: name,
     role: 'user',
-    // 초기 자산 100만원
-    balance: 1_000_000,
-    totalAsset: 1_000_000,
-    initialBalance: 1_000_000,
+    // 초기 자산 1000만원
+    balance: 10_000_000,
+    totalAsset: 10_000_000,
+    initialBalance: 10_000_000,
     // 빈 배열
     portfolio: [],
     transactions: [],

@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useAppStore, STOCKS } from '../store/appStore';
@@ -54,6 +54,10 @@ export default function PortfolioAIScreen() {
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [portfolioPrices, setPortfolioPrices] = useState<Record<string, any>>({});
   const [userData, setUserData] = useState<any>(null);
+  const [lastAnalysisDate, setLastAnalysisDate] = useState<string>('');
+
+  const today = new Date().toISOString().split('T')[0];
+  const alreadyAnalyzedToday = lastAnalysisDate === today;
 
   const pct = (v: string) => `${v}%` as unknown as number; // DimensionValue cast for RN
 
@@ -61,7 +65,11 @@ export default function PortfolioAIScreen() {
   useEffect(() => {
     if (!user?.id) return;
     const unsubscribe = onSnapshot(doc(db, 'users', user.id), (snap) => {
-      if (snap.exists()) setUserData(snap.data());
+      if (snap.exists()) {
+        const data = snap.data();
+        setUserData(data);
+        setLastAnalysisDate(data.lastAnalysisDate ?? '');
+      }
     });
     return () => unsubscribe();
   }, [user?.id]);
@@ -142,6 +150,10 @@ export default function PortfolioAIScreen() {
       Alert.alert('알림', '보유 종목이 없어요!\n먼저 주식을 매수해보세요!');
       return;
     }
+    if (alreadyAnalyzedToday) {
+      Alert.alert('분석 완료', '포트폴리오 분석은 하루 1회만 가능해요\n내일 다시 확인해보세요!', [{ text: '확인' }]);
+      return;
+    }
     if (!isConnected) {
       Alert.alert('오프라인', '인터넷 연결이 끊겨 있어요.\n연결 후 다시 시도해주세요.');
       return;
@@ -197,7 +209,7 @@ ${portfolioSummary}
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
+          max_tokens: 700,
           messages: [{ role: 'user', content: prompt }],
         }),
       }, 30000);
@@ -211,6 +223,12 @@ ${portfolioSummary}
       const result = await response.json();
       const aiText = result?.content?.[0]?.text ?? '분석을 불러오지 못했어요. 잠시 후 다시 시도해주세요.';
       setAnalysis(aiText);
+
+      // 분석 완료 날짜 저장
+      if (user?.id) {
+        await updateDoc(doc(db, 'users', user.id), { lastAnalysisDate: today }).catch(() => {});
+        setLastAnalysisDate(today);
+      }
     } catch (error) {
       console.error('AI 분석 오류:', error);
       const appError = classifyError(error);
@@ -340,9 +358,15 @@ ${portfolioSummary}
               <Text style={styles.cardTitle}>AI 분석 결과</Text>
             </View>
             <Text style={styles.aiText}>{analysis}</Text>
-            <TouchableOpacity onPress={runAIAnalysis} style={styles.reAnalyzeBtn} activeOpacity={0.85}>
-              <Text style={styles.reAnalyzeBtnText}>다시 분석하기</Text>
-            </TouchableOpacity>
+            {alreadyAnalyzedToday ? (
+              <View style={[styles.reAnalyzeBtn, { opacity: 0.4 }]}>
+                <Text style={styles.reAnalyzeBtnText}>오늘 분석 완료 ✓  내일 다시 가능</Text>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={runAIAnalysis} style={styles.reAnalyzeBtn} activeOpacity={0.85}>
+                <Text style={styles.reAnalyzeBtnText}>다시 분석하기</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <View style={[styles.card, styles.ctaCard]}>
@@ -351,8 +375,8 @@ ${portfolioSummary}
             <Text style={styles.ctaDesc}>잘한 점, 개선할 점, 추천 행동을{'\n'}쉽게 설명해드려요</Text>
             <TouchableOpacity
               onPress={runAIAnalysis}
-              disabled={isLoading}
-              style={styles.analyzeBtn}
+              disabled={isLoading || alreadyAnalyzedToday}
+              style={[styles.analyzeBtn, alreadyAnalyzedToday && { opacity: 0.4 }]}
               activeOpacity={0.85}
             >
               {isLoading ? (
@@ -360,6 +384,8 @@ ${portfolioSummary}
                   <ActivityIndicator color={theme.bgCard} size="small" />
                   <Text style={styles.analyzeBtnText}>AI 분석 중...</Text>
                 </>
+              ) : alreadyAnalyzedToday ? (
+                <Text style={styles.analyzeBtnText}>오늘 분석 완료 ✓  내일 다시 가능</Text>
               ) : (
                 <>
                   <Text style={{ fontSize: 20, marginRight: 8 }}>🤖</Text>

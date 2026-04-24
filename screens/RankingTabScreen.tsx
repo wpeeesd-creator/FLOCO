@@ -16,8 +16,9 @@ const TABS: Tab[] = ['전체', '우리 반', '커뮤니티'];
 
 interface SchoolInfo {
   name: string;
-  grade: string;
-  classNum: string;
+  cohort?: string;
+  grade?: string;
+  classNum?: string;
   classId: string;
 }
 
@@ -50,14 +51,14 @@ export default function RankingTabScreen() {
         <View style={styles.emptyClass}>
           <Text style={styles.emptyEmoji}>🏫</Text>
           <Text style={styles.emptyText}>
-            학교/반을 설정하면{'\n'}반 친구들과 경쟁할 수 있어요!
+            학교/기수를 설정하면{'\n'}같은 기수 친구들과 경쟁할 수 있어요!
           </Text>
           <TouchableOpacity
             onPress={() => navigation.getParent()?.navigate('마이페이지Tab', { screen: '학교반설정' })}
             style={styles.emptyBtn}
             activeOpacity={0.85}
           >
-            <Text style={[styles.emptyBtnText, { color: theme.bgCard }]}>학교/반 설정하기</Text>
+            <Text style={[styles.emptyBtnText, { color: theme.bgCard }]}>학교/기수 설정하기</Text>
           </TouchableOpacity>
         </View>
       );
@@ -67,8 +68,7 @@ export default function RankingTabScreen() {
       <ClassRankingScreen
         classId={school.classId}
         schoolName={school.name}
-        grade={school.grade}
-        classNum={school.classNum}
+        cohort={school.cohort ?? school.grade ?? ''}
       />
     );
   };

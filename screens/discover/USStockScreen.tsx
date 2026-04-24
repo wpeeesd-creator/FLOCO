@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl,
 } from 'react-native';
@@ -7,52 +7,14 @@ import { useNavigation } from '@react-navigation/native';
 import StockLogo from '../../components/StockLogo';
 import { useWishlist } from '../../hooks/useWishlist';
 import { useTheme } from '../../context/ThemeContext';
+import { STOCKS } from '../../store/appStore';
 
 // ── 섹터 ──────────────────────────────────
 
-type Sector = '전체' | '기술' | '반도체' | '바이오' | '금융' | '에너지';
+const SECTOR_TABS = ['전체', '기술', '반도체', '금융', '헬스케어', '에너지', '소비재', '산업재', '부동산', '유틸리티'] as const;
+type Sector = (typeof SECTOR_TABS)[number];
 
-interface USStock {
-  ticker: string;
-  name: string;
-  price: number;
-  change: number;
-  sector: Sector;
-  logo: string;
-}
-
-const US_STOCKS: USStock[] = [
-  // 기술
-  { ticker: 'AAPL',  name: 'Apple',           price: 189.50, change: +0.90, sector: '기술',   logo: '🍎' },
-  { ticker: 'MSFT',  name: 'Microsoft',       price: 415.30, change: +0.80, sector: '기술',   logo: '🔷' },
-  { ticker: 'META',  name: 'Meta',            price: 512.60, change: +1.30, sector: '기술',   logo: '👤' },
-  { ticker: 'GOOGL', name: 'Alphabet(Google)', price: 175.80, change: +1.24, sector: '기술',  logo: '🔍' },
-  { ticker: 'AMZN',  name: 'Amazon',          price: 192.10, change: +0.78, sector: '기술',   logo: '📦' },
-  { ticker: 'NFLX',  name: 'Netflix',         price: 628.40, change: +1.87, sector: '기술',   logo: '🎬' },
-  { ticker: 'TSLA',  name: 'Tesla',           price: 214.78, change: -1.23, sector: '기술',   logo: '⚡' },
-  // 반도체
-  { ticker: 'NVDA',  name: 'NVIDIA',          price: 875.40, change: +3.20, sector: '반도체', logo: '🟩' },
-  { ticker: 'AMD',   name: 'AMD',             price: 178.90, change: +2.10, sector: '반도체', logo: '🔴' },
-  { ticker: 'INTC',  name: 'Intel',           price: 43.20,  change: -0.80, sector: '반도체', logo: '🔵' },
-  { ticker: 'TSM',   name: 'TSMC',            price: 158.70, change: +1.82, sector: '반도체', logo: '🇹🇼' },
-  { ticker: 'ASML',  name: 'ASML',            price: 894.50, change: +0.63, sector: '반도체', logo: '🔬' },
-  { ticker: 'QCOM',  name: 'Qualcomm',        price: 162.80, change: +1.14, sector: '반도체', logo: '📡' },
-  // 바이오
-  { ticker: 'PFE',   name: 'Pfizer',          price: 28.40,  change: -0.70, sector: '바이오', logo: '💊' },
-  { ticker: 'JNJ',   name: 'Johnson & Johnson', price: 152.30, change: +0.40, sector: '바이오', logo: '🏥' },
-  { ticker: 'MRNA',  name: 'Moderna',         price: 102.50, change: -1.20, sector: '바이오', logo: '🧬' },
-  { ticker: 'ABBV',  name: 'AbbVie',          price: 178.90, change: +0.35, sector: '바이오', logo: '💉' },
-  // 금융
-  { ticker: 'JPM',   name: 'JPMorgan',        price: 198.70, change: +0.80, sector: '금융',   logo: '🏦' },
-  { ticker: 'GS',    name: 'Goldman Sachs',   price: 478.20, change: -0.20, sector: '금융',   logo: '💼' },
-  { ticker: 'V',     name: 'Visa',            price: 278.40, change: +0.30, sector: '금융',   logo: '💳' },
-  { ticker: 'BAC',   name: 'Bank of America', price: 38.40,  change: +0.32, sector: '금융',   logo: '🏛️' },
-  { ticker: 'COIN',  name: 'Coinbase',        price: 224.10, change: +4.21, sector: '금융',   logo: '🪙' },
-  // 에너지
-  { ticker: 'XOM',   name: 'ExxonMobil',      price: 112.80, change: +1.10, sector: '에너지', logo: '🛢️' },
-  { ticker: 'CVX',   name: 'Chevron',         price: 156.40, change: +0.65, sector: '에너지', logo: '⛽' },
-  { ticker: 'NEE',   name: 'NextEra Energy',  price: 68.20,  change: +0.42, sector: '에너지', logo: '🌱' },
-];
+const US_STOCKS = STOCKS.filter(s => s.market === '미국');
 
 // ── 지수 ──────────────────────────────────
 
@@ -76,9 +38,12 @@ export default function USStockScreen() {
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
 
-  const filtered = sector === '전체'
-    ? US_STOCKS
-    : US_STOCKS.filter(s => s.sector === sector);
+  const filtered = useMemo(() =>
+    sector === '전체'
+      ? US_STOCKS
+      : US_STOCKS.filter(s => s.sector === sector),
+    [sector],
+  );
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.bgCard },
@@ -171,7 +136,7 @@ export default function USStockScreen() {
 
           {/* Sector Tabs */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectorRow}>
-            {(['전체', '기술', '반도체', '바이오', '금융', '에너지'] as Sector[]).map(s => (
+            {SECTOR_TABS.map(s => (
               <TouchableOpacity
                 key={s}
                 style={[styles.sectorBtn, sector === s && styles.sectorBtnActive]}

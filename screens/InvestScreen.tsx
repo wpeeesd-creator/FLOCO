@@ -137,8 +137,11 @@ export default function InvestScreen() {
           wishlist: arrayRemove(existingItem),
         });
       } else {
+        const cleanItem = Object.fromEntries(
+          Object.entries(stockInfo).filter(([_, v]) => v !== undefined)
+        );
         await updateDoc(doc(db, 'users', user.id), {
-          wishlist: arrayUnion(stockInfo),
+          wishlist: arrayUnion(cleanItem),
         });
       }
     } catch (error) {

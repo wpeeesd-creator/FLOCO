@@ -21,7 +21,7 @@ export default function MockTradeScreen() {
     const loadPrices = async () => {
       const result: Record<string, number> = {};
       for (const s of STOCKS) {
-        const data = await fetchSinglePrice(s.ticker, s.isKR ?? false);
+        const data = await fetchSinglePrice(s.ticker, s.krw);
         if (data?.price) result[s.ticker] = data.price;
       }
       setPrices(result);
@@ -147,7 +147,12 @@ export default function MockTradeScreen() {
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={styles.stockPrice}>
-                      {s.krw ? `₩${(prices[s.ticker] ?? s.price).toLocaleString()}` : `$${(prices[s.ticker] ?? s.price).toFixed(2)}`}
+                      {(() => {
+                        const price = prices[s.ticker] ?? s.price;
+                        return s.krw
+                          ? `₩${price.toLocaleString()}`
+                          : `$${price.toFixed(2)} (₩${Math.round(price * 1380).toLocaleString()})`;
+                      })()}
                     </Text>
                     <View style={[styles.changeBadge, { backgroundColor: sUp ? '#FFF0F1' : '#EBF2FF' }]}>
                       <Text style={[styles.changeText, { color: sUp ? '#FF3B30' : '#3182F6' }]}>

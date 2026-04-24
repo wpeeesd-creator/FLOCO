@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { savePortfolio } from '../lib/firestoreService';
 import { logStockPurchase, logStockSold, logLessonCompleted, logLevelUp } from '../lib/analytics';
 import { recordError, setUserId } from '../lib/crashlytics';
+import { US_STOCKS_EXPANDED } from '../data/usStocksExpanded';
 
 // ── 타입 ──────────────────────────────
 
@@ -89,7 +90,7 @@ const STREAK_MILESTONE = 7;
 
 // 참고: STOCKS의 가격은 초기 fallback용 (Yahoo Finance 실시간 가격 로드 전까지만 표시)
 
-export const STOCKS: Stock[] = [
+const _RAW_STOCKS: Stock[] = [
   // ── 미국 기술 ──
   { ticker: 'AAPL',  name: '애플',           market: '미국', price: 189.50, change: +0.9,  logo: '🍎', krw: false, sector: '기술' },
   { ticker: 'MSFT',  name: '마이크로소프트',   market: '미국', price: 415.30, change: +0.8,  logo: '🔷', krw: false, sector: '기술' },
@@ -244,9 +245,158 @@ export const STOCKS: Stock[] = [
   { ticker: 'ZM',    name: '줌',              market: '미국', price: 68.40,  change: -0.8,  logo: '📹', krw: false, sector: '기술' },
   { ticker: 'T',     name: 'AT&T',            market: '미국', price: 18.40,  change: +0.2,  logo: '📞', krw: false, sector: '통신' },
   { ticker: 'VZ',    name: '버라이즌',         market: '미국', price: 42.30,  change: -0.3,  logo: '📶', krw: false, sector: '통신' },
+  // ── 확장 미국 종목 (섹터별 대량 추가) ──
+  ...US_STOCKS_EXPANDED,
+
+  // ── 한국 확장 종목 (섹터별 대량 추가) ──
+  // 반도체
+  { ticker: '042700', name: '한미반도체',        market: '한국', price: 128500, change: +2.1,  logo: '🔬', krw: true, sector: '반도체' },
+  { ticker: '058470', name: '리노공업',          market: '한국', price: 241000, change: +0.8,  logo: '🔧', krw: true, sector: '반도체' },
+  { ticker: '039030', name: '이오테크닉스',      market: '한국', price: 186400, change: -0.4,  logo: '💠', krw: true, sector: '반도체' },
+  { ticker: '240810', name: '원익IPS',          market: '한국', price: 37550,  change: +1.1,  logo: '🔬', krw: true, sector: '반도체' },
+  { ticker: '005290', name: '동진쎄미켐',        market: '한국', price: 42100,  change: +0.4,  logo: '🧪', krw: true, sector: '반도체' },
+  { ticker: '036930', name: '주성엔지니어링',    market: '한국', price: 32150,  change: +0.9,  logo: '⚙️', krw: true, sector: '반도체' },
+  { ticker: '319660', name: '피에스케이',        market: '한국', price: 27300,  change: -0.3,  logo: '🔧', krw: true, sector: '반도체' },
+  { ticker: '357780', name: '솔브레인',          market: '한국', price: 281500, change: +1.5,  logo: '🧪', krw: true, sector: '반도체' },
+  { ticker: '000990', name: 'DB하이텍',          market: '한국', price: 52400,  change: +0.8,  logo: '🔬', krw: true, sector: '반도체' },
+  { ticker: '064760', name: '티씨케이',          market: '한국', price: 98600,  change: -0.5,  logo: '⚙️', krw: true, sector: '반도체' },
+  { ticker: '067310', name: '하나마이크론',      market: '한국', price: 24850,  change: +1.8,  logo: '💾', krw: true, sector: '반도체' },
+  { ticker: '033640', name: '네패스',            market: '한국', price: 14900,  change: +0.6,  logo: '🔧', krw: true, sector: '반도체' },
+  { ticker: '074600', name: '원익QnC',          market: '한국', price: 28350,  change: +0.4,  logo: '🔬', krw: true, sector: '반도체' },
+  { ticker: '095340', name: 'ISC',              market: '한국', price: 76400,  change: +1.2,  logo: '🔧', krw: true, sector: '반도체' },
+  { ticker: '140860', name: '파크시스템스',      market: '한국', price: 182000, change: +0.6,  logo: '🔬', krw: true, sector: '반도체' },
+  { ticker: '101490', name: '에스앤에스텍',      market: '한국', price: 71300,  change: -0.6,  logo: '🧪', krw: true, sector: '반도체' },
+  { ticker: '131290', name: '티에스이',          market: '한국', price: 38400,  change: +0.8,  logo: '🔧', krw: true, sector: '반도체' },
+  { ticker: '222800', name: '심텍',              market: '한국', price: 42600,  change: +1.1,  logo: '🔬', krw: true, sector: '반도체' },
+  // IT / 게임
+  { ticker: '012510', name: '더존비즈온',        market: '한국', price: 46500,  change: +0.3,  logo: '💻', krw: true, sector: 'IT' },
+  { ticker: '030520', name: '한글과컴퓨터',      market: '한국', price: 18450,  change: +0.3,  logo: '💻', krw: true, sector: 'IT' },
+  { ticker: '053800', name: '안랩',              market: '한국', price: 62300,  change: +0.8,  logo: '🛡️', krw: true, sector: 'IT' },
+  { ticker: '042510', name: '라온시큐어',        market: '한국', price: 4620,   change: +1.5,  logo: '🔐', krw: true, sector: 'IT' },
+  { ticker: '078340', name: '컴투스',            market: '한국', price: 48600,  change: +0.8,  logo: '🎮', krw: true, sector: '게임' },
+  { ticker: '112040', name: '위메이드',          market: '한국', price: 46300,  change: +1.1,  logo: '🐉', krw: true, sector: '게임' },
+  { ticker: '192080', name: '더블유게임즈',      market: '한국', price: 71800,  change: +0.6,  logo: '🎰', krw: true, sector: '게임' },
+  { ticker: '063080', name: '컴투스홀딩스',      market: '한국', price: 28900,  change: +0.2,  logo: '🎮', krw: true, sector: '게임' },
+  { ticker: '194480', name: '데브시스터즈',      market: '한국', price: 38400,  change: +0.8,  logo: '🍪', krw: true, sector: '게임' },
+  { ticker: '069080', name: '웹젠',              market: '한국', price: 16850,  change: -0.4,  logo: '⚔️', krw: true, sector: '게임' },
+  { ticker: '462870', name: '시프트업',          market: '한국', price: 61200,  change: +1.9,  logo: '🎮', krw: true, sector: '게임' },
+  // 자동차
+  { ticker: '018880', name: '한온시스템',        market: '한국', price: 7420,   change: +0.4,  logo: '❄️', krw: true, sector: '자동차' },
+  { ticker: '073240', name: '금호타이어',        market: '한국', price: 6580,   change: +0.3,  logo: '⭕', krw: true, sector: '자동차' },
+  { ticker: '002350', name: '넥센타이어',        market: '한국', price: 8230,   change: -0.1,  logo: '⭕', krw: true, sector: '자동차' },
+  { ticker: '011210', name: '현대위아',          market: '한국', price: 62400,  change: +0.5,  logo: '🔧', krw: true, sector: '자동차' },
+  { ticker: '204320', name: 'HL만도',            market: '한국', price: 43250,  change: +0.2,  logo: '🔧', krw: true, sector: '자동차' },
+  { ticker: '064960', name: 'S&T모티브',         market: '한국', price: 58700,  change: -0.3,  logo: '🔧', krw: true, sector: '자동차' },
+  { ticker: '005850', name: '에스엘',            market: '한국', price: 34600,  change: +0.6,  logo: '💡', krw: true, sector: '자동차' },
+  { ticker: '086280', name: '현대글로비스',      market: '한국', price: 168500, change: +0.9,  logo: '🚚', krw: true, sector: '자동차' },
+  // 2차전지
+  { ticker: '003670', name: '포스코퓨처엠',      market: '한국', price: 268500, change: +0.8,  logo: '🔋', krw: true, sector: '2차전지' },
+  { ticker: '066970', name: '엘앤에프',          market: '한국', price: 128300, change: +0.7,  logo: '🔋', krw: true, sector: '2차전지' },
+  { ticker: '005070', name: '코스모신소재',      market: '한국', price: 89400,  change: +0.3,  logo: '🧪', krw: true, sector: '2차전지' },
+  { ticker: '005420', name: '코스모화학',        market: '한국', price: 36500,  change: -0.3,  logo: '🧪', krw: true, sector: '2차전지' },
+  { ticker: '011790', name: 'SKC',              market: '한국', price: 103800, change: +0.9,  logo: '🧪', krw: true, sector: '2차전지' },
+  { ticker: '278280', name: '천보',              market: '한국', price: 68400,  change: +0.6,  logo: '🔋', krw: true, sector: '2차전지' },
+  { ticker: '078600', name: '대주전자재료',      market: '한국', price: 82700,  change: +1.3,  logo: '⚡', krw: true, sector: '2차전지' },
+  { ticker: '121600', name: '나노신소재',        market: '한국', price: 71200,  change: +0.5,  logo: '🔬', krw: true, sector: '2차전지' },
+  { ticker: '336370', name: '솔루스첨단소재',    market: '한국', price: 18600,  change: -0.5,  logo: '🧪', krw: true, sector: '2차전지' },
+  // 바이오
+  { ticker: '091990', name: '셀트리온헬스케어', market: '한국', price: 76400,  change: +0.7,  logo: '💊', krw: true, sector: '바이오' },
+  { ticker: '006280', name: '녹십자',            market: '한국', price: 142800, change: +0.3,  logo: '💉', krw: true, sector: '바이오' },
+  { ticker: '185750', name: '종근당',            market: '한국', price: 118400, change: -0.2,  logo: '💊', krw: true, sector: '바이오' },
+  { ticker: '069620', name: '대웅제약',          market: '한국', price: 124500, change: +0.6,  logo: '💊', krw: true, sector: '바이오' },
+  { ticker: '170900', name: '동아에스티',        market: '한국', price: 71200,  change: +0.4,  logo: '💊', krw: true, sector: '바이오' },
+  { ticker: '302440', name: 'SK바이오사이언스', market: '한국', price: 58600,  change: +0.5,  logo: '🧬', krw: true, sector: '바이오' },
+  { ticker: '196170', name: '알테오젠',          market: '한국', price: 372500, change: +2.1,  logo: '🧬', krw: true, sector: '바이오' },
+  { ticker: '141080', name: '레고켐바이오',      market: '한국', price: 89500,  change: +0.9,  logo: '🧬', krw: true, sector: '바이오' },
+  { ticker: '028300', name: 'HLB',              market: '한국', price: 72400,  change: +1.4,  logo: '💊', krw: true, sector: '바이오' },
+  { ticker: '086900', name: '메디톡스',          market: '한국', price: 186300, change: +0.6,  logo: '💉', krw: true, sector: '바이오' },
+  { ticker: '145020', name: '휴젤',              market: '한국', price: 231000, change: +0.9,  logo: '💉', krw: true, sector: '바이오' },
+  { ticker: '214150', name: '클래시스',          market: '한국', price: 48900,  change: +0.7,  logo: '💊', krw: true, sector: '바이오' },
+  { ticker: '096530', name: '씨젠',              market: '한국', price: 28400,  change: -0.2,  logo: '🧬', krw: true, sector: '바이오' },
+  { ticker: '326030', name: 'SK바이오팜',        market: '한국', price: 91400,  change: +0.9,  logo: '🧬', krw: true, sector: '바이오' },
+  // 금융
+  { ticker: '316140', name: '우리금융지주',      market: '한국', price: 14850,  change: +0.3,  logo: '🏦', krw: true, sector: '금융' },
+  { ticker: '006800', name: '미래에셋증권',      market: '한국', price: 8320,   change: +0.4,  logo: '💼', krw: true, sector: '금융' },
+  { ticker: '016360', name: '삼성증권',          market: '한국', price: 44800,  change: +0.5,  logo: '💼', krw: true, sector: '금융' },
+  { ticker: '005940', name: 'NH투자증권',       market: '한국', price: 12650,  change: +0.2,  logo: '💼', krw: true, sector: '금융' },
+  { ticker: '071050', name: '한국금융지주',      market: '한국', price: 71200,  change: +0.3,  logo: '💼', krw: true, sector: '금융' },
+  { ticker: '039490', name: '키움증권',          market: '한국', price: 135000, change: +0.6,  logo: '💼', krw: true, sector: '금융' },
+  { ticker: '138040', name: '메리츠금융지주',    market: '한국', price: 87600,  change: +0.7,  logo: '🏦', krw: true, sector: '금융' },
+  { ticker: '138930', name: 'BNK금융지주',      market: '한국', price: 9850,   change: +0.3,  logo: '🏦', krw: true, sector: '금융' },
+  { ticker: '139130', name: 'DGB금융지주',      market: '한국', price: 8120,   change: +0.3,  logo: '🏦', krw: true, sector: '금융' },
+  { ticker: '175330', name: 'JB금융지주',       market: '한국', price: 14200,  change: +0.1,  logo: '🏦', krw: true, sector: '금융' },
+  { ticker: '088350', name: '한화생명',          market: '한국', price: 3780,   change: +0.3,  logo: '🛡️', krw: true, sector: '금융' },
+  { ticker: '005830', name: 'DB손해보험',        market: '한국', price: 116800, change: +0.5,  logo: '🛡️', krw: true, sector: '금융' },
+  { ticker: '001450', name: '현대해상',          market: '한국', price: 37600,  change: +0.4,  logo: '🛡️', krw: true, sector: '금융' },
+  // 방산
+  { ticker: '079550', name: 'LIG넥스원',         market: '한국', price: 218500, change: +0.9,  logo: '🚀', krw: true, sector: '방산' },
+  { ticker: '272210', name: '한화시스템',        market: '한국', price: 22400,  change: +0.5,  logo: '🛰️', krw: true, sector: '방산' },
+  { ticker: '103140', name: '풍산',              market: '한국', price: 54300,  change: +0.7,  logo: '💣', krw: true, sector: '방산' },
+  { ticker: '065450', name: '빅텍',              market: '한국', price: 7820,   change: +0.9,  logo: '📡', krw: true, sector: '방산' },
+  { ticker: '010820', name: '퍼스텍',            market: '한국', price: 4125,   change: +0.6,  logo: '🛩️', krw: true, sector: '방산' },
+  // 엔터 / 미디어
+  { ticker: '035900', name: 'JYP Ent.',         market: '한국', price: 68400,  change: +0.5,  logo: '🎤', krw: true, sector: '엔터' },
+  { ticker: '041510', name: 'SM',               market: '한국', price: 82300,  change: +0.2,  logo: '🎤', krw: true, sector: '엔터' },
+  { ticker: '122870', name: 'YG엔터테인먼트',    market: '한국', price: 46800,  change: +0.4,  logo: '🎤', krw: true, sector: '엔터' },
+  { ticker: '035760', name: 'CJ ENM',           market: '한국', price: 72400,  change: -0.3,  logo: '📺', krw: true, sector: '엔터' },
+  { ticker: '253450', name: '스튜디오드래곤',    market: '한국', price: 41200,  change: +0.6,  logo: '🐉', krw: true, sector: '엔터' },
+  { ticker: '036420', name: '콘텐트리중앙',      market: '한국', price: 12850,  change: +0.3,  logo: '📺', krw: true, sector: '엔터' },
+  // 화학
+  { ticker: '009830', name: '한화솔루션',        market: '한국', price: 28400,  change: +0.5,  logo: '🧪', krw: true, sector: '화학' },
+  { ticker: '011780', name: '금호석유',          market: '한국', price: 128300, change: +0.7,  logo: '🛢️', krw: true, sector: '화학' },
+  { ticker: '298000', name: '효성화학',          market: '한국', price: 108500, change: +0.4,  logo: '🧪', krw: true, sector: '화학' },
+  { ticker: '010060', name: 'OCI홀딩스',        market: '한국', price: 89200,  change: +0.4,  logo: '🧪', krw: true, sector: '화학' },
+  { ticker: '006650', name: '대한유화',          market: '한국', price: 142000, change: +0.5,  logo: '🧪', krw: true, sector: '화학' },
+  { ticker: '120110', name: '코오롱인더',        market: '한국', price: 42600,  change: +0.2,  logo: '🧪', krw: true, sector: '화학' },
+  { ticker: '002380', name: 'KCC',              market: '한국', price: 281500, change: +0.6,  logo: '🏗️', krw: true, sector: '화학' },
+  { ticker: '014680', name: '한솔케미칼',        market: '한국', price: 148700, change: +0.9,  logo: '🧪', krw: true, sector: '화학' },
+  // 철강 / 조선 / 중공업
+  { ticker: '004020', name: '현대제철',          market: '한국', price: 36400,  change: +0.2,  logo: '🏗️', krw: true, sector: '철강' },
+  { ticker: '001230', name: '동국제강',          market: '한국', price: 14850,  change: +0.2,  logo: '🏗️', krw: true, sector: '철강' },
+  { ticker: '306200', name: '세아제강',          market: '한국', price: 128400, change: +0.5,  logo: '🏗️', krw: true, sector: '철강' },
+  { ticker: '010140', name: '삼성중공업',        market: '한국', price: 9850,   change: +0.5,  logo: '🚢', krw: true, sector: '조선' },
+  { ticker: '329180', name: 'HD현대중공업',     market: '한국', price: 142500, change: +0.7,  logo: '🚢', krw: true, sector: '조선' },
+  { ticker: '267250', name: 'HD현대',           market: '한국', price: 82400,  change: +0.3,  logo: '🚢', krw: true, sector: '조선' },
+  { ticker: '241560', name: '두산밥캣',          market: '한국', price: 48600,  change: +0.4,  logo: '🚜', krw: true, sector: '중공업' },
+  { ticker: '000150', name: '두산',              market: '한국', price: 128000, change: +0.4,  logo: '🏭', krw: true, sector: '중공업' },
+  // 유통 / 식품
+  { ticker: '139480', name: '이마트',            market: '한국', price: 68200,  change: +0.2,  logo: '🛒', krw: true, sector: '유통' },
+  { ticker: '023530', name: '롯데쇼핑',          market: '한국', price: 78900,  change: -0.2,  logo: '🛍️', krw: true, sector: '유통' },
+  { ticker: '004170', name: '신세계',            market: '한국', price: 164500, change: +0.3,  logo: '🏬', krw: true, sector: '유통' },
+  { ticker: '069960', name: '현대백화점',        market: '한국', price: 52300,  change: +0.2,  logo: '🏬', krw: true, sector: '유통' },
+  { ticker: '007070', name: 'GS리테일',         market: '한국', price: 21800,  change: +0.2,  logo: '🏪', krw: true, sector: '유통' },
+  { ticker: '282330', name: 'BGF리테일',        market: '한국', price: 118400, change: +0.4,  logo: '🏪', krw: true, sector: '유통' },
+  { ticker: '007310', name: '오뚜기',            market: '한국', price: 421000, change: +0.4,  logo: '🍜', krw: true, sector: '식품' },
+  { ticker: '004370', name: '농심',              market: '한국', price: 398000, change: +0.4,  logo: '🍜', krw: true, sector: '식품' },
+  { ticker: '097950', name: 'CJ제일제당',        market: '한국', price: 271000, change: +0.3,  logo: '🍚', krw: true, sector: '식품' },
+  { ticker: '003230', name: '삼양식품',          market: '한국', price: 582000, change: +2.1,  logo: '🍜', krw: true, sector: '식품' },
+  { ticker: '271560', name: '오리온',            market: '한국', price: 108400, change: +0.5,  logo: '🍪', krw: true, sector: '식품' },
+  { ticker: '005180', name: '빙그레',            market: '한국', price: 89200,  change: +0.3,  logo: '🍦', krw: true, sector: '식품' },
+  { ticker: '005300', name: '롯데칠성',          market: '한국', price: 138500, change: +0.2,  logo: '🥤', krw: true, sector: '식품' },
+  { ticker: '000080', name: '하이트진로',        market: '한국', price: 21850,  change: +0.2,  logo: '🍺', krw: true, sector: '식품' },
+  // 건설
+  { ticker: '000720', name: '현대건설',          market: '한국', price: 37200,  change: +0.5,  logo: '🏗️', krw: true, sector: '건설' },
+  { ticker: '047040', name: '대우건설',          market: '한국', price: 3845,   change: +0.3,  logo: '🏗️', krw: true, sector: '건설' },
+  { ticker: '006360', name: 'GS건설',           market: '한국', price: 18200,  change: +0.4,  logo: '🏗️', krw: true, sector: '건설' },
+  { ticker: '294870', name: 'HDC현대산업개발',   market: '한국', price: 22400,  change: +0.4,  logo: '🏗️', krw: true, sector: '건설' },
+  { ticker: '375500', name: 'DL이앤씨',         market: '한국', price: 36800,  change: +0.5,  logo: '🏗️', krw: true, sector: '건설' },
 ];
 
 // STOCKS 가격은 Yahoo Finance 실시간 가격 로드 전 fallback으로만 사용됩니다.
+// 중복 티커 자동 제거 (기존 종목 우선)
+const _seen = new Set<string>();
+export const STOCKS: Stock[] = _RAW_STOCKS.filter(s => {
+  if (_seen.has(s.ticker)) return false;
+  _seen.add(s.ticker);
+  return true;
+});
+
+// 종목 수 콘솔 출력
+const _krCount = STOCKS.filter(s => s.market === '한국').length;
+const _usCount = STOCKS.filter(s => s.market === '미국').length;
+console.log(
+  `[FLOCO] 투자 종목 로드 — 국내 ${_krCount}개 · 미국 ${_usCount}개 · 총 ${STOCKS.length}개`,
+);
 
 export const LESSONS: Lesson[] = [
   {

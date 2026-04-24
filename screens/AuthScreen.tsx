@@ -2,24 +2,17 @@
  * 인증 화면 — Firebase 이메일 로그인 / 회원가입
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
 import { validateEmail, validatePassword, validateName } from '../lib/errorHandler';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
-
-WebBrowser.maybeCompleteAuthSession();
-
-const WEB_CLIENT_ID  = '572965735174-esma8uktkqtk92pqai7dm9ci80s7uhli.apps.googleusercontent.com';
-const EXPO_CLIENT_ID = '572965735174-3hrl5qope4q11o5eqphlmf28rn41fehf.apps.googleusercontent.com';
 
 type Mode = 'login' | 'register';
 
@@ -32,23 +25,10 @@ export default function AuthScreen() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
 
-  const { login, register, loginWithGoogle, isLoading } = useAuth();
+  const { login, register, isLoading } = useAuth();
   const { isConnected } = useNetworkStatus();
   const loading = isLoading;
   const shakeAnim = useRef(new Animated.Value(0)).current;
-
-  const [, googleResponse, googlePrompt] = Google.useAuthRequest({
-    clientId: EXPO_CLIENT_ID,
-    webClientId: WEB_CLIENT_ID,
-    iosClientId: EXPO_CLIENT_ID,
-  });
-
-  useEffect(() => {
-    if (googleResponse?.type === 'success') {
-      const idToken = googleResponse.params.id_token;
-      if (idToken) loginWithGoogle(idToken);
-    }
-  }, [googleResponse]);
 
   function shake() {
     Animated.sequence([
@@ -144,13 +124,6 @@ export default function AuthScreen() {
     dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
     dividerText: { fontSize: 12, color: Colors.textMuted },
-    googleBtn: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-      backgroundColor: theme.bgCard, borderRadius: 14, paddingVertical: 14,
-      borderWidth: 1.5, borderColor: Colors.border, gap: 10,
-    },
-    googleIcon: { fontSize: 16, fontWeight: '800', color: '#4285F4' },
-    googleText: { fontSize: 15, fontWeight: '600', color: Colors.text },
     infoBox: { backgroundColor: '#EAF4FF', borderRadius: 10, padding: 12, alignItems: 'center', gap: 4 },
     infoText: { fontSize: 12, color: Colors.primary },
   });
@@ -249,23 +222,6 @@ export default function AuthScreen() {
           </TouchableOpacity>
 
           {/* 구분선 */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>또는</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* 구글 로그인 버튼 */}
-          <TouchableOpacity
-            style={styles.googleBtn}
-            onPress={() => googlePrompt()}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.googleIcon}>G</Text>
-            <Text style={styles.googleText}>Google로 계속하기</Text>
-          </TouchableOpacity>
-
           {mode === 'login' && (
             <View style={styles.infoBox}>
               <Text style={styles.infoText}>💡 관리자: admin@floco.com</Text>

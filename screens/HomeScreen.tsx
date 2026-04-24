@@ -17,7 +17,7 @@ import StockLogo from '../components/StockLogo';
 import NewsCard from '../components/NewsCard';
 import { useAllNews } from '../hooks/useNews';
 import { loadTodayMissions, ALL_COMPLETE_BONUS, type DailyMission } from '../lib/missionService';
-import { fetchMultiplePrices, calculateProfit } from '../utils/priceService';
+import { fetchMultiplePrices, calculateProfit, getExchangeRate } from '../utils/priceService';
 import { useTheme } from '../context/ThemeContext';
 
 type TopTab = '보유' | '관심';
@@ -105,6 +105,13 @@ export default function HomeScreen() {
     }).catch(() => {});
   }, [user?.id]);
 
+  // ── 환율 ──────────────────────────────────────────
+  const [exchangeRate, setExchangeRate] = useState(1380);
+
+  useEffect(() => {
+    getExchangeRate().then(rate => setExchangeRate(rate));
+  }, []);
+
   // ── 보유 종목 실시간 가격 ──────────────────────────
   const [portfolioPrices, setPortfolioPrices] = useState<Record<string, any>>({});
 
@@ -139,10 +146,14 @@ export default function HomeScreen() {
   // ── Derived values ────────────────────────────────
   const balance = cash !== undefined ? cash : (firestoreBalance ?? 1_000_000);
   const safeHoldingsRaw = holdings ?? [];
+  console.log('보유종목 raw:', JSON.stringify(safeHoldingsRaw.find(h => h.ticker === 'NOW'), null, 2));
+  console.log('exchangeRate:', exchangeRate);
   const portfolioValue = safeHoldingsRaw.reduce((sum, h) => {
-    const livePrice = portfolioPrices[h.ticker]?.price;
-    const stockPrice = STOCKS.find(s => s.ticker === h.ticker)?.price ?? 0;
-    return sum + (livePrice ?? stockPrice) * (h.qty ?? 0);
+    const livePrice = portfolioPrices[h.ticker]?.price ??
+      STOCKS.find(s => s.ticker === h.ticker)?.price ?? 0;
+    const isKR = (h as any).krw ?? STOCKS.find(s => s.ticker === h.ticker)?.krw ?? true;
+    const livePriceKRW = isKR ? livePrice : Math.round(livePrice * exchangeRate);
+    return sum + livePriceKRW * (h.qty ?? 0);
   }, 0);
   const realTotalAsset = balance + portfolioValue;
   const initialBalance = firestoreInitialBalance ?? 1_000_000;
@@ -158,24 +169,29 @@ export default function HomeScreen() {
         totalAsset: Math.round(realTotalAsset),
       }).catch(console.error);
     }
-  }, [realTotalAsset]);
+  }, [user?.id, realTotalAsset, firestoreTotalAsset, safeHoldingsRaw.length]);
 
   // ── Holdings computation ──────────────────────────
   const safeHoldings = holdings ?? [];
   const holdingsData = safeHoldings.map(h => {
     const stock = STOCKS.find(s => s.ticker === h.ticker);
     if (!stock) return null;
-    const livePrice = portfolioPrices[h.ticker]?.price ?? stock.price ?? 0;
-    const evalAmt = livePrice * (h.qty ?? 0);
-    const pnlAmt = (livePrice - (h.avgPrice ?? 0)) * (h.qty ?? 0);
+    const isKR = (h as any).krw ?? stock?.krw ?? true;
+    const pd = portfolioPrices[h.ticker];
+    const livePrice = pd?.price ?? stock?.price ?? 0;
+    const livePriceKRW = isKR ? livePrice : Math.round(livePrice * exchangeRate);
+    const evalAmt = livePriceKRW * (h.qty ?? 0);
+    const pnlAmt = (livePriceKRW - (h.avgPrice ?? 0)) * (h.qty ?? 0);
     const pnlRate = (h.avgPrice ?? 0) > 0
-      ? ((livePrice - (h.avgPrice ?? 0)) / (h.avgPrice ?? 0)) * 100
+      ? ((livePriceKRW - (h.avgPrice ?? 0)) / (h.avgPrice ?? 0)) * 100
       : 0;
-    console.log('종목:', h.ticker, '평균매수가:', h.avgPrice, '현재가:', livePrice, '수익률:', pnlRate.toFixed(2));
-    return { ...h, stock: { ...stock, price: livePrice }, evalAmt, pnlAmt, pnlRate };
+    // 전일 종가 대비 시장 등락률 (Yahoo Finance 제공값)
+    const todayChange = pd?.change ?? 0;
+    return { ...h, stock: { ...stock, price: livePriceKRW }, evalAmt, pnlAmt, pnlRate, todayChange };
   }).filter(Boolean) as Array<{
     ticker: string; qty: number; avgPrice: number;
     stock: typeof STOCKS[0]; evalAmt: number; pnlAmt: number; pnlRate: number;
+    todayChange: number;
   }>;
 
   const filteredHoldings = holdingsData.filter(h => {
@@ -198,10 +214,29 @@ export default function HomeScreen() {
 
   const watchlistStocks = wishlist;
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    try {
+      const safeH = holdings ?? [];
+      if (safeH.length > 0) {
+        const tickers = safeH.map(h => ({
+          ticker: h.ticker,
+          isKR: h.ticker.length === 6 && /^\d+$/.test(h.ticker),
+        }));
+        const prices = await fetchMultiplePrices(tickers);
+        setPortfolioPrices(prices);
+      }
+      if (wishlist.length > 0) {
+        const tickers = wishlist.map((s: any) => ({
+          ticker: s.ticker,
+          isKR: s.isKR ?? (s.ticker.length === 6 && /^\d+$/.test(s.ticker)),
+        }));
+        const prices = await fetchMultiplePrices(tickers);
+        setWishlistPrices(prices);
+      }
+    } catch {}
+    setRefreshing(false);
+  }, [holdings, wishlist]);
 
   // ── Shared banners ────────────────────────────────
   const renderNoticeBanner = () => (
@@ -248,16 +283,25 @@ export default function HomeScreen() {
 
   const getMarketStatus = () => {
     const now = new Date();
-    const koreaOffset = 9 * 60; // UTC+9
     const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
-    const koreaMs = utcMs + koreaOffset * 60000;
+
+    // 한국 KST (UTC+9, DST 없음)
+    const koreaMs = utcMs + 9 * 60 * 60000;
     const korea = new Date(koreaMs);
     const koreaHour = korea.getHours();
     const koreaMin = korea.getMinutes();
     const koreaDay = korea.getDay();
 
-    const nyOffset = -5 * 60; // UTC-5 (EST, simplified)
-    const nyMs = utcMs + nyOffset * 60000;
+    // 뉴욕 DST 적용 (3월 둘째 일요일 ~ 11월 첫째 일요일 : EDT UTC-4, 그 외 EST UTC-5)
+    const year = now.getUTCFullYear();
+    const marchSecondSunday = new Date(Date.UTC(year, 2, 1));
+    marchSecondSunday.setUTCDate(1 + (7 - marchSecondSunday.getUTCDay()) % 7 + 7);
+    const novFirstSunday = new Date(Date.UTC(year, 10, 1));
+    novFirstSunday.setUTCDate(1 + (7 - novFirstSunday.getUTCDay()) % 7);
+    const isNYDST = now >= marchSecondSunday && now < novFirstSunday;
+    const nyOffsetMin = isNYDST ? -4 * 60 : -5 * 60;
+
+    const nyMs = utcMs + nyOffsetMin * 60000;
     const ny = new Date(nyMs);
     const nyHour = ny.getHours();
     const nyMin = ny.getMinutes();
@@ -1255,14 +1299,13 @@ export default function HomeScreen() {
                         <Text style={styles.holdingEval}>
                           {h.stock.krw
                             ? `${Math.round(h.evalAmt).toLocaleString()}원`
-                            : `$${h.evalAmt.toFixed(2)}`}
+                            : `$${(h.evalAmt / exchangeRate).toFixed(2)} (${Math.round(h.evalAmt).toLocaleString()}원)`}
                         </Text>
-                        <Text style={[styles.holdingPnl, { color: hUp ? theme.red : theme.blue }]}>
-                          {hUp ? '+' : ''}
-                          {h.stock.krw
-                            ? `${Math.round(h.pnlAmt).toLocaleString()}원`
-                            : `$${h.pnlAmt.toFixed(2)}`}
-                          {'  '}{hUp ? '+' : ''}{h.pnlRate.toFixed(2)}%
+                        <Text style={{ fontSize: 12, color: h.todayChange >= 0 ? theme.red : theme.blue, marginTop: 2 }}>
+                          오늘 {h.todayChange >= 0 ? '+' : ''}{h.todayChange.toFixed(2)}%
+                        </Text>
+                        <Text style={{ fontSize: 12, color: hUp ? theme.red : theme.blue, marginTop: 1 }}>
+                          수익 {hUp ? '+' : ''}{h.pnlRate.toFixed(2)}%
                         </Text>
                       </View>
                     </TouchableOpacity>

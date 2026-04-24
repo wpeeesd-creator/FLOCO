@@ -31,11 +31,10 @@ interface ClassMember {
 interface ClassRankingScreenProps {
   classId: string;
   schoolName: string;
-  grade: string;
-  classNum: string;
+  cohort: string;
 }
 
-export default function ClassRankingScreen({ classId, schoolName, grade, classNum }: ClassRankingScreenProps) {
+export default function ClassRankingScreen({ classId, schoolName, cohort }: ClassRankingScreenProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigation = useNavigation<any>();
@@ -145,7 +144,7 @@ export default function ClassRankingScreen({ classId, schoolName, grade, classNu
       {/* 반 정보 카드 */}
       <View style={styles.classCard}>
         <Text style={styles.classCardLabel}>현재 반</Text>
-        <Text style={styles.classCardTitle}>{schoolName} {grade} {classNum}</Text>
+        <Text style={styles.classCardTitle}>{schoolName} {cohort}</Text>
         <Text style={styles.classCardSub}>총 {ranked.length}명 참여 중</Text>
       </View>
 
@@ -154,7 +153,7 @@ export default function ClassRankingScreen({ classId, schoolName, grade, classNu
         <View style={styles.empty}>
           <Text style={styles.emptyEmoji}>👥</Text>
           <Text style={styles.emptyText}>
-            아직 반 친구들이 없어요{'\n'}친구들을 초대해보세요!
+            아직 같은 기수 친구들이 없어요{'\n'}친구들을 초대해보세요!
           </Text>
           <TouchableOpacity
             onPress={() => navigation.getParent()?.navigate('마이페이지Tab')}

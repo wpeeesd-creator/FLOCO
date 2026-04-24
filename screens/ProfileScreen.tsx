@@ -25,7 +25,8 @@ import { fetchMultiplePrices, calculateProfit } from '../utils/priceService';
 interface InvestmentType {
   emoji: string;
   title: string;
-  mbtiLike: string;
+  mbtiLike?: string;
+  mbti?: string;
   color?: string;
   description?: string;
 }
@@ -52,11 +53,11 @@ export default function ProfileScreen() {
     invitedFriends: [] as string[],
     inviteReward: 0,
   });
-  const [schoolInfo, setSchoolInfo] = useState<{ name: string; grade: string; classNum: string } | null>(null);
+  const [schoolInfo, setSchoolInfo] = useState<{ name: string; cohort?: string; grade?: string; classNum?: string } | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [realNameVerified, setRealNameVerified] = useState(false);
   const [portfolioPrices, setPortfolioPrices] = useState<Record<string, any>>({});
-  const { theme, isDark, toggleTheme } = useTheme();
+  const { theme } = useTheme();
 
   // ── Firestore: user profile + investment type (realtime) ──────────────
   useEffect(() => {
@@ -211,9 +212,9 @@ export default function ProfileScreen() {
                   onPress: async () => {
                     try {
                       await updateDoc(doc(db, 'users', currentUser!.id), {
-                        balance: 1000000,
-                        totalAsset: 1000000,
-                        initialBalance: 1000000,
+                        balance: 10000000,
+                        totalAsset: 10000000,
+                        initialBalance: 10000000,
                         portfolio: [],
                         transactions: [],
                         wishlist: [],
@@ -390,7 +391,7 @@ export default function ProfileScreen() {
               <Text style={styles.typeBadgeText}>
                 {investmentType.emoji}{'  '}{investmentType.title}{'  '}
                 <Text style={{ color: theme.textSecondary, fontWeight: '400' }}>
-                  {investmentType.mbtiLike}
+                  {investmentType.mbti ?? investmentType.mbtiLike}
                 </Text>
                 {'  '}
                 <Text style={{ color: theme.primary }}>재분석 →</Text>
@@ -405,31 +406,6 @@ export default function ProfileScreen() {
               <Text style={styles.surveyBtnText}>🔮  내 투자 유형 분석하기</Text>
             </TouchableOpacity>
           )}
-        </View>
-
-        {/* ── 다크모드 토글 ── */}
-        <View style={[styles.card, { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 }]}>
-          <View style={{
-            width: 40, height: 40, borderRadius: 12,
-            backgroundColor: isDark ? '#1A1A3A' : '#FFF9E6',
-            justifyContent: 'center', alignItems: 'center', marginRight: 12,
-          }}>
-            <Text style={{ fontSize: 20 }}>{isDark ? '🌙' : '☀️'}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>
-              {isDark ? '다크 모드' : '라이트 모드'}
-            </Text>
-            <Text style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>
-              {isDark ? '밝은 화면으로 전환' : '어두운 화면으로 전환'}
-            </Text>
-          </View>
-          <Switch
-            value={isDark}
-            onValueChange={toggleTheme}
-            trackColor={{ false: '#E5E8EB', true: '#0066FF' }}
-            thumbColor='#FFFFFF'
-          />
         </View>
 
         {/* ── 자산 현황 카드 ───────────────────────────── */}
@@ -607,7 +583,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.menuDivider} />
 
-          {/* 학교/반 설정 */}
+          {/* 학교/기수 설정 */}
           <TouchableOpacity
             style={styles.menuRow}
             onPress={() => navigation.navigate('학교반설정')}
@@ -616,8 +592,8 @@ export default function ProfileScreen() {
             <Ionicons name="school-outline" size={20} color={theme.text} style={styles.menuIcon} />
             <Text style={styles.menuLabel}>
               {schoolInfo
-                ? `${schoolInfo.name} ${schoolInfo.grade} ${schoolInfo.classNum}`
-                : '학교/반 설정'}
+                ? `${schoolInfo.name} ${schoolInfo.cohort ?? schoolInfo.grade ?? ''}`
+                : '학교/기수 설정'}
             </Text>
             <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
           </TouchableOpacity>

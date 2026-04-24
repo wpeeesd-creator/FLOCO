@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Alert,
+  RefreshControl, ActivityIndicator, Alert, Platform, TextInput, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -49,6 +49,8 @@ export default function AdminStatsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
+  const [editBalanceText, setEditBalanceText] = useState('');
 
   const loadData = useCallback(async () => {
     try {
@@ -77,19 +79,32 @@ export default function AdminStatsScreen() {
   }, []);
 
   const handleEditBalance = (user: AdminUser) => {
-    Alert.prompt(
-      '잔액 수정',
-      `${user.email} 새 잔액 입력`,
-      async (value) => {
-        if (!value || isNaN(Number(value))) return;
-        await updateDoc(doc(db, 'users', user.uid), { balance: Number(value) });
-        setUsers(prev => prev.map(u => u.uid === user.uid ? { ...u, balance: Number(value) } : u));
-        Alert.alert('완료', '잔액이 수정됐습니다.');
-      },
-      'plain-text',
-      String(user.balance),
-      'numeric',
-    );
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        '잔액 수정',
+        `${user.email} 새 잔액 입력`,
+        async (value) => {
+          if (!value || isNaN(Number(value))) return;
+          await updateDoc(doc(db, 'users', user.uid), { balance: Number(value) });
+          setUsers(prev => prev.map(u => u.uid === user.uid ? { ...u, balance: Number(value) } : u));
+          Alert.alert('완료', '잔액이 수정됐습니다.');
+        },
+        'plain-text',
+        String(user.balance),
+        'numeric',
+      );
+    } else {
+      setEditBalanceText(String(user.balance));
+      setEditTarget(user);
+    }
+  };
+
+  const confirmEditBalance = async () => {
+    if (!editTarget || isNaN(Number(editBalanceText))) return;
+    await updateDoc(doc(db, 'users', editTarget.uid), { balance: Number(editBalanceText) });
+    setUsers(prev => prev.map(u => u.uid === editTarget.uid ? { ...u, balance: Number(editBalanceText) } : u));
+    Alert.alert('완료', '잔액이 수정됐습니다.');
+    setEditTarget(null);
   };
 
   const handleResetAll = () => {
@@ -137,6 +152,31 @@ export default function AdminStatsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Android 잔액 수정 모달 */}
+      <Modal visible={!!editTarget} transparent animationType="fade" onRequestClose={() => setEditTarget(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: theme.bgCard, borderRadius: 16, padding: 24, width: '100%' }}>
+            <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16, marginBottom: 4 }}>잔액 수정</Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 13, marginBottom: 12 }}>{editTarget?.email}</Text>
+            <TextInput
+              value={editBalanceText}
+              onChangeText={setEditBalanceText}
+              keyboardType="numeric"
+              style={{ borderWidth: 1, borderColor: theme.borderStrong, borderRadius: 8, padding: 12, color: theme.text, fontSize: 16, marginBottom: 16 }}
+              autoFocus
+            />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity onPress={() => setEditTarget(null)} style={{ flex: 1, padding: 12, borderRadius: 8, backgroundColor: theme.bgInput, alignItems: 'center' }}>
+                <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmEditBalance} style={{ flex: 1, padding: 12, borderRadius: 8, backgroundColor: theme.primary, alignItems: 'center' }}>
+                <Text style={{ color: '#fff', fontWeight: '600' }}>확인</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* 헤더 */}
       <View style={[styles.header, { backgroundColor: theme.bgCard }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext } from 'react';
 
 const lightTheme = {
   mode: 'light' as const,
@@ -12,20 +12,6 @@ const lightTheme = {
   shadow: '#000000', overlay: '#00000050',
   stockBg: '#FFFFFF', stockCard: '#F8F9FA',
   stockText: '#191F28', stockBorder: '#E5E8EB',
-};
-
-const darkTheme = {
-  mode: 'dark' as const,
-  bg: '#0A0A0A', bgCard: '#111111', bgInput: '#1A1A1A',
-  bgHeader: '#0A0A0A', bgButton: '#1A1A1A',
-  text: '#FFFFFF', textSecondary: '#888888', textTertiary: '#444444',
-  primary: '#0066FF', primaryLight: '#0A1A3A',
-  red: '#FF4444', redLight: '#2A0A0A',
-  blue: '#4488FF', blueLight: '#0A1A3A',
-  green: '#34C759', border: '#1A1A1A', borderStrong: '#333333',
-  shadow: '#000000', overlay: '#00000080',
-  stockBg: '#0A0A0A', stockCard: '#111111',
-  stockText: '#FFFFFF', stockBorder: '#222222',
 };
 
 export type Theme = typeof lightTheme;
@@ -44,18 +30,8 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export const useTheme = () => useContext(ThemeContext);
 
-export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  const toggleTheme = () => setIsDark(prev => !prev);
-
-  return (
-    <ThemeContext.Provider value={{
-      theme: isDark ? darkTheme : lightTheme,
-      isDark,
-      toggleTheme,
-    }}>
-      {children}
-    </ThemeContext.Provider>
-  );
-};
+export const ThemeProvider = ({ children }: { children: React.ReactNode }) => (
+  <ThemeContext.Provider value={{ theme: lightTheme, isDark: false, toggleTheme: () => {} }}>
+    {children}
+  </ThemeContext.Provider>
+);
