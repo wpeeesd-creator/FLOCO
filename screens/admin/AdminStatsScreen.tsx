@@ -4,9 +4,18 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Alert, Platform, TextInput, Modal,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
+  Alert,
+  Platform,
+  TextInput,
+  Modal,
 } from 'react-native';
+import { Text } from '../../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,7 +23,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Colors } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
-import { getAllUserProfiles, getAllPortfolios } from '../../lib/firestoreService';
+import { getAllUserProfiles } from '../../lib/firestoreService';
 
 interface AdminUser {
   uid: string;
@@ -54,21 +63,21 @@ export default function AdminStatsScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const [userProfiles, portfolios] = await Promise.all([
-        getAllUserProfiles(),
-        getAllPortfolios(),
-      ]);
-      const allTrades = portfolios.flatMap(p => p.trades ?? []);
+      const userProfiles = await getAllUserProfiles();
+      const allTrades = userProfiles.flatMap((u: any) => u.transactions ?? []);
       setUserCount(userProfiles.length);
       setTradeCount(allTrades.length);
-      setTradeAmount(allTrades.reduce((sum, t) => sum + (t.price * t.qty), 0));
+      setTradeAmount(allTrades.reduce(
+        (sum: number, t: any) => sum + ((t.price ?? 0) * (t.quantity ?? t.qty ?? 0)),
+        0,
+      ));
       setAvgTrades(userProfiles.length > 0 ? Math.round(allTrades.length / userProfiles.length) : 0);
       setUsers(userProfiles.map((u: any) => ({
         uid: u.uid,
         email: u.email ?? '',
         name: u.name ?? u.displayName ?? u.email ?? '알 수 없음',
-        balance: u.balance ?? 1_000_000,
-        totalAsset: u.totalAsset ?? 1_000_000,
+        balance: u.balance ?? 10_000_000,
+        totalAsset: u.totalAsset ?? 10_000_000,
       })));
     } catch {
       // silent
@@ -116,13 +125,13 @@ export default function AdminStatsScreen() {
         onPress: async () => {
           for (const user of users) {
             await updateDoc(doc(db, 'users', user.uid), {
-              balance: 1_000_000,
-              totalAsset: 1_000_000,
+              balance: 10_000_000,
+              totalAsset: 10_000_000,
               portfolio: [],
               transactions: [],
             });
           }
-          setUsers(prev => prev.map(u => ({ ...u, balance: 1_000_000, totalAsset: 1_000_000 })));
+          setUsers(prev => prev.map(u => ({ ...u, balance: 10_000_000, totalAsset: 10_000_000 })));
           Alert.alert('완료', '전체 초기화가 완료됐습니다.');
         },
       },
@@ -238,7 +247,7 @@ export default function AdminStatsScreen() {
         {/* 전체 유저 리스트 */}
         <Text style={styles.sectionTitle}>👤 전체 유저 ({users.length}명)</Text>
         {users.map((user) => {
-          const returnRate = ((user.totalAsset - 1_000_000) / 1_000_000) * 100;
+          const returnRate = ((user.totalAsset - 10_000_000) / 10_000_000) * 100;
           const isUp = returnRate >= 0;
           return (
             <View key={user.uid} style={[styles.userCard, { backgroundColor: theme.bgCard, shadowColor: theme.text }]}>

@@ -5,11 +5,23 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TextInput,
-  TouchableOpacity, ActivityIndicator, Alert, Modal,
-  Dimensions, Platform, StatusBar, Keyboard,
-  TouchableWithoutFeedback, KeyboardAvoidingView, BackHandler,
+  View,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Dimensions,
+  Platform,
+  StatusBar,
+  Keyboard,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  BackHandler,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
@@ -29,6 +41,7 @@ import {
   type CandleData, type ChartPeriod, type PriceData,
 } from '../utils/priceService';
 import { saveNotif } from '../utils/notificationService';
+import { updateMissionProgress } from '../lib/missionService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -248,8 +261,8 @@ export default function StockDetailScreen() {
       if (snap.exists()) {
         const data = snap.data();
         setUserData({
-          balance: data.balance ?? 1_000_000,
-          totalAsset: data.totalAsset ?? 1_000_000,
+          balance: data.balance ?? 10_000_000,
+          totalAsset: data.totalAsset ?? 10_000_000,
           portfolio: Array.isArray(data.portfolio) ? data.portfolio : [],
           transactions: Array.isArray(data.transactions) ? data.transactions : [],
         });
@@ -348,21 +361,38 @@ export default function StockDetailScreen() {
     }
   }, [isKR]);
 
-  // ── 차트 로드 ──────────────────────────────────
+  // ── 차트 로드 (재시도 최대 2회: 1초 / 2초 backoff) ──────
   const loadChartData = useCallback(async () => {
     setChartLoading(true);
     setChartError(null);
-    try {
-      const data = await fetchChartData(ticker, stock.krw, chartPeriod);
-      setChartData(data);
-    } catch (error: any) {
-      console.error('차트 로드 오류:', error);
-      setChartError(error.message ?? '차트 로드 실패');
-      setChartData([]);
-    } finally {
-      setChartLoading(false);
+
+    const MAX_RETRIES = 2;
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const data = await fetchChartData(ticker, stock.krw, chartPeriod);
+        setChartData(data);
+        setChartLoading(false);
+        return; // 성공 시 즉시 종료
+      } catch (error: any) {
+        lastError = error;
+        console.warn(
+          `차트 로드 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`,
+          error?.message ?? error,
+        );
+        if (attempt < MAX_RETRIES) {
+          // 1초 → 2초 backoff
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        }
+      }
     }
-  }, [ticker, chartPeriod]);
+
+    // 모든 재시도 실패
+    setChartError(lastError?.message ?? '차트 로드 실패');
+    setChartData([]);
+    setChartLoading(false);
+  }, [ticker, stock.krw, chartPeriod]); // ★ stock.krw 추가 (작업 H)
 
   useEffect(() => {
     loadChartData();
@@ -643,10 +673,24 @@ export default function StockDetailScreen() {
                   <ActivityIndicator color={DS.text} />
                 </View>
               ) : chartError ? (
-                <View style={{ height: 300, justifyContent: 'center', alignItems: 'center' }}>
-                  <Text style={{ color: DS.textMuted, marginBottom: 8 }}>차트 로드 실패</Text>
-                  <TouchableOpacity onPress={loadChartData}>
-                    <Text style={{ color: DS.fall, fontSize: 13, fontWeight: 'bold' }}>다시 시도</Text>
+                <View style={{ height: 300, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
+                  <Text style={{ fontSize: 36, marginBottom: 8 }}>📊</Text>
+                  <Text style={{ color: DS.text, fontSize: 15, fontWeight: '600', marginBottom: 4 }}>
+                    차트를 불러오지 못했어요
+                  </Text>
+                  <Text style={{ color: DS.textMuted, fontSize: 12, marginBottom: 14, textAlign: 'center' }}>
+                    잠시 후 다시 시도해 주세요
+                  </Text>
+                  <TouchableOpacity
+                    onPress={loadChartData}
+                    style={{
+                      backgroundColor: DS.cardAlt,
+                      paddingVertical: 10, paddingHorizontal: 18,
+                      borderRadius: 10, borderWidth: 1, borderColor: DS.borderLight,
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={{ color: DS.text, fontSize: 13, fontWeight: 'bold' }}>다시 시도</Text>
                   </TouchableOpacity>
                 </View>
               ) : chartData.length > 0 ? (
@@ -664,7 +708,8 @@ export default function StockDetailScreen() {
                 />
               ) : (
                 <View style={{ height: 300, justifyContent: 'center', alignItems: 'center' }}>
-                  <Text style={{ color: DS.textMuted }}>차트 데이터 없음</Text>
+                  <Text style={{ fontSize: 32, marginBottom: 8 }}>📭</Text>
+                  <Text style={{ color: DS.textMuted, fontSize: 13 }}>차트 데이터가 없어요</Text>
                 </View>
               )}
 
@@ -1380,8 +1425,9 @@ function TradeSheet({
   const DS = useDS();
   const [tradeType, setTradeType] = useState(initialType);
   const [fixedPrice] = useState(livePrice);
-  const [quantity, setQuantity] = useState(0);
-  const [quantityText, setQuantityText] = useState('');
+  // 시트 열릴 때 quantity=1로 시작 → 매수 버튼이 활성 상태로 보여 사용자 오해 방지
+  const [quantity, setQuantity] = useState(1);
+  const [quantityText, setQuantityText] = useState('1');
   const [isLoading, setIsLoading] = useState(false);
 
   // 모든 거래 금액을 KRW로 통일 (해외 주식: USD → KRW 환산)
@@ -1399,9 +1445,14 @@ function TradeSheet({
   const isBuyDisabled = tradeType === 'buy' && (quantity <= 0 || balance < tradePriceKRW * quantity * 1.001);
   const isButtonDisabled = isSellDisabled || isBuyDisabled || isLoading;
 
-  const fmtP = (n: number) => {
+  // 호출부에서 들어오는 값이 이미 KRW로 환산됐는지 명시(inKRW).
+  // 기본값은 종목 통화(isKR) — 한국 종목은 KRW, 미국 종목은 USD 그대로 표시.
+  // KRW 환산값(예: totalCost, ownedStock.avgPrice)을 넘길 땐 inKRW=true 명시.
+  const fmtP = (n: number, inKRW: boolean = isKR) => {
     if (!n) return '-';
-    return `${Math.round(n).toLocaleString()}원`;
+    return inKRW
+      ? `${Math.round(n).toLocaleString()}원`
+      : `$${n.toFixed(2)}`;
   };
 
   const handleQuantityChange = (text: string) => {
@@ -1499,6 +1550,12 @@ function TradeSheet({
         });
         useAppStore.setState({ cash: newBalance, holdings: newPortfolio.map(p => ({ ticker: p.ticker, qty: p.quantity, avgPrice: p.avgPrice })) });
 
+        try {
+          await updateMissionProgress(userId!, 'trade');
+        } catch (e) {
+          console.warn('데일리 미션 진행 업데이트 실패 (매수):', e);
+        }
+
         const latestSnap = await getDoc(doc(db, 'users', userId!));
         const latestNotifs = latestSnap.data()?.notifications ?? [];
         await saveNotif(userId!, latestNotifs, {
@@ -1544,6 +1601,12 @@ function TradeSheet({
           }),
         });
         useAppStore.setState({ cash: newBalance, holdings: newPortfolio.map(p => ({ ticker: p.ticker, qty: p.quantity, avgPrice: p.avgPrice })) });
+
+        try {
+          await updateMissionProgress(userId!, 'trade');
+        } catch (e) {
+          console.warn('데일리 미션 진행 업데이트 실패 (매도):', e);
+        }
 
         const latestSnap2 = await getDoc(doc(db, 'users', userId!));
         const latestNotifs2 = latestSnap2.data()?.notifications ?? [];
@@ -1626,12 +1689,12 @@ function TradeSheet({
                 <View style={{ alignItems: 'center' }}>
                   <Text style={{ color: DS.textSub, fontSize: 12 }}>{tradeType === 'buy' ? '최대 매수' : '평균매수가'}</Text>
                   <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 14, marginTop: 4 }}>
-                    {tradeType === 'buy' ? (isKR ? `${maxBuyQty}주` : `${maxBuyQty.toFixed(4)}주`) : fmtP(ownedStock?.avgPrice ?? 0)}
+                    {tradeType === 'buy' ? (isKR ? `${maxBuyQty}주` : `${maxBuyQty.toFixed(4)}주`) : fmtP(ownedStock?.avgPrice ?? 0, true)}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
                   <Text style={{ color: DS.textSub, fontSize: 12 }}>체결가</Text>
-                  <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 14, marginTop: 4 }}>{fmtP(fixedPrice)}</Text>
+                  <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 14, marginTop: 4 }}>{fmtP(fixedPrice, isKR)}</Text>
                 </View>
               </View>
 
@@ -1662,7 +1725,12 @@ function TradeSheet({
                     <Text style={{ color: DS.text, fontSize: 22 }}>+</Text>
                   </TouchableOpacity>
                 </View>
-                {quantity > maxQty && (
+                {!isLoading && quantity <= 0 && (
+                  <Text style={{ color: DS.textSub, fontSize: 13, textAlign: 'center', marginTop: 6, fontWeight: 'bold' }}>
+                    수량을 입력해주세요
+                  </Text>
+                )}
+                {!isLoading && quantity > maxQty && (
                   <Text style={{ color: DS.rise, fontSize: 13, textAlign: 'center', marginTop: 6, fontWeight: 'bold' }}>
                     {tradeType === 'buy' ? '잔액이 부족해요' : '보유 수량을 초과했어요'}
                   </Text>
@@ -1685,9 +1753,9 @@ function TradeSheet({
               {/* 주문 요약 */}
               <View style={{ backgroundColor: DS.cardAlt, borderRadius: 12, padding: 14, marginBottom: 16 }}>
                 {[
-                  { label: '체결 가격', value: fmtP(fixedPrice) },
+                  { label: '체결 가격', value: fmtP(fixedPrice, isKR) },
                   { label: '수량', value: isKR ? `${Math.floor(quantity)}주` : `${quantity.toFixed(4)}주` },
-                  { label: '수수료 (0.1%)', value: fmtP(fixedPrice * quantity * 0.001) },
+                  { label: '수수료 (0.1%)', value: fmtP(fixedPrice * quantity * 0.001, isKR) },
                 ].map((item, i, arr) => (
                   <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: DS.border }}>
                     <Text style={{ color: DS.textSub, fontSize: 14 }}>{item.label}</Text>
@@ -1697,7 +1765,7 @@ function TradeSheet({
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: DS.borderLight }}>
                   <Text style={{ fontWeight: 'bold', fontSize: 15, color: DS.text }}>{tradeType === 'buy' ? '총 결제금액' : '총 수령금액'}</Text>
                   <Text style={{ fontWeight: 'bold', fontSize: 18, color: tradeType === 'buy' ? DS.rise : DS.fall }}>
-                    {tradeType === 'buy' ? fmtP(totalCost) : fmtP(totalReceive)}
+                    {tradeType === 'buy' ? fmtP(totalCost, true) : fmtP(totalReceive, true)}
                   </Text>
                 </View>
               </View>
@@ -1713,16 +1781,18 @@ function TradeSheet({
                 activeOpacity={0.85}
               >
                 {isLoading ? (
-                  <ActivityIndicator color={theme.bgCard} />
+                  <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={{ color: isButtonDisabled ? DS.textMuted : theme.bgCard, fontSize: 17, fontWeight: 'bold' }}>
+                  <Text style={{ color: isButtonDisabled ? '#999' : '#FFFFFF', fontSize: 17, fontWeight: 'bold' }}>
                     {tradeType === 'sell' && quantity > maxSellQty
                       ? '보유 수량 초과'
                       : tradeType === 'buy' && balance < totalCost
                         ? '잔액 부족'
-                        : tradeType === 'buy'
-                          ? `${isKR ? Math.floor(quantity) : quantity.toFixed(4)}주 매수하기`
-                          : `${isKR ? Math.floor(quantity) : quantity.toFixed(4)}주 매도하기`}
+                        : quantity <= 0
+                          ? '수량을 입력해주세요'
+                          : tradeType === 'buy'
+                            ? `${isKR ? Math.floor(quantity) : quantity.toFixed(4)}주 매수하기`
+                            : `${isKR ? Math.floor(quantity) : quantity.toFixed(4)}주 매도하기`}
                   </Text>
                 )}
               </TouchableOpacity>

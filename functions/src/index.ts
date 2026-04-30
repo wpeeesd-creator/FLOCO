@@ -1,6 +1,10 @@
 /**
  * FLOCO Cloud Functions — 서버 사이드 거래 트랜잭션
  * 클라이언트 Optimistic UI + 서버 검증 이중 구조
+ *
+ * ⚠️ DEPRECATED — portfolios 컬렉션은 더 이상 single source of truth가 아님.
+ * 클라이언트(store/appStore.ts)가 users/{uid}를 직접 갱신하므로 이 함수들은 호출되지 않음.
+ * users 컬렉션 기반으로 재작성하거나 삭제 예정.
  */
 
 import * as functions from 'firebase-functions';

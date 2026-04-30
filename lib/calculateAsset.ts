@@ -40,7 +40,7 @@ export function calculateTotalAsset(balance: number, portfolio: any[]): number {
  */
 export function calculateReturnRate(
   totalAsset: number,
-  initialBalance: number = 1_000_000,
+  initialBalance: number = 10_000_000,
 ): number {
   if (initialBalance <= 0) return 0;
   return ((totalAsset - initialBalance) / initialBalance) * 100;

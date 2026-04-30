@@ -1,22 +1,31 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity,
-  FlatList, ActivityIndicator, Linking, Alert,
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  Linking,
+  Alert,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import {
   fetchAllNews, fetchKRNews, fetchUSNews,
   formatNewsTime, type NewsItem,
 } from '../lib/newsService';
+import { updateMissionProgress } from '../lib/missionService';
 
 type NewsTab = '전체' | '국내' | '미국';
 
 export default function NewsScreen() {
   const { theme, isDark } = useTheme();
+  const { user } = useAuth();
   const navigation = useNavigation<any>();
   const [tab, setTab] = useState<NewsTab>('전체');
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -44,6 +53,15 @@ export default function NewsScreen() {
   const openNews = (item: NewsItem) => {
     if (!item.url) return;
     navigation.navigate('WebView', { url: item.url, title: item.title });
+    if (user?.id) {
+      (async () => {
+        try {
+          await updateMissionProgress(user.id, 'news');
+        } catch (e) {
+          console.warn('데일리 미션 진행 업데이트 실패 (뉴스):', e);
+        }
+      })();
+    }
   };
 
   const renderItem = ({ item }: { item: NewsItem }) => (

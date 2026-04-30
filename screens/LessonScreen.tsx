@@ -3,9 +3,14 @@
  */
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Animated, Vibration,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  Vibration,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { doc, setDoc } from 'firebase/firestore';

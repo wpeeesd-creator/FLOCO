@@ -4,17 +4,20 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator,
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
+import { Text } from '../../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
-import {
-  fetchAllUsersForAdmin, fetchAllPortfoliosForAdmin,
-} from '../../lib/adminService';
+import { fetchAllUsersForAdmin } from '../../lib/adminService';
 
 interface CategoryStat {
   label: string;
@@ -58,10 +61,7 @@ export default function AdminLearningStatsScreen() {
   const loadStats = async () => {
     setLoading(true);
     try {
-      const [, portfolios] = await Promise.all([
-        fetchAllUsersForAdmin(),
-        fetchAllPortfoliosForAdmin(),
-      ]);
+      const users = await fetchAllUsersForAdmin();
 
       let total = 0;
       let totalStreakSum = 0;
@@ -72,21 +72,20 @@ export default function AdminLearningStatsScreen() {
 
       const catCounts = [0, 0, 0, 0, 0, 0];
 
-      portfolios.forEach((p: any) => {
-        const lessons: any[] = p.completedLessons ?? [];
+      users.forEach((u: any) => {
+        const lessons: any[] = u.learning?.completedLessons ?? [];
         total += lessons.length;
 
-        lessons.forEach((l: any) => {
-          const ts = typeof l === 'number' ? l : (l.completedAt ?? 0);
+        lessons.forEach((l: any, idx: number) => {
+          const ts = typeof l === 'number' ? l : (l?.completedAt ?? 0);
           if (ts > todayStart.getTime()) todayCount++;
-          // Distribute across categories by lesson index mod 6
-          const idx = typeof l === 'number' ? (l % 6) : ((l.step ?? 0) % 6);
-          catCounts[idx] = (catCounts[idx] ?? 0) + 1;
+          const catIdx = typeof l === 'number' ? (l % 6) : ((l?.step ?? idx) % 6);
+          catCounts[catIdx] = (catCounts[catIdx] ?? 0) + 1;
         });
 
-        const streak = p.streak ?? 0;
+        const streak = u.learning?.streak ?? u.streak ?? 0;
         totalStreakSum += streak;
-        const displayName = p.nickname ?? p.name ?? p.displayName ?? '알 수 없음';
+        const displayName = u.nickname ?? u.name ?? u.displayName ?? '알 수 없음';
         board.push({ name: displayName, streak });
       });
 
@@ -95,7 +94,7 @@ export default function AdminLearningStatsScreen() {
 
       setTotalCompleted(total);
       setTodayCompleted(todayCount);
-      setAvgStreak(portfolios.length > 0 ? Math.round(totalStreakSum / portfolios.length) : 0);
+      setAvgStreak(users.length > 0 ? Math.round(totalStreakSum / users.length) : 0);
       setStreakBoard(board.slice(0, 5));
       setCategories(CATEGORY_LABELS.map((c, i) => ({
         ...c,

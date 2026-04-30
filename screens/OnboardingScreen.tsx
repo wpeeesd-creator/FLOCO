@@ -5,9 +5,13 @@
 
 import React, { useState, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
-  Dimensions, StyleSheet,
+  View,
+  FlatList,
+  TouchableOpacity,
+  Dimensions,
+  StyleSheet,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { useTheme } from '../context/ThemeContext';

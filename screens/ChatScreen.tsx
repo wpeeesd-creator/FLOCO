@@ -1,8 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput,
-  ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator,
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAppStore, STOCKS } from '../store/appStore';
@@ -42,7 +49,7 @@ export default function ChatScreen() {
   const evalProfit = ownedQty > 0 && stock ? (stock.price - avgPrice) * ownedQty : 0;
   const evalProfitRate = ownedQty > 0 && avgPrice > 0
     ? ((stock?.price ?? 0) - avgPrice) / avgPrice * 100 : 0;
-  const totalAsset = getTotalValue?.() ?? 1_000_000;
+  const totalAsset = getTotalValue?.() ?? 10_000_000;
   const profitRate = getReturnRate?.() ?? 0;
 
   const { isConnected } = useNetworkStatus();
@@ -115,7 +122,7 @@ ${ownedQty > 0 ? `평균매수가: ${Math.round(avgPrice).toLocaleString()}원
 
 === 유저 투자 현황 ===
 총 자산: ${Math.round(totalAsset).toLocaleString()}원
-보유 현금: ${Math.round(cash ?? 1_000_000).toLocaleString()}원
+보유 현금: ${Math.round(cash ?? 10_000_000).toLocaleString()}원
 수익률: ${profitRate.toFixed(2)}%
 
 === 중요 규칙 ===

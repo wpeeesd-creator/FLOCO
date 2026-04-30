@@ -5,44 +5,97 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
 } from 'react-native';
+import { Text, NumberText } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAppStore, STOCKS } from '../store/appStore';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import StockLogo from '../components/StockLogo';
-import { fetchSinglePrice } from '../utils/priceService';
+import { fetchMultiplePrices, getExchangeRate, calculateProfit } from '../utils/priceService';
 
 export default function AssetDetailScreen() {
   const { theme, isDark } = useTheme();
   const navigation = useNavigation<any>();
-  const { holdings, cash, getTotalValue, getReturnRate } = useAppStore();
+  const { user } = useAuth();
+  // holdings/cash는 store(zustand) 구독, initialBalance·balance는 자체 Firestore 리스너로
+  // 직결 — HomeScreen 패턴과 동일한 ground-truth를 사용해 화면 간 자산 정합성 보장.
+  const holdings = useAppStore(state => state.holdings);
+  const cash = useAppStore(state => state.cash);
 
-  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+  const [livePrices, setLivePrices] = useState<Record<string, any>>({});
+  const [exchangeRate, setExchangeRate] = useState(1380);
+  const [firestoreBalance, setFirestoreBalance] = useState<number | null>(null);
+  const [firestoreInitialBalance, setFirestoreInitialBalance] = useState<number | null>(null);
 
+  // 실시간 환율
   useEffect(() => {
-    const load = async () => {
-      const result: Record<string, number> = {};
-      for (const h of holdings) {
-        const isKR = !h.ticker.includes('.');
-        const data = await fetchSinglePrice(h.ticker, isKR);
-        if (data?.price) result[h.ticker] = data.price;
-      }
-      setLivePrices(result);
-    };
-    load();
+    getExchangeRate().then(setExchangeRate).catch(() => {});
   }, []);
 
-  // ── 데이터 계산 ──────────────────────────────
-  const totalValue = getTotalValue?.() ?? 1_000_000;
-  const balance = cash ?? 1_000_000;
-  const returnRate = getReturnRate?.() ?? 0;
-  const profit = totalValue - 1_000_000;
+  // 딥링크 등으로 HomeScreen을 거치지 않고 직접 진입한 경우 안전망
+  // (AuthContext가 로그인 시 이미 호출하므로 보통은 no-op)
+  useEffect(() => {
+    if (user?.id) {
+      useAppStore.getState().hydrateUserData?.(user.id);
+    }
+  }, [user?.id]);
+
+  // Firestore users/{uid} 직접 구독 — HomeScreen 동일 패턴
+  useEffect(() => {
+    if (!user?.id) return;
+    const unsubscribe = onSnapshot(doc(db, 'users', user.id), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (data?.balance !== undefined) setFirestoreBalance(data.balance);
+      if (data?.initialBalance !== undefined) setFirestoreInitialBalance(data.initialBalance);
+    }, (error) => {
+      console.error('자산현황 유저 실시간 리스너 오류:', error);
+    });
+    return () => unsubscribe();
+  }, [user?.id]);
+
+  // 실시간 시세 + 30초 폴링 (HomeScreen 패턴)
+  // deps: 길이뿐 아니라 ticker 구성 변동(같은 length 추가매수/일부매도)에도 재 fetch
+  useEffect(() => {
+    const safeH = holdings ?? [];
+    if (safeH.length === 0) return;
+    const tickers = safeH.map(h => ({
+      ticker: h.ticker,
+      isKR: h.ticker.length === 6 && /^\d+$/.test(h.ticker),
+    }));
+    fetchMultiplePrices(tickers).then(setLivePrices).catch(() => {});
+    const interval = setInterval(() => {
+      fetchMultiplePrices(tickers).then(setLivePrices).catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [holdings?.length, holdings?.map(h => h.ticker).join(',')]);
+
+  // ── 데이터 계산 (HomeScreen과 동일 인라인 공식) ──────────────────────────
+  const balance = cash !== undefined ? cash : (firestoreBalance ?? 10_000_000);
+  const initialBalance = firestoreInitialBalance ?? 10_000_000;
+
+  const portfolioValue = (holdings ?? []).reduce((sum, h) => {
+    const livePrice = (livePrices[h.ticker] as any)?.price
+      ?? STOCKS.find(s => s.ticker === h.ticker)?.price
+      ?? 0;
+    const isKR = (h as any).krw ?? STOCKS.find(s => s.ticker === h.ticker)?.krw ?? true;
+    const livePriceKRW = isKR ? livePrice : Math.round(livePrice * exchangeRate);
+    return sum + livePriceKRW * (h.qty ?? 0);
+  }, 0);
+
+  const totalValue = balance + portfolioValue;
+  const { profit, profitRate: returnRate } = calculateProfit(totalValue, initialBalance);
   const isUp = profit >= 0;
-  const portfolioValue = totalValue - balance;
 
   const cashPercent = totalValue > 0
     ? ((balance / totalValue) * 100).toFixed(1)
@@ -51,14 +104,17 @@ export default function AssetDetailScreen() {
     ? ((portfolioValue / totalValue) * 100).toFixed(1)
     : '0.0';
 
-  // 보유 종목 데이터
+  // 보유 종목 데이터 (KRW 기준 통일 — 미국 주식은 환율 적용)
   const safeHoldings = holdings ?? [];
   const holdingsData = safeHoldings.map(h => {
     const stock = STOCKS.find(s => s.ticker === h.ticker);
     if (!stock) return null;
-    const evalAmt = (livePrices[h.ticker] ?? stock.price ?? 0) * (h.qty ?? 0);
+    const livePrice = (livePrices[h.ticker] as any)?.price ?? stock.price ?? 0;
+    const isKR = stock.krw ?? true;
+    const livePriceKRW = isKR ? livePrice : Math.round(livePrice * exchangeRate);
+    const evalAmt = livePriceKRW * (h.qty ?? 0);
     const pnlRate = (h.avgPrice ?? 0) > 0
-      ? (((livePrices[h.ticker] ?? stock.price ?? 0) - (h.avgPrice ?? 0)) / (h.avgPrice ?? 0)) * 100
+      ? ((livePriceKRW - (h.avgPrice ?? 0)) / (h.avgPrice ?? 0)) * 100
       : 0;
     return { ...h, stock, evalAmt, pnlRate };
   }).filter(Boolean).sort((a: any, b: any) => b.evalAmt - a.evalAmt);
@@ -101,20 +157,20 @@ export default function AssetDetailScreen() {
         {/* ── 총 자산 카드 ─────────────────────── */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>총 자산</Text>
-          <Text style={styles.totalValue}>
+          <NumberText style={styles.totalValue}>
             ₩{Math.round(totalValue).toLocaleString()}
-          </Text>
+          </NumberText>
           <View style={styles.profitRow}>
-            <Text style={[styles.profitAmt, { color: isUp ? Colors.green : Colors.red }]}>
+            <NumberText style={[styles.profitAmt, { color: isUp ? Colors.green : Colors.red }]}>
               {isUp ? '+' : ''}₩{Math.round(profit).toLocaleString()}
-            </Text>
+            </NumberText>
             <View style={[
               styles.rateBadge,
               { backgroundColor: isUp ? Colors.greenBg : Colors.redBg },
             ]}>
-              <Text style={[styles.rateText, { color: isUp ? Colors.green : Colors.red }]}>
+              <NumberText style={[styles.rateText, { color: isUp ? Colors.green : Colors.red }]}>
                 {isUp ? '▲' : '▼'} {Math.abs(returnRate).toFixed(2)}%
-              </Text>
+              </NumberText>
             </View>
           </View>
         </View>
@@ -134,19 +190,19 @@ export default function AssetDetailScreen() {
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: Colors.primary }]} />
               <Text style={styles.legendLabel}>현금</Text>
-              <Text style={styles.legendValue}>
+              <NumberText style={styles.legendValue}>
                 ₩{Math.round(balance).toLocaleString()}
-              </Text>
-              <Text style={styles.legendPct}>({cashPercent}%)</Text>
+              </NumberText>
+              <NumberText style={styles.legendPct}>({cashPercent}%)</NumberText>
             </View>
             <View style={styles.legendDivider} />
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: '#FF9500' }]} />
               <Text style={styles.legendLabel}>투자</Text>
-              <Text style={styles.legendValue}>
+              <NumberText style={styles.legendValue}>
                 ₩{Math.round(portfolioValue).toLocaleString()}
-              </Text>
-              <Text style={styles.legendPct}>({investPercent}%)</Text>
+              </NumberText>
+              <NumberText style={styles.legendPct}>({investPercent}%)</NumberText>
             </View>
           </View>
         </View>
@@ -159,20 +215,20 @@ export default function AssetDetailScreen() {
             <Text style={styles.marketFlag}>🇰🇷</Text>
             <Text style={styles.marketName}>국내</Text>
             <View style={{ flex: 1 }} />
-            <Text style={styles.marketAmt}>
+            <NumberText style={styles.marketAmt}>
               ₩{Math.round(krEval).toLocaleString()}
-            </Text>
-            <Text style={styles.marketPct}>{krPct}%</Text>
+            </NumberText>
+            <NumberText style={styles.marketPct}>{krPct}%</NumberText>
           </View>
 
           <View style={styles.marketRow}>
             <Text style={styles.marketFlag}>🇺🇸</Text>
             <Text style={styles.marketName}>미국</Text>
             <View style={{ flex: 1 }} />
-            <Text style={styles.marketAmt}>
-              ${usEval.toFixed(2)}
-            </Text>
-            <Text style={styles.marketPct}>{usPct}%</Text>
+            <NumberText style={styles.marketAmt}>
+              ₩{Math.round(usEval).toLocaleString()}
+            </NumberText>
+            <NumberText style={styles.marketPct}>{usPct}%</NumberText>
           </View>
         </View>
 
@@ -202,20 +258,18 @@ export default function AssetDetailScreen() {
                     <Text style={styles.holdingName} numberOfLines={1}>
                       {h.stock.name}
                     </Text>
-                    <Text style={styles.holdingQty}>{h.qty}주</Text>
+                    <NumberText style={styles.holdingQty}>{h.qty}주</NumberText>
                   </View>
                   <View style={styles.holdingRight}>
-                    <Text style={styles.holdingEval}>
-                      {h.stock.krw
-                        ? `₩${Math.round(h.evalAmt).toLocaleString()}`
-                        : `$${h.evalAmt.toFixed(2)}`}
-                    </Text>
-                    <Text style={[
+                    <NumberText style={styles.holdingEval}>
+                      ₩{Math.round(h.evalAmt).toLocaleString()}
+                    </NumberText>
+                    <NumberText style={[
                       styles.holdingPnl,
                       { color: isPnlUp ? Colors.green : Colors.red },
                     ]}>
                       {isPnlUp ? '+' : ''}{h.pnlRate.toFixed(2)}%
-                    </Text>
+                    </NumberText>
                   </View>
                 </View>
               );
@@ -310,7 +364,6 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 28,
     fontWeight: '700',
-    fontFamily: 'Courier',
     color: Colors.text,
     marginBottom: 10,
   },
@@ -322,7 +375,6 @@ const styles = StyleSheet.create({
   profitAmt: {
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'Courier',
   },
   rateBadge: {
     paddingHorizontal: 8,
@@ -375,7 +427,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: Colors.text,
-    fontFamily: 'Courier',
   },
   legendPct: {
     fontSize: 12,
@@ -412,7 +463,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: Colors.text,
-    fontFamily: 'Courier',
     textAlign: 'right',
   },
   marketPct: {
@@ -454,7 +504,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: Colors.text,
-    fontFamily: 'Courier',
   },
   holdingPnl: {
     fontSize: 12,

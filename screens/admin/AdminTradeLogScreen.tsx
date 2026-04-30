@@ -4,16 +4,22 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, TouchableOpacity,
-  TextInput, ActivityIndicator, ListRenderItemInfo,
+  View,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  ListRenderItemInfo,
 } from 'react-native';
+import { Text } from '../../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
 import StockLogo from '../../components/StockLogo';
-import { getAllUserProfiles, getAllPortfolios } from '../../lib/firestoreService';
+import { getAllUserProfiles } from '../../lib/firestoreService';
 import { STOCKS } from '../../store/appStore';
 
 type TradeType = 'all' | 'buy' | 'sell';
@@ -51,22 +57,23 @@ export default function AdminTradeLogScreen() {
 
   const loadTrades = useCallback(async () => {
     try {
-      const [portfolios, users] = await Promise.all([
-        getAllPortfolios(),
-        getAllUserProfiles(),
-      ]);
-      const nameMap = new Map(users.map(u => [u.uid, u.name]));
-      const allTrades: EnrichedTrade[] = portfolios.flatMap(p =>
-        (p.trades ?? []).map(t => ({
-          id: t.id ?? `${p.uid}-${t.timestamp}`,
-          uid: p.uid,
-          userName: nameMap.get(p.uid) ?? p.name ?? '알 수 없음',
-          ticker: t.ticker,
-          type: t.type as 'buy' | 'sell',
-          price: t.price,
-          qty: t.qty,
-          timestamp: t.timestamp,
-        }))
+      const users = await getAllUserProfiles();
+      const allTrades: EnrichedTrade[] = users.flatMap((u: any) =>
+        (u.transactions ?? []).map((t: any, idx: number) => {
+          const ts = typeof t.createdAt === 'string'
+            ? new Date(t.createdAt).getTime()
+            : (t.createdAt ?? Date.now());
+          return {
+            id: `${u.uid}-${ts}-${idx}`,
+            uid: u.uid,
+            userName: u.name ?? (u as any).displayName ?? '알 수 없음',
+            ticker: t.ticker,
+            type: t.type as 'buy' | 'sell',
+            price: t.price ?? 0,
+            qty: t.quantity ?? t.qty ?? 0,
+            timestamp: ts,
+          };
+        })
       );
       allTrades.sort((a, b) => b.timestamp - a.timestamp);
       setTrades(allTrades);

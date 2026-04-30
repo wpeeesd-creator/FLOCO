@@ -303,16 +303,6 @@ export async function joinEvent(eventId: string, uid: string): Promise<void> {
 
 // ── 집계 유틸 ───────────────────────────────
 
-export async function fetchAllPortfoliosForAdmin(): Promise<any[]> {
-  try {
-    const snap = await getDocs(collection(db, 'portfolios'));
-    return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-  } catch (error) {
-    console.error('fetchAllPortfoliosForAdmin 오류:', error);
-    return [];
-  }
-}
-
 export async function fetchAllUsersForAdmin(): Promise<any[]> {
   try {
     const snap = await getDocs(collection(db, 'users'));

@@ -4,9 +4,18 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Alert, Linking, TextInput, Switch, Share, Image,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  Linking,
+  TextInput,
+  Switch,
+  Share,
+  Image,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,12 +23,12 @@ import { doc, getDoc, updateDoc, onSnapshot, increment } from 'firebase/firestor
 import * as Haptics from 'expo-haptics';
 import * as SecureStore from 'expo-secure-store';
 import { db } from '../lib/firebase';
-import { useAppStore } from '../store/appStore';
+import { useAppStore, STOCKS } from '../store/appStore';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../components/ui';
 import { BADGE_DEFINITIONS } from './BadgeScreen';
-import { fetchMultiplePrices, calculateProfit } from '../utils/priceService';
+import { fetchMultiplePrices, getExchangeRate } from '../utils/priceService';
 
 // Inline type — do NOT import from lib/investmentAnalysis
 interface InvestmentType {
@@ -36,7 +45,11 @@ export default function ProfileScreen() {
   const isFocused = useIsFocused();
 
   const { user: currentUser, logout } = useAuth();
-  const { holdings, trades, cash, getTotalValue, getReturnRate } = useAppStore();
+  // store 직접 구독 — HomeScreen onSnapshot + AuthContext hydrateUserData 동기화 값 사용
+  const holdings = useAppStore(state => state.holdings);
+  const trades = useAppStore(state => state.trades);
+  const cash = useAppStore(state => state.cash);
+  const storeInitialBalance = useAppStore(state => state.initialBalance);
 
   const [nickname, setNickname] = useState('투자자');
   const [isEditingNickname, setIsEditingNickname] = useState(false);
@@ -57,7 +70,21 @@ export default function ProfileScreen() {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [realNameVerified, setRealNameVerified] = useState(false);
   const [portfolioPrices, setPortfolioPrices] = useState<Record<string, any>>({});
+  const [exchangeRate, setExchangeRate] = useState(1380);
   const { theme } = useTheme();
+
+  // 딥링크 등으로 HomeScreen을 거치지 않고 직접 진입한 경우 안전망
+  // (AuthContext가 로그인 시 이미 호출하므로 보통은 no-op)
+  useEffect(() => {
+    if (currentUser?.id) {
+      useAppStore.getState().hydrateUserData?.(currentUser.id);
+    }
+  }, [currentUser?.id]);
+
+  // 실시간 환율
+  useEffect(() => {
+    getExchangeRate().then(setExchangeRate).catch(() => {});
+  }, []);
 
   // ── Firestore: user profile + investment type (realtime) ──────────────
   useEffect(() => {
@@ -100,7 +127,7 @@ export default function ProfileScreen() {
       .catch(() => {});
   }, [currentUser?.id, isFocused]);
 
-  // ── 보유 종목 실시간 가격 ─────────────────────────────────────────────
+  // ── 보유 종목 실시간 가격 (HomeScreen / AssetDetailScreen 패턴 — 30초 폴링) ──
   useEffect(() => {
     const safeH = holdings ?? [];
     if (safeH.length === 0) return;
@@ -109,19 +136,33 @@ export default function ProfileScreen() {
       isKR: h.ticker.length === 6 && /^\d+$/.test(h.ticker),
     }));
     fetchMultiplePrices(stocks).then(setPortfolioPrices).catch(() => {});
-  }, [(holdings ?? []).length, isFocused]);
+    const interval = setInterval(() => {
+      fetchMultiplePrices(stocks).then(setPortfolioPrices).catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [(holdings ?? []).length, holdings?.map(h => h.ticker).join(','), isFocused]);
 
-  // ── Computed values ───────────────────────────────────────────────────
-  const balance = cash ?? 1_000_000;
+  // ── Computed values (HomeScreen / AssetDetailScreen 동일 인라인 공식) ──
+  const balance = cash ?? 10_000_000;
+  const initialBalance = storeInitialBalance ?? 10_000_000;
   const safeHoldingsForCalc = holdings ?? [];
   const portfolioValue = safeHoldingsForCalc.reduce((sum, h) => {
-    const livePrice = portfolioPrices[h.ticker]?.price;
-    const fallbackPrice = h.avgPrice ?? 0;
-    return sum + (livePrice ?? fallbackPrice) * (h.qty ?? 0);
+    const livePrice = portfolioPrices[h.ticker]?.price
+      ?? STOCKS.find(s => s.ticker === h.ticker)?.price
+      ?? 0;
+    const isKR = (h as any).krw
+      ?? STOCKS.find(s => s.ticker === h.ticker)?.krw
+      ?? true;
+    const livePriceKRW = isKR ? livePrice : Math.round(livePrice * exchangeRate);
+    return sum + livePriceKRW * (h.qty ?? 0);
   }, 0);
   const totalValue = balance + portfolioValue;
-  const { profit, profitRate: returnRate } = calculateProfit(totalValue, 1_000_000);
+  const profit = totalValue - initialBalance;
+  const returnRate = initialBalance > 0
+    ? parseFloat(((profit / initialBalance) * 100).toFixed(2))
+    : 0;
   const isUp = profit >= 0;
+
   const safeTrades = trades ?? [];
   const buyCount = safeTrades.filter((t) => t.type === 'buy').length;
   const sellCount = safeTrades.filter((t) => t.type === 'sell').length;

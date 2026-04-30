@@ -16,7 +16,6 @@ import InviteCodeScreen from '../screens/InviteCodeScreen';
 import TutorialScreen from '../screens/TutorialScreen';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
-import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { useRealTimeStocks } from '../hooks/useRealTimeStocks';
 
 // ── 브랜드 로딩 화면 ────────────────────────────
@@ -72,9 +71,6 @@ export default function RootNavigator() {
       }
     })();
   }, []);
-
-  // Firestore 실시간 동기화 — 로그인 시 portfolios/{uid} 구독
-  useRealtimeSync(user?.id);
 
   // KIS API 실시간 주가 업데이트 (5분 간격, API 키 없으면 skip)
   useRealTimeStocks();

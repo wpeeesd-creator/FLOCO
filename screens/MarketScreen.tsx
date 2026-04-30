@@ -2,7 +2,8 @@
  * 지표/변동표 화면 — 주요 시장 지표
  */
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Card } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';

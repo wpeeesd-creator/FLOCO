@@ -6,8 +6,15 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity, Animated, Dimensions, Modal,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  Dimensions,
+  Modal,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -123,11 +130,8 @@ export default function SurveyResultScreen() {
   }).filter(Boolean).sort((a: any, b: any) => b.score - a.score);
 
   const navigateToStock = (ticker: string) => {
-    try {
-      navigation.getParent()?.navigate('투자Tab', { screen: '종목상세', params: { ticker } });
-    } catch {
-      navigation.navigate('종목상세', { ticker });
-    }
+    // ProfileStack 내부에서 push — 뒤로가기 시 SurveyResult로 자연 복귀
+    navigation.navigate('종목상세', { ticker });
   };
 
   const s = StyleSheet.create({

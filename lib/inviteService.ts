@@ -6,7 +6,7 @@
 
 import {
   doc, getDoc, getDocs, updateDoc,
-  collection, query, where, arrayUnion,
+  collection, query, where, arrayUnion, increment,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -54,36 +54,18 @@ export async function applyInviteCode(myUid: string, code: string): Promise<Appl
       return { success: false, message: '본인 코드는 사용할 수 없어요' };
     }
 
-    // 4. 초대자 보상 (users 문서)
+    // 4. 초대자 보상 (users 문서) — balance 직접 증가
     await updateDoc(doc(db, 'users', inviterUid), {
       invitedFriends: arrayUnion(myUid),
       inviteReward: (inviterDoc.data()?.inviteReward ?? 0) + INVITER_REWARD,
+      balance: increment(INVITER_REWARD),
     });
 
-    // 5. 초대자 포트폴리오 현금 추가
-    const inviterPortSnap = await getDoc(doc(db, 'portfolios', inviterUid));
-    if (inviterPortSnap.exists()) {
-      const inviterCash = inviterPortSnap.data()?.cash ?? 1_000_000;
-      await updateDoc(doc(db, 'portfolios', inviterUid), {
-        cash: inviterCash + INVITER_REWARD,
-        updatedAt: Date.now(),
-      });
-    }
-
-    // 6. 피초대자 보상 (users 문서)
+    // 5. 피초대자 보상 (users 문서) — balance 직접 증가
     await updateDoc(doc(db, 'users', myUid), {
       invitedBy: inviterUid,
+      balance: increment(INVITEE_REWARD),
     });
-
-    // 7. 피초대자 포트폴리오 현금 추가
-    const myPortSnap = await getDoc(doc(db, 'portfolios', myUid));
-    if (myPortSnap.exists()) {
-      const myCash = myPortSnap.data()?.cash ?? 1_000_000;
-      await updateDoc(doc(db, 'portfolios', myUid), {
-        cash: myCash + INVITEE_REWARD,
-        updatedAt: Date.now(),
-      });
-    }
 
     return {
       success: true,

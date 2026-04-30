@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, FlatList, TextInput, Platform } from 'react-native';
+import { View, TouchableOpacity, ScrollView, Alert, FlatList, TextInput, Platform } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { collection, getDocs, updateDoc, doc, query, orderBy, where } from 'firebase/firestore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { db } from '../lib/firebase';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { resetMyAccount, TARGET_UID as MY_RESET_UID } from '../scripts/resetMyAccount';
 
 interface AdminUser {
   uid: string;
@@ -19,6 +22,7 @@ type TabType = 'users' | 'trades' | 'control';
 export default function AdminScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { logout } = useAuth();
   const [tab, setTab] = useState<TabType>('users');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [trades, setTrades] = useState<any[]>([]);
@@ -35,8 +39,8 @@ export default function AdminScreen() {
         uid: d.id,
         email: d.data().email ?? '',
         name: d.data().displayName ?? d.data().email ?? '',
-        balance: d.data().balance ?? 1000000,
-        totalAsset: d.data().totalAsset ?? 1000000,
+        balance: d.data().balance ?? 10000000,
+        totalAsset: d.data().totalAsset ?? 10000000,
         portfolio: d.data().portfolio ?? [],
       }));
       setUsers(uList.sort((a, b) => b.totalAsset - a.totalAsset));
@@ -80,6 +84,32 @@ export default function AdminScreen() {
         loadData();
       }}
     ]);
+  };
+
+  // TODO: 전체 리셋 기능 추가 후 제거 — 임시 테스트용 본인 계정 리셋
+  const handleResetMyAccount = () => {
+    Alert.alert(
+      '⚠️ 내 계정 데이터 완전 리셋',
+      `대상 UID: ${MY_RESET_UID}\n\n자산/포트폴리오/거래/미션/학습이 모두 초기화되고 자동 로그아웃됩니다.\n관심종목·알림은 유지돼요.\n\n정말 리셋할까요?`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '리셋',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await resetMyAccount();
+            console.log('🔁 [resetMyAccount] 결과:', result);
+            if (result.success) {
+              Alert.alert('완료', '리셋 후 로그아웃됩니다. 다시 로그인해주세요.', [
+                { text: '확인', onPress: () => logout?.() },
+              ]);
+            } else {
+              Alert.alert('일부 실패', result.errors.join('\n'));
+            }
+          },
+        },
+      ],
+    );
   };
 
   const filteredTrades = trades.filter(t =>
@@ -199,7 +229,14 @@ export default function AdminScreen() {
           <TouchableOpacity onPress={handleResetAll}
             style={{ backgroundColor: theme.red, borderRadius: 12, padding: 16, marginBottom: 12, alignItems: 'center' }}>
             <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>🔄 전체 초기화</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 4 }}>모든 유저 자산을 100만원으로 초기화</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 4 }}>모든 유저 자산을 1000만원으로 초기화</Text>
+          </TouchableOpacity>
+
+          {/* TODO: 전체 리셋 기능 추가 후 제거 — 임시 본인 계정 리셋 버튼 */}
+          <TouchableOpacity onPress={handleResetMyAccount}
+            style={{ backgroundColor: '#B00020', borderRadius: 12, padding: 16, marginBottom: 12, alignItems: 'center', borderWidth: 2, borderColor: '#FF4444' }}>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>🚨 내 계정 데이터 완전 리셋 (테스트용)</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 4 }}>UID {MY_RESET_UID.slice(0, 12)}…만 리셋 + 자동 로그아웃</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={loadData}
             style={{ backgroundColor: theme.primary, borderRadius: 12, padding: 16, alignItems: 'center' }}>

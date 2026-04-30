@@ -252,33 +252,40 @@ export const fetchChartData = async (
 ): Promise<CandleData[]> => {
   const yahooTicker = isKR ? `${ticker}.KS` : ticker;
 
-  try {
-    const res = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?interval=${INTERVAL_MAP[period]}&range=${period}`,
-      { headers: YAHOO_HEADERS_V8 },
-    );
-    const data = await res.json();
-    const result = data.chart?.result?.[0];
-    if (!result) return [];
-
-    const timestamps: number[] = result.timestamp ?? [];
-    const quotes = result.indicators?.quote?.[0] ?? {};
-
-    return timestamps
-      .map((ts, i) => ({
-        date: new Date(ts * 1000).toISOString(),
-        timestamp: ts,
-        open: isKR ? Math.round(quotes.open?.[i] ?? 0) : quotes.open?.[i] ?? 0,
-        high: isKR ? Math.round(quotes.high?.[i] ?? 0) : quotes.high?.[i] ?? 0,
-        low: isKR ? Math.round(quotes.low?.[i] ?? 0) : quotes.low?.[i] ?? 0,
-        close: isKR ? Math.round(quotes.close?.[i] ?? 0) : quotes.close?.[i] ?? 0,
-        volume: quotes.volume?.[i] ?? 0,
-      }))
-      .filter(d => d.close > 0 && d.open > 0);
-  } catch (e) {
-    console.error('차트 오류:', e);
-    return [];
+  // 빈 데이터·HTTP 오류·네트워크 예외를 모두 throw로 전파.
+  // 호출부(loadChartData)가 retry 및 에러 UI를 책임짐.
+  const res = await fetch(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?interval=${INTERVAL_MAP[period]}&range=${period}`,
+    { headers: YAHOO_HEADERS_V8 },
+  );
+  if (!res.ok) {
+    throw new Error(`차트 API 응답 실패: ${res.status}`);
   }
+  const data = await res.json();
+  const result = data.chart?.result?.[0];
+  if (!result) {
+    throw new Error('차트 데이터 없음');
+  }
+
+  const timestamps: number[] = result.timestamp ?? [];
+  const quotes = result.indicators?.quote?.[0] ?? {};
+
+  // close 기준만 유효성 체크 (open=0인 휴장 분봉 등은 살림)
+  const filtered = timestamps
+    .map((ts, i) => ({
+      date: new Date(ts * 1000).toISOString(),
+      timestamp: ts,
+      open: isKR ? Math.round(quotes.open?.[i] ?? 0) : quotes.open?.[i] ?? 0,
+      high: isKR ? Math.round(quotes.high?.[i] ?? 0) : quotes.high?.[i] ?? 0,
+      low: isKR ? Math.round(quotes.low?.[i] ?? 0) : quotes.low?.[i] ?? 0,
+      close: isKR ? Math.round(quotes.close?.[i] ?? 0) : quotes.close?.[i] ?? 0,
+      volume: quotes.volume?.[i] ?? 0,
+    }))
+    .filter((d) => d.close > 0);
+  if (filtered.length === 0) {
+    throw new Error('유효한 차트 데이터 없음');
+  }
+  return filtered;
 };
 
 // ══════════════════════════════════════════════════

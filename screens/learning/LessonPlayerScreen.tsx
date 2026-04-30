@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
@@ -9,6 +8,7 @@ import {
   Dimensions,
   Alert,
 } from 'react-native';
+import { Text } from '../../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +20,7 @@ import { useAppStore } from '../../store/appStore';
 import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { completeLesson, loseHeart, saveWrongAnswer } from '../../lib/learningService';
+import { updateMissionProgress } from '../../lib/missionService';
 import {
   learningContent,
   REWARDS,
@@ -144,9 +145,9 @@ export default function LessonPlayerScreen() {
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
           const userData = userSnap.data();
-          const currentBalance = userData.balance ?? 1_000_000;
-          const currentTotalAsset = userData.totalAsset ?? 1_000_000;
-          const currentInitialBalance = userData.initialBalance ?? 1_000_000;
+          const currentBalance = userData.balance ?? 10_000_000;
+          const currentTotalAsset = userData.totalAsset ?? 10_000_000;
+          const currentInitialBalance = userData.initialBalance ?? 10_000_000;
           await updateDoc(userRef, {
             balance: currentBalance + reward,
             totalAsset: currentTotalAsset + reward,
@@ -169,6 +170,13 @@ export default function LessonPlayerScreen() {
         });
       } catch (e) {
         console.error('보상 저장 오류:', e);
+      }
+
+      // 데일리 미션 진행 (실패해도 레슨 보상은 정상 완료)
+      try {
+        await updateMissionProgress(user.id, 'learning');
+      } catch (e) {
+        console.warn('데일리 미션 진행 업데이트 실패 (학습):', e);
       }
     }
 

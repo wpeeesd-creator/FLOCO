@@ -19,6 +19,17 @@ import { OfflineBanner } from '../hooks/useNetworkStatus';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SecureStore from 'expo-secure-store';
+import { useFonts } from 'expo-font';
+import { Text as RNText } from 'react-native';
+
+// ── react-native Text 전역 폴백: 혹시 import 누락된 화면도 Pretendard 적용 ──
+// (defaultProps는 deprecated이지만 React Native에서 여전히 동작 — 안전망 용도)
+const RNTextAny = RNText as any;
+RNTextAny.defaultProps = RNTextAny.defaultProps || {};
+RNTextAny.defaultProps.style = [
+  { fontFamily: 'Pretendard-Regular' },
+  RNTextAny.defaultProps.style,
+];
 
 // ── 프로덕션 경고 무시 ──────────────────────────────
 LogBox.ignoreLogs([
@@ -170,6 +181,22 @@ const queryClient = new QueryClient({
 
 // ── Root Layout ──────────────────────────────────────
 export default function RootLayout() {
+  // Pretendard 5종 로드 (로드 완료 전에는 SplashScreen 유지)
+  const [fontsLoaded, fontError] = useFonts({
+    'Pretendard-Regular':    require('../assets/fonts/Pretendard-Regular.otf'),
+    'Pretendard-Medium':     require('../assets/fonts/Pretendard-Medium.otf'),
+    'Pretendard-SemiBold':   require('../assets/fonts/Pretendard-SemiBold.otf'),
+    'Pretendard-Bold':       require('../assets/fonts/Pretendard-Bold.otf'),
+    'Pretendard-ExtraBold':  require('../assets/fonts/Pretendard-ExtraBold.otf'),
+  });
+
+  // 폰트 로드 완료 후 SplashScreen 숨김 (에러 시에도 진행 — 폴백 폰트로 표시)
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded, fontError]);
+
   useEffect(() => {
     const notifSub = Notifications.addNotificationReceivedListener((notification) => {
       console.log('[알림 수신]', notification.request.content.title);
@@ -184,6 +211,11 @@ export default function RootLayout() {
       responseSub.remove();
     };
   }, []);
+
+  // 폰트 로드 미완료 시 빈 화면 (SplashScreen이 계속 보임)
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

@@ -1,15 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList,
-  ActivityIndicator, TouchableOpacity,
+  View,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { collection, query, where, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
-import { calculateProfit } from '../utils/priceService';
+import { fetchMultiplePrices, getExchangeRate } from '../utils/priceService';
+import { calculateTotalAsset } from '../utils/assetCalculator';
+import { updateMissionProgress } from '../lib/missionService';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -18,9 +24,6 @@ interface RankEntry {
   nickname: string;
   investmentType?: { emoji: string; name: string };
   totalAsset: number;
-  initialBalance: number;
-  profit: number;
-  profitRate: number;
   portfolio: any[];
   school?: { name: string; grade?: string };
   realNameVerified: boolean;
@@ -31,17 +34,28 @@ export default function RankingScreen() {
   const { theme, isDark } = useTheme();
   const { user } = useAuth();
 
-  const [ranking, setRanking] = useState<RankEntry[]>([]);
+  const [rawUsers, setRawUsers] = useState<Array<{ uid: string; data: any }>>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [myRank, setMyRank] = useState(0);
-  const [myData, setMyData] = useState<RankEntry | null>(null);
   const [selectedTab, setSelectedTab] = useState<'전체' | '우리반'>('전체');
+  const [livePrices, setLivePrices] = useState<Record<string, any>>({});
+  const [exchangeRate, setExchangeRate] = useState(1380);
 
-  // ── Firestore 실시간 랭킹 (onSnapshot) ──────────
+  // ── 랭킹 화면 진입 시 데일리 미션 진행 (실패해도 화면은 정상) ──
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      try {
+        await updateMissionProgress(user.id, 'ranking');
+      } catch (e) {
+        console.warn('데일리 미션 진행 업데이트 실패 (랭킹):', e);
+      }
+    })();
+  }, [user?.id]);
+
+  // ── Firestore 실시간 랭킹 (onSnapshot) — raw 데이터만 보관 ──────────
   useEffect(() => {
     setIsLoading(true);
 
-    // 인덱스 없이도 작동하는 단순 쿼리
     const q = query(
       collection(db, 'users'),
       where('role', '==', 'user'),
@@ -51,40 +65,9 @@ export default function RankingScreen() {
     const unsubscribe = onSnapshot(q,
       (snapshot) => {
         const users = snapshot.docs
-          .map(doc => {
-            const data = doc.data();
-            if (data.role !== 'user') return null;
-
-            const totalAsset = data.totalAsset ?? 1_000_000;
-            const initialBalance = data.initialBalance ?? 1_000_000;
-            const { profit, profitRate } = calculateProfit(totalAsset, initialBalance);
-
-            return {
-              uid: doc.id,
-              nickname: data.nickname ?? data.name ?? '익명',
-              investmentType: data.investmentType,
-              totalAsset,
-              initialBalance,
-              profit,
-              profitRate,
-              portfolio: data.portfolio ?? [],
-              school: data.school,
-              realNameVerified: data.realNameVerified ?? false,
-              rank: 0,
-            };
-          })
-          .filter(Boolean) as RankEntry[];
-
-        // 수익률 기준 정렬
-        const sorted = users
-          .sort((a, b) => b.profitRate - a.profitRate)
-          .map((u, i) => ({ ...u, rank: i + 1 }));
-
-        setRanking(sorted);
-
-        const myIndex = sorted.findIndex(u => u.uid === user?.id);
-        setMyRank(myIndex >= 0 ? myIndex + 1 : 0);
-        if (myIndex >= 0) setMyData(sorted[myIndex]);
+          .filter(d => d.data()?.role === 'user')
+          .map(d => ({ uid: d.id, data: d.data() }));
+        setRawUsers(users);
         setIsLoading(false);
       },
       (error) => {
@@ -94,7 +77,78 @@ export default function RankingScreen() {
     );
 
     return () => unsubscribe();
-  }, [user?.id]);
+  }, []);
+
+  // ── 환율 (USD→KRW) ──────────────────────────
+  useEffect(() => {
+    getExchangeRate().then(setExchangeRate).catch(() => {});
+  }, []);
+
+  // ── 시세 폴링: rawUsers 전체의 portfolio ticker, 30초 ──────
+  useEffect(() => {
+    const allTickers = new Set<string>();
+    rawUsers.forEach(({ data }) => {
+      (data.portfolio ?? []).forEach((p: any) => {
+        if (p?.ticker) allTickers.add(p.ticker);
+      });
+    });
+    if (allTickers.size === 0) return;
+    const stocks = Array.from(allTickers).map(t => ({
+      ticker: t,
+      isKR: t.length === 6 && /^\d+$/.test(t),
+    }));
+    fetchMultiplePrices(stocks).then(setLivePrices).catch(() => {});
+    const interval = setInterval(() => {
+      fetchMultiplePrices(stocks).then(setLivePrices).catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [rawUsers.length, rawUsers.map(u => u.uid).join(',')]);
+
+  // ── 랭킹 계산 (raw + livePrices + exchangeRate) ─────────
+  // 모든 사용자에게 동일한 공식 적용 — 홈/자산현황과 일치하는 실시간 시세·환율 반영
+  const ranking = useMemo<RankEntry[]>(() => {
+    const livePriceMap: Record<string, number> = {};
+    for (const [k, v] of Object.entries(livePrices)) {
+      if (typeof (v as any)?.price === 'number') livePriceMap[k] = (v as any).price;
+    }
+
+    const entries: RankEntry[] = rawUsers.map(({ uid, data }) => {
+      const balance = data.balance ?? 10_000_000;
+      const portfolio = (data.portfolio ?? []) as Array<any>;
+      const { totalAsset } = calculateTotalAsset({
+        balance,
+        portfolio,
+        livePrices: livePriceMap,
+        exchangeRate,
+      });
+
+      if (uid === user?.id) {
+        console.log('🏆 ranking totalAsset:', totalAsset);
+      }
+
+      return {
+        uid,
+        nickname: data.nickname ?? data.name ?? '익명',
+        investmentType: data.investmentType,
+        totalAsset,
+        portfolio,
+        school: data.school,
+        realNameVerified: data.realNameVerified ?? false,
+        rank: 0,
+      };
+    });
+    return entries
+      .sort((a, b) => b.totalAsset - a.totalAsset)
+      .map((u, i) => ({ ...u, rank: i + 1 }));
+  }, [rawUsers, livePrices, exchangeRate, user?.id]);
+
+  const { myRank, myData } = useMemo(() => {
+    const idx = ranking.findIndex(u => u.uid === user?.id);
+    return {
+      myRank: idx >= 0 ? idx + 1 : 0,
+      myData: idx >= 0 ? ranking[idx] : null,
+    };
+  }, [ranking, user?.id]);
 
   const displayRanking = selectedTab === '전체'
     ? ranking
@@ -139,8 +193,7 @@ export default function RankingScreen() {
     },
     myCardRank: { fontSize: 36, fontWeight: 'bold', color: theme.bgCard },
     myCardName: { color: theme.bgCard, fontSize: 16, fontWeight: 'bold' },
-    myCardSub: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 4 },
-    myCardAsset: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 2 },
+    myCardAsset: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 4 },
     tabRow: {
       flexDirection: 'row',
       marginHorizontal: 16,
@@ -189,8 +242,7 @@ export default function RankingScreen() {
     rowRank: { fontSize: 16, width: 44, textAlign: 'center', fontWeight: 'bold', color: theme.text },
     rowName: { fontSize: 15, fontWeight: 'bold', color: theme.text },
     rowSub: { color: theme.textSecondary, fontSize: 12, marginTop: 2 },
-    rowRate: { fontSize: 18, fontWeight: 'bold' },
-    rowProfit: { fontSize: 12, marginTop: 2 },
+    rowAsset: { fontSize: 16, fontWeight: 'bold', color: theme.text },
     verifiedBadge: {
       backgroundColor: '#E8F5E9',
       borderRadius: 6,
@@ -233,9 +285,6 @@ export default function RankingScreen() {
           <Text style={s.myCardRank}>{myRank}위</Text>
           <View style={{ marginLeft: 16, flex: 1 }}>
             <Text style={s.myCardName}>{myData.nickname}</Text>
-            <Text style={s.myCardSub}>
-              수익률 {myData.profitRate >= 0 ? '+' : ''}{myData.profitRate}%
-            </Text>
             <Text style={s.myCardAsset}>
               총자산 {Math.round(myData.totalAsset).toLocaleString()}원
             </Text>
@@ -307,18 +356,12 @@ export default function RankingScreen() {
                 {item.school?.name && (
                   <Text style={s.rowSub}>🏫 {item.school.name}</Text>
                 )}
-                <Text style={s.rowSub}>총자산 {Math.round(item.totalAsset).toLocaleString()}원</Text>
               </View>
 
-              {/* 수익률 */}
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={[s.rowRate, { color: item.profitRate >= 0 ? theme.green : theme.red }]}>
-                  {item.profitRate >= 0 ? '+' : ''}{item.profitRate}%
-                </Text>
-                <Text style={[s.rowProfit, { color: item.profit >= 0 ? theme.green : theme.red }]}>
-                  {item.profit >= 0 ? '+' : ''}{Math.round(item.profit).toLocaleString()}원
-                </Text>
-              </View>
+              {/* 총자산 */}
+              <Text style={s.rowAsset}>
+                {Math.round(item.totalAsset).toLocaleString()}원
+              </Text>
             </View>
           );
         }}

@@ -1,9 +1,15 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, RefreshControl, ActivityIndicator,
-  Alert, Modal,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
+  Alert,
+  Modal,
 } from 'react-native';
+import { Text, NumberText } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +24,7 @@ import NewsCard from '../components/NewsCard';
 import { useAllNews } from '../hooks/useNews';
 import { loadTodayMissions, ALL_COMPLETE_BONUS, type DailyMission } from '../lib/missionService';
 import { fetchMultiplePrices, calculateProfit, getExchangeRate } from '../utils/priceService';
+import { calculateTotalAsset } from '../utils/assetCalculator';
 import { useTheme } from '../context/ThemeContext';
 
 type TopTab = '보유' | '관심';
@@ -67,6 +74,8 @@ export default function HomeScreen() {
         }
         if (data?.initialBalance !== undefined) {
           setFirestoreInitialBalance(data.initialBalance);
+          // appStore에도 동기화 → AssetDetailScreen / ProfileScreen이 같은 기준점 사용
+          useAppStore.setState({ initialBalance: data.initialBalance });
         }
         // wishlist 동기화
         if (Array.isArray(data?.wishlist)) {
@@ -144,32 +153,35 @@ export default function HomeScreen() {
   }, [wishlist.length]);
 
   // ── Derived values ────────────────────────────────
-  const balance = cash !== undefined ? cash : (firestoreBalance ?? 1_000_000);
+  const balance = cash !== undefined ? cash : (firestoreBalance ?? 10_000_000);
   const safeHoldingsRaw = holdings ?? [];
-  console.log('보유종목 raw:', JSON.stringify(safeHoldingsRaw.find(h => h.ticker === 'NOW'), null, 2));
-  console.log('exchangeRate:', exchangeRate);
-  const portfolioValue = safeHoldingsRaw.reduce((sum, h) => {
-    const livePrice = portfolioPrices[h.ticker]?.price ??
-      STOCKS.find(s => s.ticker === h.ticker)?.price ?? 0;
-    const isKR = (h as any).krw ?? STOCKS.find(s => s.ticker === h.ticker)?.krw ?? true;
-    const livePriceKRW = isKR ? livePrice : Math.round(livePrice * exchangeRate);
-    return sum + livePriceKRW * (h.qty ?? 0);
-  }, 0);
-  const realTotalAsset = balance + portfolioValue;
-  const initialBalance = firestoreInitialBalance ?? 1_000_000;
+  const livePriceMap: Record<string, number> = {};
+  for (const [k, v] of Object.entries(portfolioPrices)) {
+    if (typeof (v as any)?.price === 'number') livePriceMap[k] = (v as any).price;
+  }
+  const { totalAsset: realTotalAsset, portfolioValue } = calculateTotalAsset({
+    balance,
+    portfolio: safeHoldingsRaw as any,
+    livePrices: livePriceMap,
+    exchangeRate,
+  });
+  console.log('🏠 home totalAsset:', realTotalAsset);
+  const initialBalance = firestoreInitialBalance ?? 10_000_000;
   const { profit, profitRate } = calculateProfit(realTotalAsset, initialBalance);
   const totalValue = realTotalAsset;
   const isUp = profit >= 0;
 
   // ── Firestore totalAsset 실시간 업데이트 ──────────
+  // holdings가 비어있으면 totalAsset = balance로 정리 (zustand persist 좀비 현상 방지)
   useEffect(() => {
-    if (!user?.id || safeHoldingsRaw.length === 0) return;
-    if (Math.abs(realTotalAsset - (firestoreTotalAsset ?? 0)) > 100) {
+    if (!user?.id) return;
+    const targetTotal = safeHoldingsRaw.length === 0 ? balance : realTotalAsset;
+    if (Math.abs(targetTotal - (firestoreTotalAsset ?? 0)) > 100) {
       updateDoc(doc(db, 'users', user.id), {
-        totalAsset: Math.round(realTotalAsset),
+        totalAsset: Math.round(targetTotal),
       }).catch(console.error);
     }
-  }, [user?.id, realTotalAsset, firestoreTotalAsset, safeHoldingsRaw.length]);
+  }, [user?.id, realTotalAsset, firestoreTotalAsset, safeHoldingsRaw.length, balance]);
 
   // ── Holdings computation ──────────────────────────
   const safeHoldings = holdings ?? [];
@@ -1086,22 +1098,22 @@ export default function HomeScreen() {
 
               {/* 총 자산 */}
               <Text style={styles.totalAssetLabel}>총 자산</Text>
-              <Text style={styles.totalAssetValue}>
+              <NumberText style={styles.totalAssetValue}>
                 {Math.round(totalValue).toLocaleString()}원
-              </Text>
+              </NumberText>
 
               {/* 수익금 + 수익률 */}
               <View style={styles.profitRow}>
-                <Text style={[styles.profitAmt, { color: isUp ? theme.red : theme.blue }]}>
+                <NumberText style={[styles.profitAmt, { color: isUp ? theme.red : theme.blue }]}>
                   {isUp ? '+' : ''}{Math.round(profit).toLocaleString()}원
-                </Text>
+                </NumberText>
                 <View style={[
                   styles.profitRateBadge,
                   { backgroundColor: isUp ? Colors.greenBg : Colors.redBg },
                 ]}>
-                  <Text style={[styles.profitRateText, { color: isUp ? theme.red : theme.blue }]}>
+                  <NumberText style={[styles.profitRateText, { color: isUp ? theme.red : theme.blue }]}>
                     {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{profitRate.toFixed(2)}%
-                  </Text>
+                  </NumberText>
                 </View>
               </View>
 
@@ -1141,16 +1153,16 @@ export default function HomeScreen() {
               <View style={styles.balanceRow}>
                 <View style={styles.balanceItem}>
                   <Text style={styles.balanceLabel}>주문가능금액</Text>
-                  <Text style={styles.balancePrimaryValue}>
+                  <NumberText style={styles.balancePrimaryValue}>
                     {Math.round(balance).toLocaleString()}원
-                  </Text>
+                  </NumberText>
                 </View>
                 <View style={styles.balanceDivider} />
                 <View style={styles.balanceItem}>
                   <Text style={styles.balanceLabel}>투자중 금액</Text>
-                  <Text style={styles.balanceValue}>
+                  <NumberText style={styles.balanceValue}>
                     {Math.round(portfolioValue).toLocaleString()}원
-                  </Text>
+                  </NumberText>
                 </View>
               </View>
             </View>
@@ -1199,16 +1211,16 @@ export default function HomeScreen() {
             <View style={styles.summaryRow}>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>평가금</Text>
-                <Text style={styles.summaryValue}>
+                <NumberText style={styles.summaryValue}>
                   {Math.round(summaryEval).toLocaleString()}원
-                </Text>
+                </NumberText>
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>수익금</Text>
-                <Text style={[styles.summaryValue, { color: summaryUp ? theme.red : theme.blue }]}>
+                <NumberText style={[styles.summaryValue, { color: summaryUp ? theme.red : theme.blue }]}>
                   {summaryUp ? '+' : ''}{Math.round(summaryPnl).toLocaleString()}원
-                </Text>
+                </NumberText>
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
@@ -1269,23 +1281,22 @@ export default function HomeScreen() {
                       ]}
                       onPress={() => {
                         const pd = portfolioPrices[h.ticker];
-                        navigation.getParent()?.navigate('투자Tab', {
-                          screen: '종목상세', params: {
-                            ticker: h.ticker,
-                            price: pd?.price,
-                            change: pd?.change,
-                            changeAmount: pd?.changeAmount,
-                            high: pd?.high,
-                            low: pd?.low,
-                            open: pd?.open,
-                            volume: pd?.volume,
-                            previousClose: pd?.previousClose,
-                            week52High: pd?.week52High,
-                            week52Low: pd?.week52Low,
-                            per: pd?.per,
-                            pbr: pd?.pbr,
-                            marketState: pd?.marketState,
-                          },
+                        // HomeStack 내부 push — 뒤로가기 시 홈으로 자연 복귀
+                        navigation.navigate('종목상세', {
+                          ticker: h.ticker,
+                          price: pd?.price,
+                          change: pd?.change,
+                          changeAmount: pd?.changeAmount,
+                          high: pd?.high,
+                          low: pd?.low,
+                          open: pd?.open,
+                          volume: pd?.volume,
+                          previousClose: pd?.previousClose,
+                          week52High: pd?.week52High,
+                          week52Low: pd?.week52Low,
+                          per: pd?.per,
+                          pbr: pd?.pbr,
+                          marketState: pd?.marketState,
                         });
                       }}
                       activeOpacity={0.7}
@@ -1414,23 +1425,22 @@ export default function HomeScreen() {
                       ]}
                       onPress={() => {
                         const pd = wishlistPrices[s.ticker];
-                        navigation.getParent()?.navigate('투자Tab', {
-                          screen: '종목상세', params: {
-                            ticker: s.ticker,
-                            price: pd?.price,
-                            change: pd?.change,
-                            changeAmount: pd?.changeAmount,
-                            high: pd?.high,
-                            low: pd?.low,
-                            open: pd?.open,
-                            volume: pd?.volume,
-                            previousClose: pd?.previousClose,
-                            week52High: pd?.week52High,
-                            week52Low: pd?.week52Low,
-                            per: pd?.per,
-                            pbr: pd?.pbr,
-                            marketState: pd?.marketState,
-                          },
+                        // HomeStack 내부 push — 뒤로가기 시 홈으로 자연 복귀
+                        navigation.navigate('종목상세', {
+                          ticker: s.ticker,
+                          price: pd?.price,
+                          change: pd?.change,
+                          changeAmount: pd?.changeAmount,
+                          high: pd?.high,
+                          low: pd?.low,
+                          open: pd?.open,
+                          volume: pd?.volume,
+                          previousClose: pd?.previousClose,
+                          week52High: pd?.week52High,
+                          week52Low: pd?.week52Low,
+                          per: pd?.per,
+                          pbr: pd?.pbr,
+                          marketState: pd?.marketState,
                         });
                       }}
                       activeOpacity={0.7}

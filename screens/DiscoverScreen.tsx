@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Linking, ActivityIndicator, Dimensions,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Linking,
+  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { STOCKS } from '../store/appStore';

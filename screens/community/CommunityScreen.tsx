@@ -1,8 +1,14 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, RefreshControl, ActivityIndicator, Alert,
+  View,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
+import { Text } from '../../components/ui/Text';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -14,6 +20,7 @@ import {
   getPosts, toggleLike,
   type CommunityPost,
 } from '../../lib/firestoreService';
+import { updateMissionProgress } from '../../lib/missionService';
 
 const TAGS = ['전체', '구독', '#모의투자', '#주식공부', '#수익인증', '#질문있어요', '#경제뉴스'] as const;
 type Tag = typeof TAGS[number];
@@ -109,7 +116,17 @@ export default function CommunityScreen({ navigation }: Props) {
 
   const handleLike = async (postId: string) => {
     if (!user?.id) return;
+    // 토글 전 상태로 "좋아요 추가" 여부 판별 (취소면 미션 호출 X)
+    const targetPost = posts.find((p) => p.id === postId);
+    const wasLiked = targetPost ? (targetPost.likes ?? []).includes(user.id) : false;
     await toggleLike(postId, user.id);
+    if (!wasLiked) {
+      try {
+        await updateMissionProgress(user.id, 'community');
+      } catch (e) {
+        console.warn('데일리 미션 진행 업데이트 실패 (커뮤니티):', e);
+      }
+    }
     loadPosts();
   };
 

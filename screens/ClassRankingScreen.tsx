@@ -5,20 +5,24 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, FlatList, StyleSheet,
-  ActivityIndicator, RefreshControl, TouchableOpacity,
+  View,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { useNavigation } from '@react-navigation/native';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
-import { getAllPortfolios } from '../lib/firestoreService';
 import { STOCKS } from '../store/appStore';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
-const INITIAL_FUND = 1_000_000;
+const INITIAL_FUND = 10_000_000;
 
 interface ClassMember {
   uid: string;
@@ -45,36 +49,28 @@ export default function ClassRankingScreen({ classId, schoolName, cohort }: Clas
 
   const load = useCallback(async () => {
     try {
-      // 같은 classId를 가진 유저 조회
+      // 같은 classId를 가진 유저 조회 — users.portfolio + users.balance 기반
       const q = query(collection(db, 'users'), where('school.classId', '==', classId));
       const usersSnap = await getDocs(q);
-      const classUsers = usersSnap.docs.map((d) => ({
-        uid: d.id,
-        name: d.data()?.name ?? '익명',
-        investEmoji: d.data()?.investmentType?.emoji ?? '📊',
-      }));
 
-      if (classUsers.length === 0) {
-        setRanked([]);
-        return;
-      }
-
-      // 포트폴리오 로드
-      const allPortfolios = await getAllPortfolios();
-      const classUids = new Set(classUsers.map((u) => u.uid));
-
-      const members: ClassMember[] = classUsers.map((cu) => {
-        const port = allPortfolios.find((p) => p.uid === cu.uid);
-        let totalAsset = INITIAL_FUND;
-        if (port) {
-          const holdingsValue = (port.holdings ?? []).reduce((sum, h) => {
-            const s = STOCKS.find((st) => st.ticker === h.ticker);
-            return sum + (s ? (s.price ?? 0) * (h.qty ?? 0) : 0);
-          }, 0);
-          totalAsset = (port.cash ?? 0) + holdingsValue;
-        }
+      const members: ClassMember[] = usersSnap.docs.map((d) => {
+        const data = d.data();
+        const balance = data?.balance ?? INITIAL_FUND;
+        const portfolio: any[] = data?.portfolio ?? [];
+        const holdingsValue = portfolio.reduce((sum, h) => {
+          const s = STOCKS.find((st) => st.ticker === h.ticker);
+          const qty = h.quantity ?? h.qty ?? 0;
+          return sum + (s ? (s.price ?? 0) * qty : 0);
+        }, 0);
+        const totalAsset = data?.totalAsset ?? (balance + holdingsValue);
         const returnRate = ((totalAsset - INITIAL_FUND) / INITIAL_FUND) * 100;
-        return { ...cu, totalAsset, returnRate };
+        return {
+          uid: d.id,
+          name: data?.name ?? '익명',
+          investEmoji: data?.investmentType?.emoji ?? '📊',
+          totalAsset,
+          returnRate,
+        };
       });
 
       members.sort((a, b) => b.totalAsset - a.totalAsset);

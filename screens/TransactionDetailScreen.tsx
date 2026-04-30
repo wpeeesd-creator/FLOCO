@@ -4,8 +4,12 @@
 
 import React from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';

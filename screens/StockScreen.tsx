@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Alert, TextInput,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  TextInput,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
@@ -63,7 +69,7 @@ export default function StockScreen() {
   } catch (error) {
     // ignore
   }
-  const profit = totalValue - 1_000_000;
+  const profit = totalValue - 10_000_000;
   const isUp = profit >= 0;
 
   const safeHoldings = holdings ?? [];

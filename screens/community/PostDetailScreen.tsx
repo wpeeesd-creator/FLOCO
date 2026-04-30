@@ -1,9 +1,17 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
-  TextInput, KeyboardAvoidingView, Platform, ActivityIndicator,
-  Alert, Keyboard,
+  View,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
 } from 'react-native';
+import { Text } from '../../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +26,7 @@ import { Colors } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getPost, deletePost, type CommunityPost } from '../../lib/firestoreService';
+import { updateMissionProgress } from '../../lib/missionService';
 
 interface Comment {
   id: string;
@@ -109,6 +118,14 @@ export default function PostDetailScreen() {
         };
       });
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // 좋아요 추가 시에만 데일리 미션 진행 (취소 시 X)
+      if (!isLiked) {
+        try {
+          await updateMissionProgress(user.id, 'community');
+        } catch (e) {
+          console.warn('데일리 미션 진행 업데이트 실패 (커뮤니티):', e);
+        }
+      }
     } catch (error) {
       console.error('좋아요 오류:', error);
     }

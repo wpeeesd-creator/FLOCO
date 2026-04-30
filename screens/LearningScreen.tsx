@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
-  Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -229,11 +229,14 @@ export default function LearningScreen() {
           {CATEGORIES.map((catId) => {
             const meta = CATEGORY_META[catId];
             const color = meta.color[0];
-            const progress = learningData?.categoryProgress?.[catId];
-            const completed = progress?.completed ?? 0;
-            const total = progress?.total ?? 1;
-            const pct = Math.round((completed / total) * 100);
-            const allDone = pct === 100;
+            // total은 learningContent에서 동적 계산 (Firestore 하드코딩 값 무시 — 50% 고정 버그 회피)
+            const userProgress = learningData?.categoryProgress?.[catId];
+            const completedCount = userProgress?.completed ?? 0;
+            const totalLevels = learningContent[catId]?.levels?.length ?? 0;
+            const pct = totalLevels > 0
+              ? Math.round((completedCount / totalLevels) * 100)
+              : 0;
+            const allDone = totalLevels > 0 && completedCount >= totalLevels;
 
             return (
               <TouchableOpacity

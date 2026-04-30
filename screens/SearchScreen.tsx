@@ -7,9 +7,14 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import {
-  View, Text, TextInput, ScrollView, StyleSheet,
-  TouchableOpacity, Keyboard,
+  View,
+  TextInput,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Keyboard,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { STOCKS } from '../store/appStore';

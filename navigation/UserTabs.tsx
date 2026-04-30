@@ -83,6 +83,9 @@ function HomeNavigator() {
       <HomeStack.Screen name="데일리미션" component={DailyMissionScreen} />
       <HomeStack.Screen name="AI분석" component={PortfolioAIScreen} />
       <HomeStack.Screen name="WebView" component={WebViewScreen} />
+      {/* 종목상세는 InvestStack에도 등록되어 있지만, 홈에서 자기 스택 내 push 가능하도록 여기도 등록.
+          cross-stack 점프 방지 → 뒤로가기 시 자연스럽게 홈으로 복귀. */}
+      <HomeStack.Screen name="종목상세" component={StockDetailScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -153,6 +156,8 @@ function ProfileNavigator() {
       <ProfileStack.Screen name="서비스이용약관" component={TermsScreen} />
       <ProfileStack.Screen name="실명인증" component={RealNameVerifyScreen} />
       <ProfileStack.Screen name="배지" component={BadgeScreen} />
+      {/* SurveyResultScreen 추천 종목 탭 시 자기 스택 내에서 push (cross-stack 점프 방지) */}
+      <ProfileStack.Screen name="종목상세" component={StockDetailScreen} />
     </ProfileStack.Navigator>
   );
 }

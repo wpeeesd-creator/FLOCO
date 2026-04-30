@@ -5,12 +5,19 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, ActivityIndicator, RefreshControl,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import {
   loadTodayMissions, getTodayKey, ALL_COMPLETE_BONUS,
@@ -30,25 +37,44 @@ export default function DailyMissionScreen() {
 
   const today = getTodayKey();
 
-  const load = useCallback(async () => {
+  // 최초 진입 시 오늘 미션 보장 + 옛날 날짜 키 정리 (한 번만 실행)
+  useEffect(() => {
     if (!user?.id) return;
+    loadTodayMissions(user.id).catch(() => {});
+  }, [user?.id]);
+
+  // 실시간 리스너: users 문서 변경 시 즉시 반영 (다른 화면에서 미션 진행 후 즉시 갱신)
+  useEffect(() => {
+    if (!user?.id) return;
+    const unsubscribe = onSnapshot(
+      doc(db, 'users', user.id),
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          const todayMissions = data?.dailyMissions?.[today];
+          setMissions(Array.isArray(todayMissions) ? (todayMissions as DailyMission[]) : []);
+        }
+        setLoading(false);
+        setRefreshing(false);
+      },
+      (error) => {
+        console.error('데일리 미션 실시간 리스너 오류:', error);
+        setLoading(false);
+        setRefreshing(false);
+      },
+    );
+    return () => unsubscribe();
+  }, [user?.id, today]);
+
+  const onRefresh = useCallback(async () => {
+    if (!user?.id) return;
+    setRefreshing(true);
     try {
-      const m = await loadTodayMissions(user.id);
-      setMissions(m);
+      await loadTodayMissions(user.id);
     } catch {
-      setMissions([]);
-    } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   }, [user?.id]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    load();
-  }, [load]);
 
   const completedCount = missions.filter((m) => m.completed).length;
   const totalCount = missions.length;

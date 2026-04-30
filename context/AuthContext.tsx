@@ -7,6 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { app, db } from '../lib/firebase';
 import { setSessionUser } from '../lib/userSession';
+import { useAppStore } from '../store/appStore';
 
 // ── 타입 ──────────────────────────────────────────
 export type User = {
@@ -107,6 +108,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   function setUser(u: User | null) {
     setUserState(u);
     setSessionUser(u ? { name: u.name, email: u.email } : null);
+    // appStore도 사용자 변경에 맞춰 hydrate / unhydrate
+    // (어느 화면에 먼저 진입하든 store.initialBalance 등이 정확히 채워지게 함)
+    if (u?.id) {
+      useAppStore.getState().hydrateUserData(u.id);
+    } else {
+      useAppStore.getState().unhydrateUser();
+    }
   }
 
   // ── 세션 복원 (앱 시작 시) ─────────────────────

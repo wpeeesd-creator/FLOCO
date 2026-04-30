@@ -7,10 +7,15 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { savePortfolio } from '../lib/firestoreService';
+import { doc, onSnapshot, getDoc, updateDoc, arrayUnion, increment } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { updateMissionProgress } from '../lib/missionService';
 import { logStockPurchase, logStockSold, logLessonCompleted, logLevelUp } from '../lib/analytics';
 import { recordError, setUserId } from '../lib/crashlytics';
 import { US_STOCKS_EXPANDED } from '../data/usStocksExpanded';
+
+// 유저 onSnapshot unsubscribe 핸들 (모듈 스코프 — store state에 함수 저장 시 직렬화 이슈 회피)
+let userUnsubscribe: (() => void) | null = null;
 
 // ── 타입 ──────────────────────────────
 
@@ -490,6 +495,7 @@ interface AppState {
   cash: number;
   holdings: Holding[];
   trades: TradeRecord[];
+  initialBalance: number; // 수익률 계산 기준점 (users.initialBalance 동기화)
 
   // 듀오링고 알고리즘
   xp: number;
@@ -509,10 +515,8 @@ interface AppState {
     xp: number; level: number; streak: number; hearts: number;
     lastCheckIn: string; lastStudyDate: string; floPoints: number;
     completedLessons: string[]; completedEvents: string[]; achievements: string[];
+    initialBalance: number;
   }>) => void;
-  syncToAuth: () => void;
-  syncToAuthAsync: () => Promise<void>;
-
   // Optimistic UI — 거래 진행 중 여부
   isTradePending: boolean;
 
@@ -528,10 +532,15 @@ interface AppState {
   restoreHearts: () => void;
   initStreak: () => void;
 
-  // 유틸
-  getTotalValue: () => number;
-  getReturnRate: () => number;
+  // 유틸 (livePrices: 실시간 시세 맵 — Yahoo Finance, exchangeRate: USD→KRW 환율)
+  getTotalValue: (livePrices?: Record<string, number>, exchangeRate?: number) => number;
+  getReturnRate: (livePrices?: Record<string, number>, exchangeRate?: number) => number;
+  getProfit: (livePrices?: Record<string, number>, exchangeRate?: number) => number;
   getLessonStatus: (lessonId: string) => 'completed' | 'active' | 'locked';
+
+  // 유저 데이터 hydrate / unhydrate (AuthContext에서 로그인/로그아웃 시 호출)
+  hydrateUserData: (uid: string) => void;
+  unhydrateUser: () => void;
 }
 
 // ── 스토어 구현 ──────────────────────────
@@ -541,9 +550,10 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       // 초기값 (로그인 전 기본값)
       userId: '',
-      cash: 1_000_000,
+      cash: 10_000_000,
       holdings: [],
       trades: [],
+      initialBalance: 10_000_000,
       xp: 0,
       level: 1,
       hearts: 5,
@@ -556,13 +566,67 @@ export const useAppStore = create<AppState>()(
       achievements: [],
       isTradePending: false,
 
+      // ── 유저 데이터 실시간 구독 (AuthContext가 로그인 시 호출) ──
+      // users/{uid}를 직접 onSnapshot으로 구독하여 어느 화면에 먼저 진입하든
+      // initialBalance/balance/portfolio가 항상 최신 상태로 store에 채워지게 함.
+      hydrateUserData: (uid: string) => {
+        // 기존 구독이 있으면 정리 (사용자 변경/재로그인 대응)
+        if (userUnsubscribe) {
+          userUnsubscribe();
+          userUnsubscribe = null;
+        }
+        if (!uid) return;
+
+        set({ userId: uid });
+        setUserId(uid);
+
+        const ref = doc(db, 'users', uid);
+        userUnsubscribe = onSnapshot(
+          ref,
+          (snap) => {
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const partial: Record<string, any> = {};
+
+            // 게이트 완화 — undefined 체크 시 옛 사용자(필드 부재)에게 zustand persist
+            // 캐시값(이전 세션의 다른 계정 값)이 그대로 남아 화면 간 자산 불일치 발생.
+            // 명시적으로 fallback 10_000_000을 set해 store/Firestore 정합성 보장.
+            partial.cash = data?.balance ?? 10_000_000;
+            partial.initialBalance = data?.initialBalance ?? 10_000_000;
+
+            // users.portfolio → store.holdings 동기화 (HomeScreen onSnapshot과 동일 로직)
+            if (Array.isArray(data?.portfolio)) {
+              partial.holdings = data.portfolio.map((p: any) => ({
+                ticker: p.ticker,
+                qty: p.quantity ?? p.qty ?? 0,
+                avgPrice: p.avgPrice ?? 0,
+              }));
+            }
+
+            if (Object.keys(partial).length > 0) {
+              set(partial);
+            }
+          },
+          (error) => {
+            console.warn('[appStore.hydrateUserData] onSnapshot 오류:', error);
+          },
+        );
+      },
+
+      // ── 유저 구독 해제 (AuthContext가 로그아웃 시 호출) ──
+      unhydrateUser: () => {
+        if (userUnsubscribe) {
+          userUnsubscribe();
+          userUnsubscribe = null;
+        }
+      },
+
       // ── 유저 데이터 로드 ──
       loadFromSnapshot: (userId, snapshot) => {
-        console.log('loadFromSnapshot 호출, userId:', userId);
         setUserId(userId);
         set({
           userId,
-          cash: snapshot.cash ?? 1_000_000,
+          cash: snapshot.cash ?? 10_000_000,
           holdings: snapshot.holdings ?? [],
           trades: snapshot.trades ?? [],
           xp: snapshot.xp ?? 0,
@@ -575,66 +639,24 @@ export const useAppStore = create<AppState>()(
           completedLessons: snapshot.completedLessons ?? [],
           completedEvents: snapshot.completedEvents ?? [],
           achievements: snapshot.achievements ?? [],
+          initialBalance: snapshot.initialBalance ?? 10_000_000,
         });
       },
 
-      // ── Firestore 포트폴리오 동기화 (fire-and-forget) ──
-      syncToAuth: () => {
-        const s = get();
-        if (!s.userId) return;
-        const { getSessionUser } = require('../lib/userSession');
-        const profile = getSessionUser();
-        if (!profile) return;
-        savePortfolio(s.userId, {
-          name: profile.name,
-          email: profile.email,
-          cash: s.cash,
-          holdings: s.holdings,
-          trades: s.trades,
-          xp: s.xp,
-          level: s.level,
-          streak: s.streak,
-          lastCheckIn: s.lastCheckIn,
-          floPoints: s.floPoints,
-          completedLessons: s.completedLessons,
-          completedEvents: s.completedEvents,
-          achievements: s.achievements,
-        }).catch(() => {});
-      },
-
-      // ── Firestore 포트폴리오 동기화 (await 가능 — Optimistic UI 롤백용) ──
-      syncToAuthAsync: async () => {
-        const s = get();
-        if (!s.userId) return;
-        const { getSessionUser } = require('../lib/userSession');
-        const profile = getSessionUser();
-        if (!profile) return;
-        await savePortfolio(s.userId, {
-          name: profile.name,
-          email: profile.email,
-          cash: s.cash,
-          holdings: s.holdings,
-          trades: s.trades,
-          xp: s.xp,
-          level: s.level,
-          streak: s.streak,
-          lastCheckIn: s.lastCheckIn,
-          floPoints: s.floPoints,
-          completedLessons: s.completedLessons,
-          completedEvents: s.completedEvents,
-          achievements: s.achievements,
-        });
-      },
-
-      // ── 매수 (Optimistic UI: 로컬 즉시 반영 → Firestore 백그라운드 동기화 → 실패 시 롤백) ──
+      // ── 매수 (Optimistic UI: 로컬 즉시 반영 → users/{uid} 직접 갱신 → 실패 시 롤백) ──
+      // users.portfolio가 single source of truth — 모든 화면이 여길 보고,
+      // store hydrate도 여기서 일어나므로 화면 간 정합성 보장.
       buyStock: async (ticker, qty, price) => {
         const total = price * qty;
         const fee = total * 0.001; // 수수료 0.1%
         const totalWithFee = total + fee;
-        const { cash, holdings } = get();
+        const { cash, holdings, userId } = get();
 
         if (cash < totalWithFee) {
           return { success: false, message: `잔액이 부족해요. (필요: ${Math.round(totalWithFee).toLocaleString()}원)` };
+        }
+        if (!userId) {
+          return { success: false, message: '로그인이 필요해요.' };
         }
 
         // 롤백용 스냅샷
@@ -657,26 +679,81 @@ export const useAppStore = create<AppState>()(
         set({ cash: cash - totalWithFee, holdings: newHoldings, trades: [...(snapshot.trades ?? []), newTrade], isTradePending: true });
 
         try {
-          // ② 백그라운드 Firestore 동기화
-          await get().syncToAuthAsync();
+          // ② users/{uid} 문서 직접 갱신 (모든 화면이 보는 single source of truth)
+          // 평균매수가 재계산: newAvg = (oldAvg * oldQty + newPrice * newQty) / (oldQty + newQty)
+          const userRef = doc(db, 'users', userId);
+          const userSnap = await getDoc(userRef);
+          const currentPortfolio: any[] = userSnap.data()?.portfolio ?? [];
+
+          const stockMeta = STOCKS.find(s => s.ticker === ticker);
+          const existingItem = currentPortfolio.find((p) => p.ticker === ticker);
+          const newPortfolioFs: any[] = existingItem
+            ? currentPortfolio.map((p) => {
+                if (p.ticker !== ticker) return p;
+                const oldQty = p.quantity ?? p.qty ?? 0;
+                const oldAvg = p.avgPrice ?? 0;
+                const newQty = oldQty + qty;
+                const newAvg = newQty > 0 ? (oldAvg * oldQty + price * qty) / newQty : price;
+                return { ...p, quantity: newQty, avgPrice: newAvg, price };
+              })
+            : [
+                ...currentPortfolio,
+                {
+                  ticker,
+                  name: stockMeta?.name ?? ticker,
+                  quantity: qty,
+                  avgPrice: price,
+                  price,
+                  sector: stockMeta?.sector ?? '기타',
+                  change: stockMeta?.change ?? 0,
+                  bg: '#8E8E93',
+                  logo: stockMeta?.logo ?? '',
+                },
+              ];
+
+          await updateDoc(userRef, {
+            balance: increment(-Math.round(totalWithFee)),
+            portfolio: newPortfolioFs,
+            transactions: arrayUnion({
+              type: 'buy',
+              ticker,
+              stockName: stockMeta?.name ?? ticker,
+              quantity: qty,
+              price,
+              total: Math.round(total),
+              fee: Math.round(fee),
+              createdAt: new Date().toISOString(),
+            }),
+          });
+
           set({ isTradePending: false });
           logStockPurchase(ticker, qty, price);
+
+          // 데일리 미션 진행 (실패해도 거래는 정상 완료)
+          try {
+            await updateMissionProgress(userId, 'trade');
+          } catch (e) {
+            console.warn('데일리 미션 진행 업데이트 실패 (매수):', e);
+          }
           return { success: true, message: `${ticker} ${qty}주 매수 완료` };
         } catch (error) {
-          // ③ 실패 시 롤백
+          // ④ 실패 시 롤백
           if (error instanceof Error) recordError(error, '매수 Firestore 동기화 실패');
           set({ cash: snapshot.cash, holdings: snapshot.holdings, trades: snapshot.trades, isTradePending: false });
           return { success: false, message: '거래 저장에 실패했어요. 다시 시도해주세요.' };
         }
       },
 
-      // ── 매도 (Optimistic UI: 로컬 즉시 반영 → Firestore 백그라운드 동기화 → 실패 시 롤백) ──
+      // ── 매도 (Optimistic UI: 로컬 즉시 반영 → users/{uid} 직접 갱신 → 실패 시 롤백) ──
       sellStock: async (ticker, qty, price) => {
-        const { holdings, cash } = get();
+        const { holdings, cash, userId } = get();
         const holding = holdings.find(h => h.ticker === ticker);
 
         if (!holding || holding.qty < qty) {
           return { success: false, message: '보유 수량이 부족해요.' };
+        }
+        if (!userId) {
+          return { success: false, message: '로그인이 필요해요.' };
         }
 
         // 롤백용 스냅샷
@@ -700,13 +777,54 @@ export const useAppStore = create<AppState>()(
         set({ cash: cash + netAmount, holdings: newHoldings, trades: [...(snapshot.trades ?? []), newTrade], isTradePending: true });
 
         try {
-          // ② 백그라운드 Firestore 동기화
-          await get().syncToAuthAsync();
+          // ② users/{uid} 문서 직접 갱신
+          const userRef = doc(db, 'users', userId);
+          const userSnap = await getDoc(userRef);
+          const currentPortfolio: any[] = userSnap.data()?.portfolio ?? [];
+
+          const stockMeta = STOCKS.find(s => s.ticker === ticker);
+          const existingItem = currentPortfolio.find((p) => p.ticker === ticker);
+          const oldQty = existingItem ? (existingItem.quantity ?? existingItem.qty ?? 0) : 0;
+          const remainingQty = oldQty - qty;
+          const newPortfolioFs: any[] = remainingQty <= 0
+            ? currentPortfolio.filter((p) => p.ticker !== ticker)
+            : currentPortfolio.map((p) =>
+                p.ticker === ticker ? { ...p, quantity: remainingQty } : p,
+              );
+
+          // 매도 차익 계산 (평균매수가 대비)
+          const avgBuy = existingItem?.avgPrice ?? holding.avgPrice ?? 0;
+          const profitAmt = Math.floor((price - avgBuy) * qty);
+
+          await updateDoc(userRef, {
+            balance: increment(Math.round(netAmount)),
+            portfolio: newPortfolioFs,
+            transactions: arrayUnion({
+              type: 'sell',
+              ticker,
+              stockName: stockMeta?.name ?? ticker,
+              quantity: qty,
+              price,
+              avgPrice: avgBuy,
+              total: Math.round(netAmount),
+              profit: profitAmt,
+              fee: Math.round(fee),
+              createdAt: new Date().toISOString(),
+            }),
+          });
+
           set({ isTradePending: false });
           logStockSold(ticker, qty, price);
+
+          // 데일리 미션 진행 (실패해도 거래는 정상 완료)
+          try {
+            await updateMissionProgress(userId, 'trade');
+          } catch (e) {
+            console.warn('데일리 미션 진행 업데이트 실패 (매도):', e);
+          }
           return { success: true, message: `${ticker} ${qty}주 매도 완료` };
         } catch (error) {
-          // ③ 실패 시 롤백
+          // ④ 실패 시 롤백
           if (error instanceof Error) recordError(error, '매도 Firestore 동기화 실패');
           set({ cash: snapshot.cash, holdings: snapshot.holdings, trades: snapshot.trades, isTradePending: false });
           return { success: false, message: '거래 저장에 실패했어요. 다시 시도해주세요.' };
@@ -740,7 +858,6 @@ export const useAppStore = create<AppState>()(
           lastStudyDate: today,
           streak: streak + (get().lastStudyDate !== today ? 1 : 0),
         });
-        get().syncToAuth();
 
         logLessonCompleted(lessonId, xpGained);
         if (levelUp) logLevelUp(newLevel);
@@ -754,7 +871,6 @@ export const useAppStore = create<AppState>()(
         const { floPoints } = get();
         if (completedEvents.includes(eventId)) return;
         set({ completedEvents: [...completedEvents, eventId], floPoints: floPoints + xp });
-        get().syncToAuth();
       },
 
       // ── 오늘의 질문 답변 ──
@@ -763,7 +879,6 @@ export const useAppStore = create<AppState>()(
         const { floPoints } = get();
         if (completedEvents.includes(key)) return { floGained: 0 };
         set({ completedEvents: [...completedEvents, key], floPoints: floPoints + floReward });
-        get().syncToAuth();
         return { floGained: floReward };
       },
 
@@ -785,28 +900,46 @@ export const useAppStore = create<AppState>()(
         if (lastCheckIn === today) return; // 오늘 이미 체크인
         const newStreak = lastCheckIn === yesterday ? streak + 1 : 1;
         set({ streak: newStreak, lastCheckIn: today });
-        get().syncToAuth(); // 백그라운드 Firestore 동기화
       },
 
       // ── 유틸 ──
-      getTotalValue: () => {
+      // 자산 평가: 실시간 시세(livePrices) + 환율(exchangeRate) 적용
+      // livePrices에 ticker가 없으면 STOCKS 시드값으로 fallback
+      // 미국 주식(stock.krw === false)은 USD × exchangeRate 환산
+      getTotalValue: (livePrices, exchangeRate) => {
         try {
           const { cash, holdings } = get();
+          const fx = exchangeRate ?? 1380;
           const safeHoldings = holdings ?? [];
           return safeHoldings.reduce((sum, h) => {
             const stock = STOCKS.find(s => s.ticker === h.ticker);
-            return sum + (stock ? (stock.price ?? 0) * (h.qty ?? 0) : 0);
-          }, cash ?? 1_000_000);
+            const livePrice = livePrices?.[h.ticker] ?? stock?.price ?? 0;
+            const isKR = (h as any).krw ?? stock?.krw ?? true;
+            const priceKRW = isKR ? livePrice : Math.round(livePrice * fx);
+            return sum + priceKRW * (h.qty ?? 0);
+          }, cash ?? 0);
         } catch (error) {
           console.error('getTotalValue 오류:', error);
-          return 1_000_000;
+          return get().cash ?? 10_000_000;
         }
       },
 
-      getReturnRate: () => {
+      getProfit: (livePrices, exchangeRate) => {
         try {
-          const total = get().getTotalValue();
-          return ((total - 1_000_000) / 1_000_000) * 100;
+          const total = get().getTotalValue(livePrices, exchangeRate);
+          const initial = get().initialBalance ?? 10_000_000;
+          return total - initial;
+        } catch (error) {
+          console.error('getProfit 오류:', error);
+          return 0;
+        }
+      },
+
+      getReturnRate: (livePrices, exchangeRate) => {
+        try {
+          const profit = get().getProfit(livePrices, exchangeRate);
+          const initial = get().initialBalance ?? 10_000_000;
+          return initial > 0 ? (profit / initial) * 100 : 0;
         } catch (error) {
           console.error('getReturnRate 오류:', error);
           return 0;

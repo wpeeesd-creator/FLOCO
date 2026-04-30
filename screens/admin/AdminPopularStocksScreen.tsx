@@ -4,15 +4,20 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator,
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
+import { Text } from '../../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
-import { fetchAllPortfoliosForAdmin } from '../../lib/adminService';
+import { fetchAllUsersForAdmin } from '../../lib/adminService';
 import { STOCKS } from '../../store/appStore';
 import StockLogo from '../../components/StockLogo';
 
@@ -43,7 +48,7 @@ export default function AdminPopularStocksScreen() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const portfolios = await fetchAllPortfoliosForAdmin();
+      const users = await fetchAllUsersForAdmin();
 
       const holdingCount: Record<string, number> = {};
       const tradeCount: Record<string, number> = {};
@@ -52,11 +57,10 @@ export default function AdminPopularStocksScreen() {
       let krTrades = 0;
       let usTrades = 0;
 
-      portfolios.forEach((p: any) => {
-        (p.holdings ?? []).forEach((h: any) => {
+      users.forEach((u: any) => {
+        (u.portfolio ?? []).forEach((h: any) => {
           if (!h?.ticker) return;
           holdingCount[h.ticker] = (holdingCount[h.ticker] ?? 0) + 1;
-          // Compute unrealized return if available
           if (h.avgPrice && h.avgPrice > 0) {
             const stock = STOCKS.find(s => s.ticker === h.ticker);
             if (stock) {
@@ -67,7 +71,7 @@ export default function AdminPopularStocksScreen() {
           }
         });
 
-        (p.trades ?? []).forEach((t: any) => {
+        (u.transactions ?? []).forEach((t: any) => {
           if (!t?.ticker) return;
           tradeCount[t.ticker] = (tradeCount[t.ticker] ?? 0) + 1;
           const stock = STOCKS.find(s => s.ticker === t.ticker);

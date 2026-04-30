@@ -4,9 +4,19 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Animated, Dimensions, Vibration, ActivityIndicator, Linking, RefreshControl, Image,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  Dimensions,
+  Vibration,
+  ActivityIndicator,
+  Linking,
+  RefreshControl,
+  Image,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { useNavigation } from '@react-navigation/native';
 import { useAppStore, FLO_EVENTS, STOCKS } from '../store/appStore';
 import { Colors, Typography, Badge, SectionHeader } from '../components/ui';

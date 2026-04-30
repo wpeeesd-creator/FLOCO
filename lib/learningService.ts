@@ -26,13 +26,16 @@ const DEFAULT_LEARNING: LearningData = {
   completedLessons: [],
   wrongAnswers: [],
   reviewSchedule: [],
+  // ⚠️ total 필드는 더 이상 사용되지 않음 (LearningScreen이 learningContent에서 동적 계산).
+  //   기존 Firestore 문서엔 stale total 값이 남아 있을 수 있으나, 화면 렌더링은 무시함.
+  //   호환성을 위해 0으로 두며, 새 사용자는 이 default로 초기화됨.
   categoryProgress: {
-    vocabulary: { completed: 0, total: 10 },
-    newsLearning: { completed: 0, total: 8 },
-    chartAnalysis: { completed: 0, total: 12 },
-    companyAnalysis: { completed: 0, total: 10 },
-    psychology: { completed: 0, total: 8 },
-    macro: { completed: 0, total: 10 },
+    vocabulary:      { completed: 0, total: 0 },
+    newsLearning:    { completed: 0, total: 0 },
+    chartAnalysis:   { completed: 0, total: 0 },
+    companyAnalysis: { completed: 0, total: 0 },
+    psychology:      { completed: 0, total: 0 },
+    macro:           { completed: 0, total: 0 },
   },
 };
 

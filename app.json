@@ -24,7 +24,7 @@
         "NSPhotoLibraryUsageDescription": "프로필 사진 선택",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "3"
+      "buildNumber": "4"
     },
     "android": {
       "adaptiveIcon": {
@@ -62,7 +62,8 @@
         }
       ],
       "expo-image-picker",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-font"
     ],
     "owner": "seoyoung10"
   }

@@ -4,9 +4,14 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Alert, ActivityIndicator,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -76,40 +81,28 @@ export default function EventDetailScreen() {
   const fetchLeaderboard = useCallback(async () => {
     if (!event) return;
     try {
-      const portfoliosSnap = await getDocs(collection(db, 'portfolios'));
       const usersSnap = await getDocs(collection(db, 'users'));
 
-      const nameMap: Record<string, { name: string; emoji: string }> = {};
-      usersSnap.docs.forEach(d => {
-        const data = d.data();
-        nameMap[d.id] = {
-          name: data.name ?? data.nickname ?? '익명',
-          emoji: data.investmentType?.emoji ?? '📊',
-        };
-      });
-
-      const entries = portfoliosSnap.docs
+      const entries = usersSnap.docs
         .map(d => {
           const data = d.data();
           const uid = d.id;
           let score = 0;
 
           if (event.type === 'profit_rate') {
-            const total = (data.holdings ?? []).reduce(
-              (sum: number, h: any) => sum + (h.qty ?? 0) * 100,
-              data.cash ?? 1000000,
-            );
-            score = ((total - 1000000) / 1000000) * 100;
+            const initial = data.initialBalance ?? 10000000;
+            const total = data.totalAsset ?? data.balance ?? initial;
+            score = ((total - initial) / initial) * 100;
           } else if (event.type === 'trade_count') {
-            score = (data.trades ?? []).length;
+            score = (data.transactions ?? []).length;
           } else if (event.type === 'learning_streak') {
-            score = data.streak ?? 0;
+            score = data.learning?.streak ?? data.streak ?? 0;
           }
 
           return {
             uid,
-            name: nameMap[uid]?.name ?? data.name ?? '익명',
-            emoji: nameMap[uid]?.emoji ?? '📊',
+            name: data.name ?? data.nickname ?? '익명',
+            emoji: data.investmentType?.emoji ?? '📊',
             score,
           };
         })

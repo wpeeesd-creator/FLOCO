@@ -5,9 +5,14 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Alert,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -87,8 +92,8 @@ export default function PortfolioAIScreen() {
   }, [portfolio.length]);
 
   const safeHoldings = holdings ?? [];
-  const balance = userData?.balance ?? cash ?? 1_000_000;
-  const initialBalance = userData?.initialBalance ?? 1_000_000;
+  const balance = userData?.balance ?? cash ?? 10_000_000;
+  const initialBalance = userData?.initialBalance ?? 10_000_000;
 
   // 포트폴리오 평가액 계산 (실시간 가격 우선)
   const holdingsWithStock = safeHoldings.map((h) => {

@@ -7,8 +7,13 @@
 
 import React, { useState, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView,
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  ScrollView,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';

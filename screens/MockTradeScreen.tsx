@@ -1,8 +1,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, FlatList,
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
 } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAppStore, STOCKS } from '../store/appStore';
