@@ -27,6 +27,7 @@ export default function TradingScreen() {
 
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [qtyStr, setQtyStr] = useState('1');
+  const [reasonStr, setReasonStr] = useState('');
   const [toast, setToast] = useState({
     visible: false,
     message: '',
@@ -77,9 +78,16 @@ export default function TradingScreen() {
       return;
     }
 
+    const trimmedReason = reasonStr.trim();
+    if (trimmedReason.length === 0) {
+      showToast('거래 이유를 입력해주세요', 'error');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+
     const result = await (tradeType === 'buy'
-      ? buyStock(ticker, qty, stock.price)
-      : sellStock(ticker, qty, stock.price));
+      ? buyStock(ticker, qty, stock.price, trimmedReason)
+      : sellStock(ticker, qty, stock.price, trimmedReason));
 
     if (result.success) {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -89,6 +97,7 @@ export default function TradingScreen() {
           : `✅ ${stock.name} ${qty}주 매도 완료!`,
         'success',
       );
+      setReasonStr('');
       setTimeout(() => navigation.goBack(), 1500);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -170,6 +179,24 @@ export default function TradingScreen() {
               <Text style={styles.qtyBtnText}>+</Text>
             </TouchableOpacity>
           </View>
+        </Card>
+
+        {/* ── Reason Input (필수) ─────────────── */}
+        <Card style={styles.card}>
+          <Text style={styles.cardLabel}>
+            거래 이유 <Text style={styles.requiredMark}>*</Text>
+          </Text>
+          <TextInput
+            style={styles.reasonInput}
+            value={reasonStr}
+            onChangeText={setReasonStr}
+            placeholder={tradeType === 'buy' ? '왜 매수하나요?' : '왜 매도하나요?'}
+            placeholderTextColor={Colors.textSub}
+            multiline
+            maxLength={200}
+            textAlignVertical="top"
+          />
+          <Text style={styles.reasonCounter}>{reasonStr.length}/200</Text>
         </Card>
 
         {/* ── Order Summary ────────────────────── */}
@@ -354,6 +381,26 @@ const styles = StyleSheet.create({
     color: Colors.text,
     paddingVertical: 10,
     fontFamily: 'Courier',
+  },
+
+  // Reason
+  requiredMark: { color: Colors.red },
+  reasonInput: {
+    minHeight: 88,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: Colors.text,
+    backgroundColor: Colors.bg,
+  },
+  reasonCounter: {
+    fontSize: 11,
+    color: Colors.textSub,
+    marginTop: 6,
+    textAlign: 'right',
   },
 
   // Summary

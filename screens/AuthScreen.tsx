@@ -1,5 +1,6 @@
 /**
  * 인증 화면 — Firebase 이메일 로그인 / 회원가입
+ * 디자인: Nike 스타일 brutalist minimal (라이트 전용 강제)
  */
 
 import React, { useState, useRef } from 'react';
@@ -16,19 +17,27 @@ import {
 import { Text } from '../components/ui/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { Colors } from '../components/ui';
-import { useTheme } from '../context/ThemeContext';
 import { validateEmail, validatePassword, validateName } from '../lib/errorHandler';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 type Mode = 'login' | 'register';
 
+const PALETTE = {
+  bg: '#FFFFFF',
+  text: '#111111',
+  textSub: '#757575',
+  border: '#111111',
+  borderSubtle: '#E5E5E5',
+  error: '#FE0000',
+  onPrimary: '#FFFFFF',
+};
+
 export default function AuthScreen() {
-  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
 
@@ -51,20 +60,19 @@ export default function AuthScreen() {
     setError('');
     setEmail('');
     setPassword('');
+    setPasswordConfirm('');
     setName('');
   }
 
   async function handleSubmit() {
     setError('');
 
-    // 네트워크 체크
     if (!isConnected) {
       setError('인터넷 연결이 끊겨 있어요. 연결을 확인해주세요.');
       shake();
       return;
     }
 
-    // 입력값 검증
     if (mode === 'register') {
       const nameErr = validateName(name);
       if (nameErr) { setError(nameErr); shake(); return; }
@@ -74,6 +82,12 @@ export default function AuthScreen() {
     const passErr = validatePassword(password);
     if (passErr) { setError(passErr); shake(); return; }
 
+    if (mode === 'register' && password !== passwordConfirm) {
+      setError('비밀번호가 일치하지 않아요.');
+      shake();
+      return;
+    }
+
     const result = mode === 'login'
       ? await login(email.trim(), password)
       : await register(email.trim(), password, name.trim());
@@ -82,58 +96,9 @@ export default function AuthScreen() {
       setError(result.message);
       shake();
     }
-    // 성공 시 App.tsx의 onAuthStateChanged가 자동으로 화면 전환
   }
 
-  const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.bg },
-    scroll: { flexGrow: 1, justifyContent: 'center', padding: 24, paddingBottom: 40 },
-    logoArea: { alignItems: 'center', marginBottom: 40, gap: 8 },
-    logoCircle: {
-      width: 76, height: 76, borderRadius: 38,
-      backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
-      shadowColor: Colors.primary, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8,
-    },
-    logoText: { color: theme.bgCard, fontSize: 34, fontWeight: '800' },
-    appName: { fontSize: 26, fontWeight: '800', color: Colors.text, letterSpacing: -0.5 },
-    appSub: { fontSize: 13, color: Colors.textSub },
-    tabRow: {
-      flexDirection: 'row', backgroundColor: '#EEF2F7',
-      borderRadius: 12, padding: 4, marginBottom: 24,
-    },
-    tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-    tabBtnActive: {
-      backgroundColor: theme.bgCard,
-      shadowColor: theme.text, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
-    },
-    tabText: { fontSize: 15, fontWeight: '600', color: Colors.textSub },
-    tabTextActive: { color: Colors.primary },
-    form: { gap: 16 },
-    inputGroup: { gap: 6 },
-    label: { fontSize: 13, fontWeight: '600', color: Colors.textSub },
-    hint: { fontSize: 11, fontWeight: '400', color: Colors.textMuted },
-    input: {
-      backgroundColor: theme.bgCard, borderRadius: 12, padding: 14,
-      fontSize: 15, borderWidth: 1.5, borderColor: Colors.border,
-    },
-    errorBox: {
-      backgroundColor: theme.redLight, borderRadius: 10, padding: 12,
-      borderWidth: 1, borderColor: '#FFD0D0',
-    },
-    errorText: { fontSize: 13, color: Colors.red, fontWeight: '600' },
-    submitBtn: {
-      backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 16,
-      alignItems: 'center', marginTop: 4,
-      shadowColor: Colors.primary, shadowOpacity: 0.35, shadowRadius: 12, elevation: 5,
-    },
-    submitBtnDisabled: { opacity: 0.65 },
-    submitText: { color: theme.bgCard, fontSize: 16, fontWeight: '700' },
-    dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
-    dividerText: { fontSize: 12, color: Colors.textMuted },
-    infoBox: { backgroundColor: '#EAF4FF', borderRadius: 10, padding: 12, alignItems: 'center', gap: 4 },
-    infoText: { fontSize: 12, color: Colors.primary },
-  });
+  const isLogin = mode === 'login';
 
   return (
     <KeyboardAvoidingView
@@ -141,80 +106,66 @@ export default function AuthScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16 }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 80 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* 로고 */}
-        <View style={styles.logoArea}>
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>F</Text>
-          </View>
-          <Text style={styles.appName}>FLOCO</Text>
-          <Text style={styles.appSub}>NCS 3기 모의투자 대회</Text>
-        </View>
-
-        {/* 탭 */}
-        <View style={styles.tabRow}>
-          {(['login', 'register'] as Mode[]).map(m => (
-            <TouchableOpacity
-              key={m}
-              style={[styles.tabBtn, mode === m && styles.tabBtnActive]}
-              onPress={() => switchMode(m)}
-            >
-              <Text style={[styles.tabText, mode === m && styles.tabTextActive]}>
-                {m === 'login' ? '로그인' : '회원가입'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* 헤드라인 */}
+        <Text style={styles.headline}>
+          {isLogin ? 'FLOCO에 오신 것을\n환영해요' : 'FLOCO 시작하기'}
+        </Text>
 
         {/* 폼 */}
         <Animated.View style={[styles.form, { transform: [{ translateX: shakeAnim }] }]}>
-          {mode === 'register' && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>이름</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="홍길동"
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-                returnKeyType="next"
-              />
-            </View>
-          )}
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>이메일</Text>
+          {!isLogin && (
             <TextInput
               style={styles.input}
-              placeholder="example@email.com"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
+              placeholder="닉네임"
+              placeholderTextColor={PALETTE.textSub}
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
               returnKeyType="next"
             />
-          </View>
+          )}
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>비밀번호 {mode === 'register' && <Text style={styles.hint}>(6자 이상)</Text>}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="이메일"
+            placeholderTextColor={PALETTE.textSub}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            returnKeyType="next"
+          />
+
+          <TextInput
+            style={styles.input}
+            placeholder="비밀번호"
+            placeholderTextColor={PALETTE.textSub}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            returnKeyType={isLogin ? 'done' : 'next'}
+            onSubmitEditing={isLogin ? handleSubmit : undefined}
+          />
+
+          {!isLogin && (
             <TextInput
               style={styles.input}
-              placeholder="비밀번호 입력"
-              value={password}
-              onChangeText={setPassword}
+              placeholder="비밀번호 확인"
+              placeholderTextColor={PALETTE.textSub}
+              value={passwordConfirm}
+              onChangeText={setPasswordConfirm}
               secureTextEntry
               returnKeyType="done"
               onSubmitEditing={handleSubmit}
             />
-          </View>
+          )}
 
           {!!error && (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>⚠️ {error}</Text>
-            </View>
+            <Text style={styles.errorText}>{error}</Text>
           )}
 
           <TouchableOpacity
@@ -224,20 +175,105 @@ export default function AuthScreen() {
             activeOpacity={0.85}
           >
             <Text style={styles.submitText}>
-              {loading ? '처리 중...' : mode === 'login' ? '로그인' : '회원가입'}
+              {loading ? '처리 중...' : isLogin ? '로그인' : '가입하기'}
             </Text>
           </TouchableOpacity>
 
-          {/* 구분선 */}
-          {mode === 'login' && (
-            <View style={styles.infoBox}>
-              <Text style={styles.infoText}>💡 관리자: admin@floco.com</Text>
-              <Text style={styles.infoText}>앱 재실행 시 자동 로그인됩니다</Text>
-            </View>
+          {isLogin && (
+            <TouchableOpacity style={styles.forgotBtn} activeOpacity={0.6}>
+              <Text style={styles.forgotText}>비밀번호를 잊으셨나요?</Text>
+            </TouchableOpacity>
           )}
         </Animated.View>
+
+        {/* 하단 분리선 + 모드 전환 */}
+        <View style={styles.divider} />
+        <View style={styles.switchRow}>
+          <Text style={styles.switchHint}>
+            {isLogin ? '처음이신가요? ' : '이미 계정이 있으신가요? '}
+          </Text>
+          <TouchableOpacity onPress={() => switchMode(isLogin ? 'register' : 'login')} activeOpacity={0.6}>
+            <Text style={styles.switchLink}>
+              {isLogin ? '가입하기' : '로그인'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: PALETTE.bg },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },
+  headline: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: PALETTE.text,
+    letterSpacing: -0.7,
+    lineHeight: 44,
+    marginBottom: 48,
+  },
+  form: { gap: 24 },
+  input: {
+    height: 56,
+    borderRadius: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: PALETTE.borderSubtle,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    fontSize: 16,
+    fontWeight: '400',
+    color: PALETTE.text,
+    backgroundColor: PALETTE.bg,
+  },
+  errorText: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: PALETTE.error,
+    marginTop: -8,
+  },
+  submitBtn: {
+    backgroundColor: PALETTE.text,
+    height: 56,
+    borderRadius: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  submitBtnDisabled: { opacity: 0.5 },
+  submitText: {
+    color: PALETTE.onPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  forgotBtn: { alignSelf: 'flex-start', paddingVertical: 4 },
+  forgotText: {
+    fontSize: 13,
+    color: PALETTE.textSub,
+    textDecorationLine: 'underline',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: PALETTE.borderSubtle,
+    marginTop: 40,
+    marginBottom: 24,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  switchHint: {
+    fontSize: 14,
+    color: PALETTE.textSub,
+    fontWeight: '400',
+  },
+  switchLink: {
+    fontSize: 14,
+    color: PALETTE.text,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+});

@@ -24,10 +24,21 @@ interface RankEntry {
   nickname: string;
   investmentType?: { emoji: string; name: string };
   totalAsset: number;
+  initialBalance: number;
   portfolio: any[];
   school?: { name: string; grade?: string };
   realNameVerified: boolean;
   rank: number;
+}
+
+// 자산 증가율 — 한국 주식 관행: 양수 빨강, 음수 파랑
+function formatAssetGrowth(totalAsset: number, initialBalance: number): { text: string; color: string } {
+  const base = initialBalance > 0 ? initialBalance : 10_000_000;
+  const rate = ((totalAsset - base) / base) * 100;
+  const sign = rate > 0 ? '+' : '';
+  const text = `${sign}${rate.toFixed(1)}%`;
+  const color = rate > 0 ? '#FF3B30' : rate < 0 ? '#2175F3' : '#888888';
+  return { text, color };
 }
 
 export default function RankingScreen() {
@@ -114,6 +125,7 @@ export default function RankingScreen() {
 
     const entries: RankEntry[] = rawUsers.map(({ uid, data }) => {
       const balance = data.balance ?? 10_000_000;
+      const initialBalance = data.initialBalance ?? 10_000_000;
       const portfolio = (data.portfolio ?? []) as Array<any>;
       const { totalAsset } = calculateTotalAsset({
         balance,
@@ -131,6 +143,7 @@ export default function RankingScreen() {
         nickname: data.nickname ?? data.name ?? '익명',
         investmentType: data.investmentType,
         totalAsset,
+        initialBalance,
         portfolio,
         school: data.school,
         realNameVerified: data.realNameVerified ?? false,
@@ -243,6 +256,8 @@ export default function RankingScreen() {
     rowName: { fontSize: 15, fontWeight: 'bold', color: theme.text },
     rowSub: { color: theme.textSecondary, fontSize: 12, marginTop: 2 },
     rowAsset: { fontSize: 16, fontWeight: 'bold', color: theme.text },
+    rowGrowth: { fontSize: 11, fontWeight: '600', marginTop: 2, textAlign: 'right' },
+    myCardGrowth: { fontSize: 12, fontWeight: '700', marginTop: 2 },
     verifiedBadge: {
       backgroundColor: '#E8F5E9',
       borderRadius: 6,
@@ -280,20 +295,26 @@ export default function RankingScreen() {
       </View>
 
       {/* ── 내 순위 카드 ── */}
-      {myRank > 0 && myData && (
-        <View style={s.myCard}>
-          <Text style={s.myCardRank}>{myRank}위</Text>
-          <View style={{ marginLeft: 16, flex: 1 }}>
-            <Text style={s.myCardName}>{myData.nickname}</Text>
-            <Text style={s.myCardAsset}>
-              총자산 {Math.round(myData.totalAsset).toLocaleString()}원
+      {myRank > 0 && myData && (() => {
+        const myGrowth = formatAssetGrowth(myData.totalAsset, myData.initialBalance);
+        return (
+          <View style={s.myCard}>
+            <Text style={s.myCardRank}>{myRank}위</Text>
+            <View style={{ marginLeft: 16, flex: 1 }}>
+              <Text style={s.myCardName}>{myData.nickname}</Text>
+              <Text style={s.myCardAsset}>
+                총자산 {Math.round(myData.totalAsset).toLocaleString()}원
+              </Text>
+              <Text style={[s.myCardGrowth, { color: myGrowth.color }]}>
+                {myGrowth.text}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 40 }}>
+              {myData.investmentType?.emoji ?? '📊'}
             </Text>
           </View>
-          <Text style={{ fontSize: 40 }}>
-            {myData.investmentType?.emoji ?? '📊'}
-          </Text>
-        </View>
-      )}
+        );
+      })()}
 
       {/* ── 탭 ── */}
       <View style={s.tabRow}>
@@ -325,6 +346,7 @@ export default function RankingScreen() {
         renderItem={({ item, index }) => {
           const isMe = item.uid === user?.id;
           const isTop3 = index < 3;
+          const growth = formatAssetGrowth(item.totalAsset, item.initialBalance);
 
           return (
             <View style={[s.row, isMe && s.rowMe]}>
@@ -358,10 +380,15 @@ export default function RankingScreen() {
                 )}
               </View>
 
-              {/* 총자산 */}
-              <Text style={s.rowAsset}>
-                {Math.round(item.totalAsset).toLocaleString()}원
-              </Text>
+              {/* 총자산 + 자산 증가율 */}
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={s.rowAsset}>
+                  {Math.round(item.totalAsset).toLocaleString()}원
+                </Text>
+                <Text style={[s.rowGrowth, { color: growth.color }]}>
+                  {growth.text}
+                </Text>
+              </View>
             </View>
           );
         }}

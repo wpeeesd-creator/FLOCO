@@ -33,6 +33,7 @@ interface EnrichedTrade {
   price: number;
   qty: number;
   timestamp: number;
+  reason?: string;
 }
 
 // ── 상대 시간 ───────────────────────────────────
@@ -72,6 +73,7 @@ export default function AdminTradeLogScreen() {
             price: t.price ?? 0,
             qty: t.quantity ?? t.qty ?? 0,
             timestamp: ts,
+            reason: t.reason ?? '미입력',
           };
         })
       );
@@ -125,32 +127,37 @@ export default function AdminTradeLogScreen() {
 
     return (
       <View style={styles.tradeRow}>
-        <StockLogo ticker={item.ticker} size={36} />
-        <View style={styles.tradeInfo}>
-          <Text style={styles.tradeName} numberOfLines={1}>
-            {item.userName}
-          </Text>
-          <Text style={styles.tradeTicker} numberOfLines={1}>
-            {stock?.name ?? item.ticker} · {item.ticker}
-          </Text>
+        <View style={styles.tradeRowMain}>
+          <StockLogo ticker={item.ticker} size={36} />
+          <View style={styles.tradeInfo}>
+            <Text style={styles.tradeName} numberOfLines={1}>
+              {item.userName}
+            </Text>
+            <Text style={styles.tradeTicker} numberOfLines={1}>
+              {stock?.name ?? item.ticker} · {item.ticker}
+            </Text>
+          </View>
+          <View style={[styles.tradeBadge, { backgroundColor: isBuy ? '#FFF0F1' : theme.primaryLight }]}>
+            <Text style={[styles.tradeBadgeText, { color: isBuy ? Colors.green : Colors.red }]}>
+              {isBuy ? '매수' : '매도'}
+            </Text>
+          </View>
+          <View style={styles.tradeAmountCol}>
+            <Text style={[styles.tradeAmount, { color: isBuy ? Colors.green : Colors.red }]}>
+              {isBuy ? '-' : '+'}
+              {stock?.krw
+                ? `₩${Math.round(total).toLocaleString()}`
+                : `$${total.toFixed(2)}`}
+            </Text>
+            <Text style={styles.tradeDetail}>
+              {item.qty}주 · {stock?.krw ? `₩${item.price.toLocaleString()}` : `$${item.price.toFixed(2)}`}
+            </Text>
+            <Text style={styles.tradeTime}>{relativeTime(item.timestamp)}</Text>
+          </View>
         </View>
-        <View style={[styles.tradeBadge, { backgroundColor: isBuy ? '#FFF0F1' : theme.primaryLight }]}>
-          <Text style={[styles.tradeBadgeText, { color: isBuy ? Colors.green : Colors.red }]}>
-            {isBuy ? '매수' : '매도'}
-          </Text>
-        </View>
-        <View style={styles.tradeAmountCol}>
-          <Text style={[styles.tradeAmount, { color: isBuy ? Colors.green : Colors.red }]}>
-            {isBuy ? '-' : '+'}
-            {stock?.krw
-              ? `₩${Math.round(total).toLocaleString()}`
-              : `$${total.toFixed(2)}`}
-          </Text>
-          <Text style={styles.tradeDetail}>
-            {item.qty}주 · {stock?.krw ? `₩${item.price.toLocaleString()}` : `$${item.price.toFixed(2)}`}
-          </Text>
-          <Text style={styles.tradeTime}>{relativeTime(item.timestamp)}</Text>
-        </View>
+        <Text style={styles.tradeReason} numberOfLines={2}>
+          이유: {item.reason ?? '미입력'}
+        </Text>
       </View>
     );
   };
@@ -240,13 +247,21 @@ export default function AdminTradeLogScreen() {
     listContent: { padding: 16, paddingBottom: 40 },
     separator: { height: 1, backgroundColor: Colors.border },
     tradeRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
       backgroundColor: theme.bgCard,
       paddingHorizontal: 14,
       paddingVertical: 12,
-      gap: 10,
       borderRadius: 12,
+    },
+    tradeRowMain: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    tradeReason: {
+      fontSize: 11,
+      color: Colors.textSub,
+      marginTop: 8,
+      lineHeight: 16,
     },
     tradeInfo: { flex: 1, minWidth: 0 },
     tradeName: { fontSize: 13, fontWeight: '700', color: Colors.text },

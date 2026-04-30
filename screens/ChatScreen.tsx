@@ -13,7 +13,6 @@ import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAppStore, STOCKS } from '../store/appStore';
-import { fetchWithTimeout, classifyError } from '../lib/errorHandler';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { useTheme } from '../context/ThemeContext';
 
@@ -90,102 +89,10 @@ export default function ChatScreen() {
     setInput('');
     setLoading(true);
 
-    try {
-      const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
-
-      const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 500,
-          system: `당신은 FLOCO 앱의 AI 투자 어시스턴트 "주니몽"입니다.
-청소년 모의투자 앱에서 사용자의 투자를 도와주는 친근한 AI예요.
-
-${stock ? `=== 현재 보고 있는 종목 (실시간 데이터) ===
-종목명: ${stock.name}
-티커: ${ticker}
-현재가: ${stock.krw ? `₩${stock.price.toLocaleString()}` : `$${stock.price.toFixed(2)}`}
-등락률: ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
-섹터: ${stock.sector ?? '기타'}
-시장: ${stock.market}
-
-=== 유저 보유 현황 ===
-보유수량: ${ownedQty}주
-${ownedQty > 0 ? `평균매수가: ${Math.round(avgPrice).toLocaleString()}원
-현재 평가손익: ${evalProfit >= 0 ? '+' : ''}${Math.round(evalProfit).toLocaleString()}원 (${evalProfitRate >= 0 ? '+' : ''}${evalProfitRate.toFixed(2)}%)` : '현재 미보유 종목'}` : '종목 미선택 상태'}
-
-=== 유저 투자 현황 ===
-총 자산: ${Math.round(totalAsset).toLocaleString()}원
-보유 현금: ${Math.round(cash ?? 10_000_000).toLocaleString()}원
-수익률: ${profitRate.toFixed(2)}%
-
-=== 중요 규칙 ===
-1. 위의 실시간 데이터를 기반으로 답변하세요
-2. 주가는 반드시 위에 제공된 현재가를 사용하세요
-3. 절대로 실제 투자를 권유하지 마세요 — "모의투자 앱"임을 항상 인식하세요
-4. 청소년 눈높이에 맞게 쉽고 친근하게 설명해주세요
-5. 답변은 짧고 명확하게 (200자 이내)
-6. 이모지를 적절히 사용해주세요`,
-          messages: newMessages
-            .map(m => ({ role: m.role, content: m.content }))
-            .slice(-10),
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('API 에러:', response.status, errorData);
-        const errorType = (errorData as any)?.error?.type ?? '';
-        const errorMsg = (errorData as any)?.error?.message ?? '';
-
-        if (response.status === 429 || errorType === 'rate_limit_error') {
-          setMessages([...newMessages, {
-            role: 'assistant',
-            content: '요청이 너무 많아요. 잠시 후 다시 시도해주세요 ⏳',
-          }]);
-          return;
-        }
-        if (response.status === 401 || errorType === 'authentication_error') {
-          setMessages([...newMessages, {
-            role: 'assistant',
-            content: 'API 키가 유효하지 않아요. 관리자에게 문의해주세요 🔑',
-          }]);
-          return;
-        }
-        if (errorType === 'invalid_request_error' && errorMsg.includes('credit')) {
-          setMessages([...newMessages, {
-            role: 'assistant',
-            content: 'AI 크레딧이 부족해요. 관리자에게 문의해주세요 🙏',
-          }]);
-          return;
-        }
-        throw new Error(errorMsg || `API 오류: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const aiMessage = data?.content?.[0]?.text ?? '응답을 받지 못했어요.';
-      setMessages([...newMessages, { role: 'assistant', content: aiMessage }]);
-    } catch (error: any) {
-      console.error('ChatScreen API error:', error);
-      const appError = classifyError(error);
-      const errorMessages: Record<string, string> = {
-        network: '인터넷 연결이 불안정해요. 연결을 확인하고 다시 시도해주세요 📡',
-        timeout: '서버 응답이 너무 느려요. 잠시 후 다시 물어봐주세요 ⏳',
-        server: '서버에 문제가 생겼어요. 잠시 후 다시 시도해주세요 🔧',
-      };
-      setMessages([...newMessages, {
-        role: 'assistant',
-        content: errorMessages[appError.category] ?? '일시적인 오류가 발생했어요. 다시 시도해주세요 🙏',
-      }]);
-    } finally {
-      setLoading(false);
-    }
+    // AI 기능 점검 중 (백엔드 프록시 마이그레이션 예정)
+    const aiMessage = '⚙️ AI 기능 업그레이드 중이에요!\n곧 더 똑똑해진 모습으로 돌아올게요 🐾';
+    setMessages([...newMessages, { role: 'assistant', content: aiMessage }]);
+    setLoading(false);
   };
 
   const showSuggestions = messages.length === 0;

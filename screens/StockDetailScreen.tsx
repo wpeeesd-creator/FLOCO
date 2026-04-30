@@ -1428,7 +1428,10 @@ function TradeSheet({
   // 시트 열릴 때 quantity=1로 시작 → 매수 버튼이 활성 상태로 보여 사용자 오해 방지
   const [quantity, setQuantity] = useState(1);
   const [quantityText, setQuantityText] = useState('1');
+  const [reason, setReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const buyStock = useAppStore(s => s.buyStock);
+  const sellStock = useAppStore(s => s.sellStock);
 
   // 모든 거래 금액을 KRW로 통일 (해외 주식: USD → KRW 환산)
   const tradePriceKRW = isKR ? fixedPrice : Math.round(fixedPrice * exchangeRate);
@@ -1493,136 +1496,70 @@ function TradeSheet({
   };
 
   const handleTrade = async () => {
-    console.log('handleTrade 호출:', tradeType, quantity, fixedPrice);
-    console.log('user.uid:', userId);
     if (!userId || quantity <= 0) {
       if (quantity <= 0) Alert.alert('알림', '수량을 입력해주세요');
       return;
     }
 
+    // 모든 거래는 KRW 기준 (해외 주식: USD → KRW 환산)
+    const tradePrice = tradePriceKRW;
+
+    // 사전 검증 (스토어 액션 호출 전 사용자 피드백)
+    if (tradeType === 'buy') {
+      const cost = Math.floor(tradePrice * quantity * 1.001);
+      if (balance < cost) {
+        Alert.alert('잔액 부족', `필요: ${fmtP(cost)}\n보유: ${fmtP(balance)}`);
+        return;
+      }
+    } else {
+      if (!ownedStock || ownedStock.quantity < quantity) {
+        Alert.alert(
+          '보유 수량 부족',
+          `보유: ${isKR ? (ownedStock?.quantity ?? 0) : (ownedStock?.quantity ?? 0).toFixed(4)}주`,
+        );
+        return;
+      }
+    }
+
+    // 거래 이유 필수
+    const trimmedReason = reason.trim();
+    if (trimmedReason.length === 0) {
+      Alert.alert('알림', '거래 이유를 입력해주세요');
+      return;
+    }
+
     try {
       setIsLoading(true);
-      // 모든 거래는 KRW 기준 (해외 주식: USD → KRW 환산)
-      const tradePrice = tradePriceKRW;
 
-      if (tradeType === 'buy') {
-        const cost = Math.floor(tradePrice * quantity * 1.001);
-        if (balance < cost) {
-          Alert.alert('잔액 부족', `필요: ${fmtP(cost)}\n보유: ${fmtP(balance)}`);
-          return;
-        }
+      const result = tradeType === 'buy'
+        ? await buyStock(stock.ticker, quantity, tradePrice, trimmedReason)
+        : await sellStock(stock.ticker, quantity, tradePrice, trimmedReason);
 
-        const existingStock = userData?.portfolio?.find(p => p.ticker === stock.ticker);
-        const newPortfolio = existingStock
-          ? (userData?.portfolio ?? []).map(p =>
-              p.ticker === stock.ticker
-                ? {
-                    ...p,
-                    quantity: p.quantity + quantity,
-                    avgPrice: Math.round((p.avgPrice * p.quantity + tradePrice * quantity) / (p.quantity + quantity)),
-                    price: tradePrice,
-                  }
-                : p,
-            )
-          : [
-              ...(userData?.portfolio ?? []),
-              {
-                ticker: stock.ticker, name: stock.name, quantity,
-                avgPrice: tradePrice, price: tradePrice,
-                sector: stock.sector ?? '기타', change: stock.change ?? 0,
-                bg: '#8E8E93', logo: stock.logo ?? '',
-              },
-            ];
-
-        const newBalance = balance - cost;
-        const portfolioValue = newPortfolio.reduce((sum, p) => sum + (p.price ?? p.avgPrice) * p.quantity, 0);
-
-        await updateDoc(doc(db, 'users', userId), {
-          balance: newBalance,
-          totalAsset: newBalance + portfolioValue,
-          portfolio: newPortfolio,
-          transactions: arrayUnion({
-            type: 'buy', ticker: stock.ticker, stockName: stock.name,
-            quantity, price: tradePrice, total: cost,
-            fee: Math.floor(tradePrice * quantity * 0.001),
-            createdAt: new Date().toISOString(),
-          }),
-        });
-        useAppStore.setState({ cash: newBalance, holdings: newPortfolio.map(p => ({ ticker: p.ticker, qty: p.quantity, avgPrice: p.avgPrice })) });
-
-        try {
-          await updateMissionProgress(userId!, 'trade');
-        } catch (e) {
-          console.warn('데일리 미션 진행 업데이트 실패 (매수):', e);
-        }
-
-        const latestSnap = await getDoc(doc(db, 'users', userId!));
-        const latestNotifs = latestSnap.data()?.notifications ?? [];
-        await saveNotif(userId!, latestNotifs, {
-          type: 'trade',
-          title: '✅ 매수 완료',
-          body: `${stock.name} ${isKR ? Math.floor(quantity) : quantity.toFixed(4)}주 @ ₩${tradePrice.toLocaleString()}`,
-          ticker: stock.ticker,
-          stockName: stock.name,
-          quantity,
-          price: tradePrice,
-          total: totalCost,
-          tradeType: 'buy'
-        });
-
-      } else {
-        if (!ownedStock || ownedStock.quantity < quantity) {
-          Alert.alert('보유 수량 부족', `보유: ${isKR ? (ownedStock?.quantity ?? 0) : (ownedStock?.quantity ?? 0).toFixed(4)}주`);
-          return;
-        }
-
-        const sellAmount = Math.floor(tradePrice * quantity * 0.999);
-        const profit = Math.floor((tradePrice - ownedStock.avgPrice) * quantity);
-
-        const newPortfolio = Math.abs(ownedStock.quantity - quantity) < 0.0001
-          ? (userData?.portfolio ?? []).filter(p => p.ticker !== stock.ticker)
-          : (userData?.portfolio ?? []).map(p =>
-              p.ticker === stock.ticker ? { ...p, quantity: parseFloat((p.quantity - quantity).toFixed(4)) } : p,
-            );
-
-        const newBalance = balance + sellAmount;
-        const portfolioValue = newPortfolio.reduce((sum, p) => sum + (p.price ?? p.avgPrice) * p.quantity, 0);
-
-        await updateDoc(doc(db, 'users', userId), {
-          balance: newBalance,
-          totalAsset: newBalance + portfolioValue,
-          portfolio: newPortfolio,
-          transactions: arrayUnion({
-            type: 'sell', ticker: stock.ticker, stockName: stock.name,
-            quantity, price: tradePrice, avgPrice: ownedStock.avgPrice,
-            total: sellAmount, profit,
-            fee: Math.floor(tradePrice * quantity * 0.001),
-            createdAt: new Date().toISOString(),
-          }),
-        });
-        useAppStore.setState({ cash: newBalance, holdings: newPortfolio.map(p => ({ ticker: p.ticker, qty: p.quantity, avgPrice: p.avgPrice })) });
-
-        try {
-          await updateMissionProgress(userId!, 'trade');
-        } catch (e) {
-          console.warn('데일리 미션 진행 업데이트 실패 (매도):', e);
-        }
-
-        const latestSnap2 = await getDoc(doc(db, 'users', userId!));
-        const latestNotifs2 = latestSnap2.data()?.notifications ?? [];
-        await saveNotif(userId!, latestNotifs2, {
-          type: 'trade',
-          title: '✅ 매도 완료',
-          body: `${stock.name} ${isKR ? Math.floor(quantity) : quantity.toFixed(4)}주 @ ₩${tradePrice.toLocaleString()}`,
-          ticker: stock.ticker,
-          stockName: stock.name,
-          quantity,
-          price: tradePrice,
-          total: totalReceive,
-          tradeType: 'sell'
-        });
+      if (!result.success) {
+        Alert.alert('거래 실패', result.message);
+        return;
       }
 
+      // 거래 알림 저장 (액션 성공 후 부수 효과)
+      try {
+        const latestSnap = await getDoc(doc(db, 'users', userId));
+        const latestNotifs = latestSnap.data()?.notifications ?? [];
+        await saveNotif(userId, latestNotifs, {
+          type: 'trade',
+          title: tradeType === 'buy' ? '✅ 매수 완료' : '✅ 매도 완료',
+          body: `${stock.name} ${isKR ? Math.floor(quantity) : quantity.toFixed(4)}주 @ ₩${tradePrice.toLocaleString()}`,
+          ticker: stock.ticker,
+          stockName: stock.name,
+          quantity,
+          price: tradePrice,
+          total: tradeType === 'buy' ? totalCost : totalReceive,
+          tradeType,
+        });
+      } catch (e) {
+        console.warn('거래 알림 저장 실패:', e);
+      }
+
+      setReason('');
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onClose();
       const qtyStr = isKR ? `${Math.floor(quantity)}` : `${quantity.toFixed(4)}`;
@@ -1748,6 +1685,35 @@ function TradeSheet({
                     <Text style={{ color: DS.text, fontSize: 13, fontWeight: 'bold' }}>{pct}%</Text>
                   </TouchableOpacity>
                 ))}
+              </View>
+
+              {/* 거래 이유 (필수) */}
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: DS.textSub, fontSize: 13, marginBottom: 8, paddingHorizontal: 4 }}>
+                  거래 이유 <Text style={{ color: DS.fall }}>*</Text>
+                </Text>
+                <TextInput
+                  value={reason}
+                  onChangeText={setReason}
+                  placeholder={tradeType === 'buy' ? '왜 매수하나요?' : '왜 매도하나요?'}
+                  placeholderTextColor={DS.textDim}
+                  multiline
+                  maxLength={200}
+                  textAlignVertical="top"
+                  style={{
+                    minHeight: 72,
+                    borderWidth: 1,
+                    borderColor: DS.borderLight,
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 14,
+                    color: DS.text,
+                  }}
+                />
+                <Text style={{ color: DS.textDim, fontSize: 11, textAlign: 'right', marginTop: 4 }}>
+                  {reason.length}/200
+                </Text>
               </View>
 
               {/* 주문 요약 */}

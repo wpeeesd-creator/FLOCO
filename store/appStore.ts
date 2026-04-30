@@ -44,6 +44,7 @@ export interface TradeRecord {
   price: number;
   fee: number;
   timestamp: number;
+  reason?: string;
 }
 
 export interface Lesson {
@@ -521,8 +522,9 @@ interface AppState {
   isTradePending: boolean;
 
   // 액션 — 거래 (Optimistic UI: 로컬 즉시 반영 → 백그라운드 Firestore 동기화 → 실패 시 롤백)
-  buyStock: (ticker: string, qty: number, price: number) => Promise<{ success: boolean; message: string }>;
-  sellStock: (ticker: string, qty: number, price: number) => Promise<{ success: boolean; message: string }>;
+  // reason은 UI에서 강제 입력받지만, dead code 호환을 위해 타입은 옵셔널 (내부에서 '미입력' fallback)
+  buyStock: (ticker: string, qty: number, price: number, reason?: string) => Promise<{ success: boolean; message: string }>;
+  sellStock: (ticker: string, qty: number, price: number, reason?: string) => Promise<{ success: boolean; message: string }>;
 
   // 액션 — 듀오링고 알고리즘
   completeLesson: (lessonId: string) => { xpGained: number; levelUp: boolean; streakBonus: boolean };
@@ -646,7 +648,8 @@ export const useAppStore = create<AppState>()(
       // ── 매수 (Optimistic UI: 로컬 즉시 반영 → users/{uid} 직접 갱신 → 실패 시 롤백) ──
       // users.portfolio가 single source of truth — 모든 화면이 여길 보고,
       // store hydrate도 여기서 일어나므로 화면 간 정합성 보장.
-      buyStock: async (ticker, qty, price) => {
+      buyStock: async (ticker, qty, price, reason) => {
+        const safeReason = (reason ?? '').trim() || '미입력';
         const total = price * qty;
         const fee = total * 0.001; // 수수료 0.1%
         const totalWithFee = total + fee;
@@ -673,6 +676,7 @@ export const useAppStore = create<AppState>()(
           id: Date.now().toString(),
           ticker, type: 'buy', qty, price, fee,
           timestamp: Date.now(),
+          reason: safeReason,
         };
 
         // ① 즉시 로컬 상태 반영 (Optimistic Update)
@@ -722,6 +726,7 @@ export const useAppStore = create<AppState>()(
               price,
               total: Math.round(total),
               fee: Math.round(fee),
+              reason: safeReason,
               createdAt: new Date().toISOString(),
             }),
           });
@@ -745,7 +750,8 @@ export const useAppStore = create<AppState>()(
       },
 
       // ── 매도 (Optimistic UI: 로컬 즉시 반영 → users/{uid} 직접 갱신 → 실패 시 롤백) ──
-      sellStock: async (ticker, qty, price) => {
+      sellStock: async (ticker, qty, price, reason) => {
+        const safeReason = (reason ?? '').trim() || '미입력';
         const { holdings, cash, userId } = get();
         const holding = holdings.find(h => h.ticker === ticker);
 
@@ -771,6 +777,7 @@ export const useAppStore = create<AppState>()(
           id: Date.now().toString(),
           ticker, type: 'sell', qty, price, fee,
           timestamp: Date.now(),
+          reason: safeReason,
         };
 
         // ① 즉시 로컬 상태 반영 (Optimistic Update)
@@ -809,6 +816,7 @@ export const useAppStore = create<AppState>()(
               total: Math.round(netAmount),
               profit: profitAmt,
               fee: Math.round(fee),
+              reason: safeReason,
               createdAt: new Date().toISOString(),
             }),
           });

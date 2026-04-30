@@ -22,11 +22,9 @@ import { useAuth } from '../context/AuthContext';
 import { useAppStore, STOCKS } from '../store/appStore';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
-import { fetchWithTimeout, classifyError } from '../lib/errorHandler';
+import { classifyError } from '../lib/errorHandler';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { fetchMultiplePrices } from '../utils/priceService';
-
-const API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
 
 const SECTOR_COLORS = ['#0066FF', '#34C759', '#FF9500', '#FF2D55', '#5856D6', '#FF3B30', '#AF52DE', '#007AFF'];
 
@@ -169,64 +167,8 @@ export default function PortfolioAIScreen() {
       const data = calculateAnalysis();
       setAnalysisData(data);
 
-      const portfolioSummary = holdingsWithStock.map((h) =>
-        `${h.stock.name}(${h.ticker}): ${h.qty}주, 평균단가 ${Math.round(h.avgPrice).toLocaleString()}원, 현재가 ${Math.round(h.stock.price).toLocaleString()}원`,
-      ).join('\n');
-
-      const prompt = `나는 청소년 모의투자 앱 FLOCO를 사용하는 학생 투자자입니다.
-
-현재 포트폴리오:
-${portfolioSummary}
-
-투자 현황:
-- 총 자산: ${Math.round(totalAsset).toLocaleString()}원
-- 현금 비율: ${data.cashRatio}%
-- 투자 비율: ${data.investRatio}%
-- 수익률: ${profitRate}%
-- 보유 종목 수: ${data.stockCount}개
-- 최대 집중 비중: ${data.maxConcentration}%
-- 국내주식: ${data.krRatio}% / 미국주식: ${data.usRatio}%
-- 섹터: ${data.sectorBreakdown.map((s) => `${s.sector} ${s.percent}%`).join(', ')}
-
-위 포트폴리오를 아래 형식으로 분석해줘:
-
-1. 전체 평가 (한 줄)
-2. 잘한 점 2가지
-3. 개선할 점 2가지
-4. 구체적인 추천 행동 2가지
-
-친근하고 쉬운 말로, 청소년이 이해할 수 있게 설명해줘.
-이모지를 적절히 사용해줘.
-각 항목은 줄바꿈으로 구분해줘.`;
-
-      if (!API_KEY) {
-        setAnalysis('API 키가 설정되지 않았어요. EAS 빌드 환경에서 EXPO_PUBLIC_ANTHROPIC_API_KEY를 설정해주세요.');
-        return;
-      }
-
-      const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': API_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 700,
-          messages: [{ role: 'user', content: prompt }],
-        }),
-      }, 30000);
-
-      if (!response.ok) {
-        const httpErr = classifyError(new Error(`API 오류: ${response.status}`));
-        Alert.alert('오류', httpErr.message);
-        return;
-      }
-
-      const result = await response.json();
-      const aiText = result?.content?.[0]?.text ?? '분석을 불러오지 못했어요. 잠시 후 다시 시도해주세요.';
+      // AI 기능 점검 중 (백엔드 프록시 마이그레이션 예정)
+      const aiText = '⚙️ AI 기능 업그레이드 중이에요!\n곧 더 똑똑해진 모습으로 돌아올게요 🐾';
       setAnalysis(aiText);
 
       // 분석 완료 날짜 저장

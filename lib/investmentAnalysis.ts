@@ -137,80 +137,10 @@ export const SURVEY_QUESTIONS: SurveyQuestion[] = [
   },
 ];
 
-// ── Claude API 분석 ──────────────────────────
-const ANTHROPIC_API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
-
-const SYSTEM_PROMPT = `당신은 청소년 투자 성향 분석 전문가입니다.
-설문 답변을 분석해서 투자 유형을 진단해주세요.
-
-투자 유형 6가지:
-1. 🦁 공격형 투자자 - 고위험 고수익 추구
-2. 🐯 성장형 투자자 - 성장주 중심 투자
-3. 🦊 균형형 투자자 - 안정과 수익 균형
-4. 🐻 안정형 투자자 - 안전 자산 선호
-5. 🦅 분석형 투자자 - 데이터 기반 투자
-6. 🦋 학습형 투자자 - 경험 중심 투자
-
-반드시 JSON 형식으로만 답변:
-{
-  "type": "유형명",
-  "emoji": "이모지",
-  "title": "OO형 투자자",
-  "description": "2~3문장 설명",
-  "strengths": ["강점1", "강점2", "강점3"],
-  "weaknesses": ["약점1", "약점2"],
-  "strategy": "추천 투자 전략 2~3문장",
-  "recommended_stocks": ["추천 종목 유형1", "추천 종목 유형2"],
-  "mbti_like": "XXXX형 (MBTI 스타일 4글자)"
-}`;
-
+// ── 설문 분석 ─────────────────────────────────
+// AI 기능 점검 중 (백엔드 프록시 마이그레이션 예정) — 점수 기반 더미 결과로 라우팅
 export async function analyzeSurvey(answers: string[]): Promise<InvestmentTypeResult> {
-  // API 키가 없으면 더미 결과
-  if (!ANTHROPIC_API_KEY) {
-    console.log('Anthropic API 키 없음 → 더미 분석 결과 사용');
-    return getDummyResult(answers);
-  }
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 700,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: `설문 답변: ${answers.join(', ')}\n\n위 답변을 분석해서 투자 유형을 JSON으로 알려주세요.`,
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      console.warn('Claude API 응답 오류:', response.status);
-      return getDummyResult(answers);
-    }
-
-    const data = await response.json();
-    const text = data.content?.[0]?.text ?? '';
-    // JSON 블록 추출 (```json ... ``` 또는 raw JSON)
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.warn('Claude 응답에서 JSON 파싱 실패');
-      return getDummyResult(answers);
-    }
-    return JSON.parse(jsonMatch[0]) as InvestmentTypeResult;
-  } catch (error) {
-    console.warn('Claude API 호출 실패:', error);
-    return getDummyResult(answers);
-  }
+  return getDummyResult(answers);
 }
 
 // ── Firestore 저장 ───────────────────────────
