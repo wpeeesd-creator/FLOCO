@@ -8,27 +8,13 @@
       "android": {
         "buildType": "apk"
       },
-      "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_ANTHROPIC_API_KEY": "***REMOVED***",
-        "EXPO_PUBLIC_NEWS_API_KEY": "***REMOVED***",
-        "EXPO_PUBLIC_KIS_APP_KEY": "***REMOVED***",
-        "EXPO_PUBLIC_KIS_APP_SECRET": "***REMOVED***",
-        "EXPO_PUBLIC_KIS_ACCOUNT": "***REMOVED***"
-      }
+      "distribution": "internal"
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
       },
       "ios": {},
-      "env": {
-        "EXPO_PUBLIC_ANTHROPIC_API_KEY": "***REMOVED***",
-        "EXPO_PUBLIC_NEWS_API_KEY": "***REMOVED***",
-        "EXPO_PUBLIC_KIS_APP_KEY": "***REMOVED***",
-        "EXPO_PUBLIC_KIS_APP_SECRET": "***REMOVED***",
-        "EXPO_PUBLIC_KIS_ACCOUNT": "***REMOVED***"
-      },
       "autoIncrement": true
     }
   }

@@ -4,3 +4,14 @@ node_modules/
 *.keystore
 *.jks
 .env
+
+# Build outputs
+dist/
+
+# Backup files
+*.backup
+
+# Local env files
+.env
+.env.local
+.env.*.local
