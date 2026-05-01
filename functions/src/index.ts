@@ -14,6 +14,9 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
+import { checkAndNotifyTop1Change } from './rankingTracker';
+import { notifyNewPost } from './communityNotifier';
+
 // ── 매수 트랜잭션 ──────────────────────────────
 
 export const buyStock = functions.https.onCall(async (data, context) => {
@@ -180,3 +183,49 @@ export const getRankings = functions.https.onCall(async () => {
   });
   return { rankings };
 });
+
+// ── 랭킹 1위 변경 감지 트리거 ──────────────────────
+
+export const onUserAssetChange = functions
+  .region('asia-northeast3')
+  .firestore.document('users/{uid}')
+  .onUpdate(async (change, _context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+
+    const beforeAsset = before.totalAsset ?? before.balance ?? 0;
+    const afterAsset = after.totalAsset ?? after.balance ?? 0;
+
+    if (Math.abs(beforeAsset - afterAsset) < 100) {
+      return;
+    }
+
+    try {
+      await checkAndNotifyTop1Change();
+    } catch (error) {
+      console.error('1위 변경 체크 실패:', error);
+    }
+  });
+
+// ── 커뮤니티 새 글 작성 트리거 ──────────────────────
+
+export const onCommunityPostCreate = functions
+  .region('asia-northeast3')
+  .firestore.document('posts/{postId}')
+  .onCreate(async (snapshot, _context) => {
+    const post = snapshot.data();
+    if (!post) return;
+
+    const authorUid = post.uid;
+    if (!authorUid) {
+      console.warn('작성자 uid 없음, 알림 건너뜀');
+      return;
+    }
+
+    await notifyNewPost({
+      uid: authorUid,
+      nickname: post.nickname,
+      content: post.content,
+      category: post.category,
+    });
+  });

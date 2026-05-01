@@ -29,6 +29,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../components/ui';
 import { BADGE_DEFINITIONS } from './BadgeScreen';
 import { fetchMultiplePrices, getExchangeRate } from '../utils/priceService';
+import { registerPushToken, removePushToken } from '../utils/pushToken';
 
 // Inline type — do NOT import from lib/investmentAnalysis
 interface InvestmentType {
@@ -203,7 +204,23 @@ export default function ProfileScreen() {
     setNotificationsEnabled(value);
     if (!currentUser?.id) return;
     try {
-      await updateDoc(doc(db, 'users', currentUser.id), { notificationsEnabled: value });
+      if (value) {
+        const token = await registerPushToken(currentUser.id);
+        if (!token) {
+          setNotificationsEnabled(false);
+          await updateDoc(doc(db, 'users', currentUser.id), { notificationsEnabled: false });
+          Alert.alert(
+            '알림 권한 필요',
+            '설정 > FLOCO > 알림에서 권한을 허용해주세요',
+            [{ text: '확인' }]
+          );
+          return;
+        }
+        await updateDoc(doc(db, 'users', currentUser.id), { notificationsEnabled: true });
+      } else {
+        await removePushToken(currentUser.id);
+        await updateDoc(doc(db, 'users', currentUser.id), { notificationsEnabled: false });
+      }
     } catch {
       setNotificationsEnabled(!value);
     }
