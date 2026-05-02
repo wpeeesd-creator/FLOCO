@@ -29,6 +29,8 @@ const CATEGORY_DESCRIPTIONS: Record<CategoryId, string> = {
   companyAnalysis: '재무제표 읽기, 해자 분석',
   psychology: '공포와 탐욕, 손실회피 편향',
   macro: '금리, 환율, 경기 사이클',
+  portfolio: 'MPT, CAPM, 샤프비율, 자산배분',
+  quant: '팩터 투자, 백테스팅, 퀀트 전략',
 };
 
 export default function LearningScreen() {

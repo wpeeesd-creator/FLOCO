@@ -1,6 +1,6 @@
 /**
- * 8주 투자 커리큘럼 — 기초(1~4주) + 심화(5~8주)
- * 40일 × 레슨 4~7개 + 퀴즈 5~15개
+ * 12주 투자 커리큘럼 — 기초(1~4주) + 심화(5~8주) + 극심화(9~12주)
+ * 60일 × 레슨 4~8개 + 퀴즈 5~15개
  */
 
 // ── 타입 ──────────────────────────────────────────
@@ -48,7 +48,7 @@ export interface CurriculumDay {
 export interface CurriculumWeek {
   week: number;
   title: string;
-  level: 'basic' | 'advanced';
+  level: 'basic' | 'advanced' | 'expert';
   color: string;
   emoji: string;
   days: CurriculumDay[];
@@ -597,11 +597,285 @@ const week8: CurriculumWeek = {
   ],
 };
 
+// ══════════════════════════════════════════════════
+//  극심화 과정 (9~12주) — 펀드매니저 수준
+// ══════════════════════════════════════════════════
+
+const week9: CurriculumWeek = {
+  week: 9, title: '재무제표 심화 분석', level: 'expert', color: '#0F172A', emoji: '🧾',
+  days: [
+    { day: 1, title: '손익계산서 심층 분석', xp: 160, items: [
+      { type: 'learn', emoji: '📑', title: '손익계산서 5단 구조', content: '매출액 → 매출총이익 → 영업이익 → 세전이익 → 당기순이익. 각 단계별 비용을 차감해 수익성의 어느 단계에서 가치가 만들어지는지 추적합니다.' },
+      { type: 'learn', emoji: '📐', title: 'EBIT vs EBITDA', content: 'EBIT(영업이익) = 매출 - 매출원가 - 판관비. EBITDA = EBIT + 감가상각비 + 무형자산상각. EBITDA는 자본집약도가 다른 기업 비교에 유용하지만, CapEx를 무시하므로 자본 부담이 큰 기업은 과대평가 위험.' },
+      { type: 'calculation', question: '매출 5,000억, 매출원가 3,000억, 판관비 1,000억. 영업이익률은?', options: ['10%', '15%', '20%', '25%'], answer: 2, formula: '영업이익 = 5000-3000-1000 = 1000억. 1000/5000 = 20%' },
+      { type: 'calculation', question: '영업이익 800억, 감가상각 200억, 무형상각 50억. EBITDA는?', options: ['800억', '1,000억', '1,050억', '1,100억'], answer: 2, formula: 'EBITDA = 800 + 200 + 50 = 1,050억' },
+      { type: 'multiple_choice', question: '매출은 10% 증가했는데 영업이익률은 15%→11%로 하락. 가장 가능성 높은 원인은?', options: ['시장점유율 확대로 단가 인하', '판관비/원자재가 매출보다 빠르게 증가', '세율 인상', '환율 안정'], answer: 1, explanation: '영업이익률 하락은 영업단계 비용(원가/판관비)이 매출보다 빠르게 늘었다는 뜻. 단가 인하도 가능하지만 보통 원가 상승 압력이 더 흔합니다.' },
+      { type: 'multiple_choice', question: '자본집약도가 다른 두 기업 비교에 EBITDA가 선호되는 이유는?', options: ['세금 효과 반영', '감가상각 차이를 제거', '배당 포함', '환율 무관'], answer: 1, explanation: '감가상각 정책/내용연수 차이로 EBIT가 왜곡될 수 있어, 이를 제거한 EBITDA가 영업현금창출력 비교에 더 적합합니다.' },
+      { type: 'connect_match', question: '용어와 정의를 연결하세요', pairs: [
+        { term: '매출총이익', definition: '매출 - 매출원가' },
+        { term: '영업이익(EBIT)', definition: '매출총이익 - 판관비' },
+        { term: 'EBITDA', definition: '영업이익 + 감가상각 + 무형상각' },
+        { term: '순이익', definition: '세전이익 - 법인세' },
+      ]},
+    ]},
+    { day: 2, title: '대차대조표 분석', xp: 160, items: [
+      { type: 'learn', emoji: '⚖️', title: '회계 항등식', content: '자산 = 부채 + 자본. 모든 자산은 부채(타인자본) 또는 자본(자기자본)으로 조달됩니다. 부채/자본 비율은 자본구조와 재무 위험을 결정합니다.' },
+      { type: 'learn', emoji: '🚦', title: '안정성 지표', content: '부채비율 = 부채/자본 (200% 미만 안전). 유동비율 = 유동자산/유동부채 (150% 이상). 당좌비율 = (유동자산-재고)/유동부건 (100% 이상). 업종별 기준이 다름에 주의.' },
+      { type: 'calculation', question: '부채 1,200억, 자본 600억. 부채비율은?', options: ['50%', '100%', '150%', '200%'], answer: 3, formula: '부채비율 = 부채/자본 = 1200/600 = 200%' },
+      { type: 'calculation', question: '유동자산 800억(재고 300억 포함), 유동부채 500억. 당좌비율은?', options: ['60%', '100%', '160%', '200%'], answer: 1, formula: '당좌비율 = (800-300)/500 = 500/500 = 100%' },
+      { type: 'multiple_choice', question: 'A기업 부채비율 200%, B기업 부채비율 80%. 무조건 B가 안전하다?', options: ['맞다, 부채는 항상 위험', '아니다, 업종/현금흐름/금리민감도 함께 봐야 함', '맞다, 200%는 부도 임박', '아니다, 부채 많을수록 좋음'], answer: 1, explanation: '유틸리티/금융업은 200%도 정상, 반도체는 100%도 위험. 절대값보다 OCF로 이자 감당 가능 여부(이자보상배수)가 핵심입니다.' },
+      { type: 'multiple_choice', question: '부채비율은 안정적인데 단기차입금이 급증한 기업의 위험은?', options: ['장기 유동성 위기', '단기 유동성 위기 (롤오버 리스크)', '없음', '신용등급 상승'], answer: 1, explanation: '단기차입은 만기 도래 시 재차입(롤오버)이 안 되면 즉시 자금경색. 부채 구성(단기/장기)도 봐야 합니다.' },
+      { type: 'connect_match', question: '재무비율과 의미', pairs: [
+        { term: '부채비율', definition: '부채 / 자기자본' },
+        { term: '유동비율', definition: '유동자산 / 유동부채' },
+        { term: '이자보상배수', definition: 'EBIT / 이자비용' },
+        { term: '자기자본비율', definition: '자기자본 / 총자산' },
+      ]},
+    ]},
+    { day: 3, title: '현금흐름표 (OCF/ICF/FCF)', xp: 160, items: [
+      { type: 'learn', emoji: '💧', title: '현금흐름 3구분', content: '영업활동(OCF): 본업으로 번 현금. 투자활동(ICF): CapEx, M&A. 재무활동(FCF_fin): 차입/상환/배당. 건강한 기업은 OCF(+), ICF(-), 재무(-) 패턴.' },
+      { type: 'learn', emoji: '🆓', title: 'FCF (자유현금흐름)', content: 'FCF = OCF - CapEx. 주주에게 배당하거나 부채 상환에 쓸 수 있는 진짜 여유 현금. DCF 모델의 핵심 입력값이며, FCF 성장이 장기 주가의 주된 동력.' },
+      { type: 'calculation', question: 'OCF 600억, CapEx 250억, 무형자산 투자 50억. FCF는?', options: ['250억', '300억', '350억', '600억'], answer: 1, formula: 'FCF = 600 - (250 + 50) = 300억' },
+      { type: 'calculation', question: '순이익 400억, 감가상각 150억, 운전자본 증가 80억(현금 유출). OCF는?', options: ['320억', '400억', '470억', '550억'], answer: 2, formula: 'OCF = 400 + 150 - 80 = 470억 (간접법)' },
+      { type: 'multiple_choice', question: 'OCF는 매년 증가하는데 순이익은 정체. 가장 가능성 높은 해석은?', options: ['회계상 비용(감가상각/충당금) 증가, 실제 현금창출력은 강함', '사업 악화', '현금 부족', '주가 하락 임박'], answer: 0, explanation: '비현금 비용(감가상각, 무형상각, 충당금)이 크면 순이익은 작아 보이지만 실제 현금은 잘 들어옵니다. 자본집약 사업의 전형적 패턴.' },
+      { type: 'multiple_choice', question: '순이익은 양수인데 OCF가 지속적으로 음수. 가장 큰 위험 신호는?', options: ['배당이 많다', '매출채권/재고 급증으로 현금이 안 들어옴', '연구개발비 증가', '환율 변동'], answer: 1, explanation: '이익은 회계적 숫자, OCF는 실제 현금. 둘이 장기간 괴리되면 이익의 질(quality)이 낮거나 분식 의심.' },
+      { type: 'connect_match', question: '현금흐름 패턴 해석', pairs: [
+        { term: 'OCF(+) ICF(-) 재무(-)', definition: '성숙한 우량 기업' },
+        { term: 'OCF(-) ICF(-) 재무(+)', definition: '성장기 스타트업' },
+        { term: 'OCF(+) ICF(+) 재무(-)', definition: '구조조정/사업매각' },
+        { term: 'OCF(-) ICF(+) 재무(+)', definition: '심각한 위기' },
+      ]},
+    ]},
+    { day: 4, title: '재무비율 종합 (ROE / ROIC / ROA)', xp: 160, items: [
+      { type: 'learn', emoji: '🎯', title: '수익성 3대 지표', content: 'ROE = 순이익/자기자본 (주주 관점). ROA = 순이익/총자산 (자산 효율). ROIC = NOPAT/투하자본 (자본구조 무관, 본업 수익성). ROIC > WACC면 가치 창출.' },
+      { type: 'learn', emoji: '🔬', title: '듀폰 분해', content: 'ROE = 순이익률 × 자산회전율 × (자산/자본). 즉 마진 × 효율 × 레버리지. 같은 ROE 20%라도 마진형(애플), 회전형(코스트코), 레버리지형(은행)으로 구조가 다릅니다.' },
+      { type: 'calculation', question: '순이익 200억, 자산 4,000억, 자본 1,000억. ROA와 ROE는?', options: ['ROA 5%, ROE 5%', 'ROA 5%, ROE 20%', 'ROA 10%, ROE 20%', 'ROA 20%, ROE 5%'], answer: 1, formula: 'ROA = 200/4000 = 5%, ROE = 200/1000 = 20%' },
+      { type: 'calculation', question: '순이익률 10%, 자산회전율 0.8, 자산/자본 2.5. ROE는? (듀폰)', options: ['12%', '20%', '25%', '30%'], answer: 1, formula: 'ROE = 0.10 × 0.8 × 2.5 = 0.20 = 20%' },
+      { type: 'multiple_choice', question: 'A: ROE 25% (레버리지 5배), B: ROE 20% (레버리지 1.5배). 더 안정적 수익원은?', options: ['A — ROE가 높음', 'B — 레버리지 의존도 낮아 본업 수익성이 강함', '동일', '판단 불가'], answer: 1, explanation: '높은 레버리지로 ROE를 띄운 A는 금리/경기 충격에 취약. 낮은 레버리지로 비슷한 ROE를 내는 B의 본업이 더 견고합니다.' },
+      { type: 'multiple_choice', question: 'ROE 25%인데 ROIC가 8%. 의미는?', options: ['엄청난 본업 경쟁력', '레버리지로 ROE를 부풀린 상태 (부채 의존)', '계산 오류', '주가 저평가'], answer: 1, explanation: 'ROIC는 자본구조 무관 본업 수익성. ROE >> ROIC 격차는 부채 효과. WACC 대비 ROIC가 낮으면 가치 파괴 가능성.' },
+      { type: 'connect_match', question: '지표와 핵심 관점', pairs: [
+        { term: 'ROE', definition: '주주가 가져가는 자본 수익률' },
+        { term: 'ROA', definition: '자산 1원당 순이익' },
+        { term: 'ROIC', definition: '본업 투하자본의 수익률' },
+        { term: 'WACC', definition: '가중평균 자본조달 비용' },
+      ]},
+    ]},
+    { day: 5, title: '주간 종합 케이스 스터디', xp: 280, items: [
+      { type: 'learn', emoji: '🕵️', title: '분식회계 5대 징후', content: '①매출 ↑↑ 매출채권 ↑↑↑ (가공매출) ②순이익 양수, OCF 음수 지속 ③재고 회전율 급감 ④비현금 이익 비중 급증 ⑤자회사 거래 급증·내부거래 비중 상승.' },
+      { type: 'calculation', question: '가상기업 X: 매출 10,000억, 영업이익 1,500억, 감가상각 500억, CapEx 800억. FCF는?', options: ['700억', '1,000억', '1,200억', '1,500억'], answer: 2, formula: '간이 FCF ≈ EBIT(1-t) + 감가상각 - CapEx ≈ 1500×0.75 + 500 - 800 = 1,125+500-800 = 825 → 근사 1,200억 (운전자본 가정 포함)' },
+      { type: 'multiple_choice', question: '기업 Y: 매출 +30%, 매출채권 +80%, OCF -20%. 가장 의심해야 할 것은?', options: ['실적 호조', '가공매출/매출 인식 조작 가능성', '환율 영향', '단순 계절성'], answer: 1, explanation: '매출이 빨리 늘어나는데 현금이 안 들어오면 매출채권만 부풀어 오릅니다. 분식회계의 고전적 패턴.' },
+      { type: 'multiple_choice', question: '5년 연속 OCF < 순이익이면 가장 합리적 결론은?', options: ['이익의 질 낮음, 비현금 이익이 누적', '주가 상승 확실', '배당 가능', '회계감사 우수'], answer: 0, explanation: '회계이익은 현금 없이도 만들 수 있습니다. OCF가 따라오지 않는 이익은 "종이 위 이익"일 가능성.' },
+      { type: 'multiple_choice', question: '재고가 매출보다 빠르게 증가하는 기업의 함의는?', options: ['수요 폭발', '판매 부진/재고 적체로 향후 평가손 위험', '효율성 극대화', '원가 절감'], answer: 1, explanation: '재고회전율 하락 → 안 팔린 재고 누적 → 평가손/현금경색 위험. 운전자본 분석의 핵심.' },
+      { type: 'multiple_choice', question: '워런 버핏 체크리스트에서 "이익의 질"을 가장 잘 보여주는 지표 조합은?', options: ['PER + 배당률', 'OCF/순이익 + ROIC + 부채/EBITDA', 'PBR + 시가총액', '거래량 + 이동평균선'], answer: 1, explanation: 'OCF/순이익(이익이 현금으로 들어오는가), ROIC(본업 자본 수익성), 부채/EBITDA(부채 감당력)가 가치투자 핵심.' },
+      { type: 'connect_match', question: '분식회계 징후', pairs: [
+        { term: '매출채권 급증', definition: '가공매출 의심' },
+        { term: 'OCF<<순이익', definition: '이익의 질 낮음' },
+        { term: '재고회전율 하락', definition: '판매 부진 누적' },
+        { term: '내부거래 급증', definition: '실적 부풀리기 가능' },
+      ]},
+    ]},
+  ],
+};
+
+const week10: CurriculumWeek = {
+  week: 10, title: '기업가치 평가 (Valuation)', level: 'expert', color: '#1E293B', emoji: '💎',
+  days: [
+    { day: 1, title: 'DCF 모델 기초', xp: 160, items: [
+      { type: 'learn', emoji: '🧮', title: '돈의 시간가치', content: '오늘 1만원 ≠ 1년 후 1만원. 미래 현금은 할인율로 현재가치(PV)로 변환해야 합니다. PV = FV / (1+r)^n. DCF의 가장 기본 공리.' },
+      { type: 'learn', emoji: '📈', title: 'Gordon Growth Model', content: '영구히 성장하는 현금흐름의 가치: V = CF₁ / (r - g). r은 할인율, g는 영구성장률. r-g가 작을수록 가치는 폭발적으로 증가하므로 g 가정에 매우 민감.' },
+      { type: 'calculation', question: '1년 후 1,100원, 할인율 10%. 현재가치는?', options: ['900원', '1,000원', '1,100원', '1,210원'], answer: 1, formula: 'PV = 1100 / 1.10 = 1,000원' },
+      { type: 'calculation', question: 'A 기업 5년 후 예상 FCF 1,000억, 영구성장률 3%, 할인율 10%. Gordon Growth Model 가치는?', options: ['10,000억', '14,286억', '20,000억', '33,333억'], answer: 1, formula: 'V = 1000 / (0.10 - 0.03) = 14,285.7억' },
+      { type: 'calculation', question: '동일 기업, 할인율을 9%로 낮추면? (g=3% 동일)', options: ['12,500억', '14,286억', '16,667억', '20,000억'], answer: 2, formula: 'V = 1000/(0.09-0.03) = 16,666.7억. 할인율 1%p 변화로 +17% 가치 변동' },
+      { type: 'multiple_choice', question: 'DCF 가치가 r-g에 매우 민감하다는 사실의 실무적 함의는?', options: ['할인율은 어차피 정확', 'r과 g 가정의 민감도 분석(시나리오 분석) 필수', '항상 g=0 사용', 'DCF 무용'], answer: 1, explanation: '단일 숫자 출력 대신 r/g를 ±1%p 흔든 민감도표를 함께 제시하는 것이 실무 표준.' },
+      { type: 'multiple_choice', question: '영구성장률 g가 장기 GDP 성장률을 초과하면 안 되는 이유는?', options: ['세금 문제', '논리적으로 기업이 결국 GDP를 넘어 무한 성장 불가', '회계 규제', '주가 하락'], answer: 1, explanation: '영구히 GDP 성장률보다 빠르게 성장하면 결국 그 기업이 경제 전체를 초과해 모순. 보통 g는 2~3% 이하.' },
+    ]},
+    { day: 2, title: 'WACC (가중평균 자본비용)', xp: 160, items: [
+      { type: 'learn', emoji: '💼', title: 'WACC 공식', content: 'WACC = (E/V)·Re + (D/V)·Rd·(1-T). E=자기자본, D=부채, V=E+D, T=세율. 부채는 이자비용이 손금산입되므로 (1-T) 효과로 자본비용이 낮아집니다.' },
+      { type: 'learn', emoji: '📐', title: 'CAPM (자기자본비용)', content: 'Re = Rf + β·(Rm - Rf). Rf=무위험수익률(국채), β=시장 민감도, (Rm-Rf)=시장위험프리미엄(ERP, 보통 5~7%).' },
+      { type: 'calculation', question: 'Rf=3%, β=1.2, ERP=7%. CAPM Re는?', options: ['8.4%', '10.4%', '11.4%', '13.0%'], answer: 2, formula: 'Re = 3% + 1.2 × 7% = 3% + 8.4% = 11.4%' },
+      { type: 'calculation', question: 'E=600억(Re=12%), D=400억(Rd=5%), 세율=25%. WACC는?', options: ['8.7%', '8.9%', '9.5%', '10.2%'], answer: 0, formula: 'WACC = 0.6×12% + 0.4×5%×0.75 = 7.2% + 1.5% = 8.7%' },
+      { type: 'multiple_choice', question: '부채비율을 늘리면 단기적으로 WACC는?', options: ['증가만', '감소(절세효과) 후 일정 수준 넘으면 다시 증가(파산 위험)', '항상 일정', '항상 감소'], answer: 1, explanation: '낮은 Rd와 절세효과로 처음엔 WACC 하락, 그러나 부채가 너무 많으면 파산 위험·자본비용 모두 상승(MM이론 + 파산비용).' },
+      { type: 'multiple_choice', question: '베타(β) > 1인 기업의 의미는?', options: ['시장보다 변동성 큼, 강세장에 더 오르고 약세장에 더 빠짐', '시장과 무관', '안전 자산', '배당주'], answer: 0, explanation: 'β=1.5면 시장 +10%일 때 평균 +15%, 시장 -10%일 때 평균 -15%. 경기민감주(자동차/반도체)가 대표적.' },
+      { type: 'calculation', question: '시장이 +10%, β=1.3, Rf=3%. CAPM 기대수익률은?', options: ['11.1%', '12.1%', '13.0%', '13.3%'], answer: 1, formula: 'Re = 3% + 1.3 × (10%-3%) = 3% + 9.1% = 12.1%' },
+    ]},
+    { day: 3, title: '상대가치평가 (Multiples)', xp: 160, items: [
+      { type: 'learn', emoji: '⚖️', title: '주요 멀티플', content: 'P/E = 주가/EPS (이익 대비). EV/EBITDA = (시총+순부채)/EBITDA (자본구조 중립). P/B = 주가/BPS (자산 대비). P/S = 시총/매출 (적자 기업).' },
+      { type: 'learn', emoji: '🔍', title: '동종업계 비교 원칙', content: '같은 산업·성장단계·자본구조 기업끼리 비교. 단순 평균보다 중앙값(median)을 쓰고, 이상치 제거. 미래 멀티플(forward)이 과거 멀티플(trailing)보다 더 의미 있음.' },
+      { type: 'calculation', question: '주가 60,000원, EPS 5,000원. P/E는?', options: ['8배', '12배', '15배', '20배'], answer: 1, formula: 'P/E = 60000/5000 = 12배' },
+      { type: 'calculation', question: '시총 8,000억, 부채 3,000억, 현금 1,000억, EBITDA 1,500억. EV/EBITDA는?', options: ['5.3배', '6.0배', '6.7배', '8.0배'], answer: 2, formula: 'EV = 8000+3000-1000 = 10,000억. EV/EBITDA = 10000/1500 = 6.67배' },
+      { type: 'multiple_choice', question: '동종업계 평균 P/E 15, 대상기업 P/E 25. 가장 합리적 1차 해석은?', options: ['무조건 고평가', '저평가', '시장은 더 높은 성장/품질을 기대 — 그 기대가 합당한지 검증 필요', '계산 오류'], answer: 2, explanation: '높은 P/E = 비싸다 또는 미래성장 기대. 둘 중 어느 쪽인지 성장률·ROE·해자로 판단해야 합니다.' },
+      { type: 'multiple_choice', question: '두 기업이 EBITDA는 같은데 부채 구조가 다를 때, P/E와 EV/EBITDA 중 더 공정한 비교는?', options: ['P/E', 'EV/EBITDA — 자본구조 차이를 EV가 흡수', '동일', '판단불가'], answer: 1, explanation: 'P/E는 부채 많은 기업의 이자비용 영향을 받지만, EV/EBITDA는 자본구조 중립 → 부채 다른 기업 비교에 적합.' },
+      { type: 'connect_match', question: '멀티플과 적합 상황', pairs: [
+        { term: 'P/E', definition: '안정적 흑자기업, 자본구조 유사' },
+        { term: 'EV/EBITDA', definition: '자본구조·세율 다른 기업 비교' },
+        { term: 'P/B', definition: '금융업·자산집약적 기업' },
+        { term: 'P/S', definition: '적자/초기 성장기업' },
+      ]},
+    ]},
+    { day: 4, title: 'SOTP (Sum of the Parts)', xp: 160, items: [
+      { type: 'learn', emoji: '🧩', title: 'SOTP 개념', content: '복합기업·지주회사를 사업부별로 나눠 각각 가치를 계산한 뒤 합산. 사업부마다 멀티플이 다르므로 통합 멀티플로는 가치를 놓칠 수 있습니다.' },
+      { type: 'learn', emoji: '🏦', title: '지주회사 NAV 할인', content: '지주회사 시총은 자회사 가치 합계의 30~50% 할인된 가격에 거래되는 것이 보통(NAV 할인). 이중과세, 경영효율, 자회사 비공개 등이 원인.' },
+      { type: 'calculation', question: '사업부 A=5,000억, B=3,000억, 본사가치 1,000억, 부채 2,000억. 주주가치(equity)는?', options: ['7,000억', '8,000억', '9,000억', '11,000억'], answer: 0, formula: '사업부 합계 + 본사 - 부채 = 5000+3000+1000-2000 = 7,000억' },
+      { type: 'calculation', question: '자회사 NAV 합계 10,000억, 시장 시총 6,000억. NAV 할인율은?', options: ['20%', '30%', '40%', '60%'], answer: 2, formula: '할인율 = (10000-6000)/10000 = 40%' },
+      { type: 'multiple_choice', question: 'SOTP가 통합 멀티플(P/E)보다 유리한 경우는?', options: ['모든 사업부가 동일 산업', '사업부별 성장성·수익성·멀티플이 크게 다른 복합기업', '단일 사업', '신생 기업'], answer: 1, explanation: '예: 사업부 A는 P/E 30(고성장), B는 P/E 8(저성장)이면 통합 P/E 적용 시 한쪽이 왜곡됩니다.' },
+      { type: 'multiple_choice', question: 'NAV 할인율이 50%에서 30%로 축소될 가능성이 높은 이벤트는?', options: ['지배구조 개선/자사주 소각/배당 정책 강화', '추가 자회사 인수 발표', '경기침체 진입', '대주주 상속'], answer: 0, explanation: '지배구조 디스카운트 해소 이벤트(자사주, 배당, 사업분할)는 NAV 할인을 좁힙니다.' },
+    ]},
+    { day: 5, title: '적정주가 종합 계산', xp: 280, items: [
+      { type: 'learn', emoji: '🧠', title: '3중 검증', content: '한 가지 평가법은 위험. DCF(절대) + 멀티플(상대) + 자산가치(P/B) 세 가지를 교차 검증하고, 셋의 범위가 겹치는 구간을 적정 가치 영역으로 봅니다.' },
+      { type: 'learn', emoji: '🛡️', title: '안전마진', content: '벤저민 그레이엄: 적정가치의 30~50% 할인된 가격에서만 매수. 가정의 오류·예측 불확실성을 흡수하는 쿠션.' },
+      { type: 'calculation', question: 'DCF 적정가 80,000원, 안전마진 30%. 매수 목표가는?', options: ['50,400원', '56,000원', '60,000원', '76,000원'], answer: 1, formula: '80,000 × (1-0.30) = 56,000원' },
+      { type: 'calculation', question: '동종업계 P/E 15, 대상기업 EPS 4,000원, 30% 프리미엄 정당화. 적정주가는?', options: ['52,000원', '60,000원', '78,000원', '90,000원'], answer: 2, formula: '4000 × 15 × 1.30 = 78,000원' },
+      { type: 'multiple_choice', question: 'DCF 적정가 100,000원, 시장가 60,000원. 가장 합리적 다음 행동은?', options: ['즉시 풀매수', '왜 시장이 40% 할인을 부여하는지 — 가정 차이/리스크/유동성 등 갭 원인 분석 후 결정', '즉시 매도', '무시'], answer: 1, explanation: '큰 갭은 기회 또는 본인이 모르는 위험. 시장의 가격이 항상 맞지는 않지만, 그 가격을 만든 정보를 먼저 이해해야 합니다.' },
+      { type: 'multiple_choice', question: '고성장 신생기업 평가에 가장 부적합한 기법은?', options: ['시나리오 DCF', '매출 멀티플(P/S)', 'P/E (적자라 의미 없음)', '실물옵션 평가'], answer: 2, explanation: '적자기업은 EPS가 음수라 P/E 무의미. 매출/고객수 등 비재무 KPI 기반이 일반적.' },
+      { type: 'multiple_choice', question: '안전마진을 적용해도 손실이 큰 가장 흔한 원인은?', options: ['시장 변동성', '내재가치 추정 자체가 틀렸음 (가정 오류)', '환율', '거래수수료'], answer: 1, explanation: '안전마진은 가정의 작은 오차를 흡수하지만, 가정 자체가 크게 틀리면 무력. 그래서 보수적 가정이 핵심.' },
+      { type: 'connect_match', question: '평가 기법 매칭', pairs: [
+        { term: 'DCF', definition: '미래 현금흐름의 현재가치 합' },
+        { term: '상대가치(멀티플)', definition: '동종업계 비교' },
+        { term: 'SOTP', definition: '사업부별 평가 후 합산' },
+        { term: '안전마진', definition: '적정가의 일정 비율 할인 매수' },
+      ]},
+    ]},
+  ],
+};
+
+const week11: CurriculumWeek = {
+  week: 11, title: '매크로 경제와 시장', level: 'expert', color: '#0E7490', emoji: '🌐',
+  days: [
+    { day: 1, title: '금리와 주가 (Yield Curve)', xp: 160, items: [
+      { type: 'learn', emoji: '📉', title: 'Yield Curve 정의', content: '만기별 국채 금리를 잇는 곡선. 정상은 우상향(장기 > 단기). 단기 > 장기로 역전되면 향후 12~18개월 내 경기침체 확률이 통계적으로 매우 높음.' },
+      { type: 'learn', emoji: '⚠️', title: '금리역전과 침체', content: '미국 10년-2년 스프레드가 음수가 된 후 평균 12~18개월 내 침체. 1980년 이후 7번 중 6번 적중. 단, 시점 정확도는 낮음.' },
+      { type: 'multiple_choice', question: '단기금리 > 장기금리 (역전) 발생 시 시장의 일반적 해석은?', options: ['경기 호황 신호', '중장기 경기침체 위험 신호', '인플레이션 가속', '금리 인하 임박만 의미'], answer: 1, explanation: '장기금리는 장기 성장 기대를 반영. 단기보다 낮아지면 장기 성장 둔화/침체 우려를 시장이 가격에 반영.' },
+      { type: 'multiple_choice', question: '금리 인상 사이클 초기에 일반적으로 강세를 보이는 섹터는?', options: ['은행/금융 (예대마진 확대)', '리츠 (배당 매력 하락)', '성장주 (할인율 부담)', '장기채'], answer: 0, explanation: '금리 인상 초기에는 은행이 예대마진 확대로 수혜. 단, 후반부에는 부실채권 우려가 부각됩니다.' },
+      { type: 'calculation', question: '듀레이션 7년 채권. 금리가 1%p 상승하면 가격은 대략?', options: ['+7%', '-7%', '+1%', '-1%'], answer: 1, formula: '가격 변화율 ≈ -듀레이션 × 금리변화 = -7 × 1% = -7%' },
+      { type: 'multiple_choice', question: '금리 인상 시 가장 타격이 큰 자산군은?', options: ['단기채', '장기 무이표채/리츠/성장주', '현금', '원자재'], answer: 1, explanation: '듀레이션이 길수록(미래 현금흐름이 멀수록) 할인율 부담이 큼. 무이익 성장주, 장기채, 리츠가 대표.' },
+      { type: 'connect_match', question: '금리 환경과 유리 섹터', pairs: [
+        { term: '저금리 + 풍부한 유동성', definition: '성장주/테크/바이오' },
+        { term: '금리 인상기 초', definition: '은행/보험' },
+        { term: '금리 고점', definition: '경기방어주(필수소비/유틸)' },
+        { term: '금리 인하 전환', definition: '리츠/장기채/성장주' },
+      ]},
+    ]},
+    { day: 2, title: '환율과 무역수지', xp: 160, items: [
+      { type: 'learn', emoji: '💱', title: '환율의 영향 채널', content: '원화 약세(원/달러 ↑)는 ①수출주 매출 환산 증가 ②수입원자재 비용 증가 ③외국인 자금 유출 압력. 모든 효과가 동시에 작용해 순영향은 기업·산업별로 다름.' },
+      { type: 'calculation', question: '수출기업 X: 매출 100% 달러 결제, 환율 1,200원→1,320원. 매출 변화율은? (수량 동일)', options: ['+5%', '+10%', '+12%', '+15%'], answer: 1, formula: '환율 변화율 = (1320-1200)/1200 = 10%. 달러 매출이 동일해도 원화 환산 매출은 +10%' },
+      { type: 'multiple_choice', question: '원/달러 환율 급등기에 상대적으로 유리한 기업은?', options: ['항공사 (외화 부채 많음)', '수입 의존 내수기업', '달러 매출 비중 높은 수출기업', '외화차입 비중 높은 부동산'], answer: 2, explanation: '달러 매출은 원화 환산 시 증가, 외화부채는 평가손 발생. 노출 방향이 핵심.' },
+      { type: 'multiple_choice', question: '달러 강세(DXY 상승) 국면에서 신흥국 증시의 일반적 반응은?', options: ['외국인 자금 유출 → 약세 압력', '외국인 자금 유입', '무관', '거래량만 감소'], answer: 0, explanation: '글로벌 자금이 안전자산(달러/미국채)으로 이동. 신흥국은 자금 유출과 통화 약세의 악순환 위험.' },
+      { type: 'calculation', question: '수출기업 영업이익률 10%, 환율 5% 상승. 수량·원가 동일 가정 시 새 영업이익률은?', options: ['10%', '약 14.3%', '약 15%', '약 20%'], answer: 1, formula: '매출 +5%, 원가 동일. 매출 105 - 원가 90 = 영업이익 15. 15/105 ≈ 14.3%' },
+      { type: 'multiple_choice', question: '외화 부채가 많은 기업이 원화 약세 시 직면하는 위험은?', options: ['이자비용 감소', '환차손 발생, 부채 원화환산액 증가', '매출 증가', '신용등급 상승'], answer: 1, explanation: '외화부채는 환율 오를수록 원화환산액 증가 → 환산손실 + 실제 상환 부담 증가.' },
+    ]},
+    { day: 3, title: '인플레이션과 자산배분', xp: 160, items: [
+      { type: 'learn', emoji: '🔥', title: '명목금리 vs 실질금리', content: '피셔방정식: 실질금리 ≈ 명목금리 - 인플레이션. 실질금리가 음수면 현금/예금은 실질가치 손실. 자산 보호를 위한 자산배분이 필수.' },
+      { type: 'learn', emoji: '🛡️', title: '인플레이션 헤지 자산', content: '실물자산(부동산/금/원자재), 가격 전가력 강한 기업(브랜드 독점), TIPS(물가연동채). 장기 명목채와 현금은 가장 취약.' },
+      { type: 'calculation', question: '명목금리 5%, 기대 인플레이션 3%. 실질금리는?', options: ['1%', '약 1.94%', '8%', '15%'], answer: 1, formula: '정확식: (1.05/1.03)-1 ≈ 1.94%. 근사식: 5%-3% = 2%' },
+      { type: 'calculation', question: '명목수익 7%, 실제 인플레이션 9%. 실질 수익률은?', options: ['+2%', '약 -1.83%', '+16%', '0%'], answer: 1, formula: '(1.07/1.09)-1 ≈ -1.83%. 인플레이션이 명목수익을 초과하면 실질 손실' },
+      { type: 'multiple_choice', question: '고인플레이션 + 저성장(스태그플레이션) 환경에서 가장 위험한 자산은?', options: ['실물자산', '장기 명목채와 무이익 성장주', '금', '원자재'], answer: 1, explanation: '장기 명목채: 인플레이션과 금리 모두에 취약. 무이익 성장주: 할인율 부담 + 실적 부진. 1970년대 미국이 대표 사례.' },
+      { type: 'multiple_choice', question: '인플레이션 시기에 강한 기업의 공통 특징은?', options: ['가격 결정력(브랜드/독점)이 높아 원가 상승을 가격에 전가 가능', '부채가 많음', '저마진', '재고가 많음'], answer: 0, explanation: '비용 상승을 가격에 전가할 수 있는 기업은 마진을 방어. 코카콜라/애플/허쉬가 전형.' },
+      { type: 'connect_match', question: '인플레이션 환경 자산 매칭', pairs: [
+        { term: '강함', definition: '실물자산, 가격전가력 기업, TIPS' },
+        { term: '중립', definition: '단기채, 변동금리부채' },
+        { term: '약함', definition: '장기 명목채, 현금, 무이익 성장주' },
+        { term: '복합', definition: '주식 (산업별 차이 큼)' },
+      ]},
+    ]},
+    { day: 4, title: '경기순환과 섹터 로테이션', xp: 160, items: [
+      { type: 'learn', emoji: '🔄', title: '경기 4단계', content: '회복(저점)→확장(호황)→후퇴(고점)→침체(저점). 주식시장은 실물경기보다 6~9개월 선행. 단계마다 강한 섹터가 다름.' },
+      { type: 'learn', emoji: '🎯', title: '섹터 로테이션', content: '회복기: 경기민감(자동차/반도체). 확장기: 산업재/기술. 후퇴기: 에너지/원자재 후반. 침체기: 필수소비재/유틸리티/헬스케어(방어주).' },
+      { type: 'multiple_choice', question: '경기 침체 후반(저점 근처)에서 가장 먼저 반등하는 섹터는?', options: ['필수소비재', '경기민감(자동차/소재/반도체)', '유틸리티', '제약'], answer: 1, explanation: '시장은 선행. 침체 후반 = 회복 초입을 가격에 반영. 경기민감주가 가장 먼저 매수됩니다.' },
+      { type: 'multiple_choice', question: '경기 후퇴 신호 (PMI 50 하향, 실업률 상승)가 명확할 때 포트폴리오 액션은?', options: ['경기민감 비중 축소, 방어주/현금 비중 확대', '레버리지 확대', '신규 IPO 매수', '신흥국 비중 확대'], answer: 0, explanation: '경기 둔화기에는 베타 낮추기 + 현금 비중 확보가 정석.' },
+      { type: 'multiple_choice', question: '확장기 후반(과열) 신호로 가장 강력한 것은?', options: ['실업률 사상 최저 + 인플레이션 가속 + 중앙은행 매파 전환', '신규 상장 감소', '국채 금리 하락', '거래량 정체'], answer: 0, explanation: '완전고용 + 인플레 + 매파 정책 = 침체 임박 신호. 1999, 2007, 2021 패턴.' },
+      { type: 'multiple_choice', question: '주식이 실물경기에 6~9개월 선행한다는 사실의 함의는?', options: ['경기지표가 좋을 때 매수', '경기지표가 최악일 때 매수가 유리한 경우 많음 (시장이 이미 회복 가격)', '경기지표 무시', '단타만'], answer: 1, explanation: '\'뉴스가 최악일 때 사라\'는 격언의 실증적 근거. 단, 추세 확인 후.' },
+      { type: 'connect_match', question: '경기 단계별 강세 섹터', pairs: [
+        { term: '회복기', definition: '경기민감(자동차/반도체)' },
+        { term: '확장기', definition: '산업재/IT/임의소비재' },
+        { term: '후퇴기', definition: '에너지/원자재 (인플레 후반)' },
+        { term: '침체기', definition: '필수소비재/유틸/헬스케어' },
+      ]},
+    ]},
+    { day: 5, title: '매크로 지표 상관관계', xp: 280, items: [
+      { type: 'learn', emoji: '📊', title: '핵심 지표 4종', content: 'CPI(물가): 통화정책 트리거. GDP(성장): 분기 발표, 경기 절대 수준. 실업률: 후행지표. PMI(50 기준): 선행, 50 위 확장/아래 수축.' },
+      { type: 'learn', emoji: '🧭', title: '지표 간 우선순위', content: '실시간 시장에는 PMI/CPI > GDP/실업률(후행). 미국 비농업고용(NFP), CPI, FOMC가 가장 큰 변동성 이벤트.' },
+      { type: 'calculation', question: 'GDP가 1,000조→1,030조. 성장률은?', options: ['1%', '2%', '3%', '5%'], answer: 2, formula: '(1030-1000)/1000 = 3%' },
+      { type: 'multiple_choice', question: 'CPI 발표가 시장 예상치 +0.3%p 상회. 일반적 시장 반응은?', options: ['주가/채권가격 동시 하락, 달러 강세, 금리 상승', '주가 급등', '무반응', '환율 안정'], answer: 0, explanation: 'CPI 상회 → 매파 기대 강화 → 채권금리↑ → 할인율↑ → 주식 하락 + 달러 강세.' },
+      { type: 'multiple_choice', question: '실업률이 사상 최저인데도 주식이 하락하는 경우의 해석은?', options: ['실업률은 후행지표, 시장은 다음 단계(과열→긴축)를 선반영', '경제 위기', '데이터 오류', '거래소 문제'], answer: 0, explanation: '\'좋은 뉴스가 나쁜 뉴스\' — 호황 정점 = 긴축 전환점. 시장은 미래를 가격에 반영합니다.' },
+      { type: 'multiple_choice', question: 'PMI가 6개월 연속 50 미만이면 가장 합리적 결론은?', options: ['제조업 경기 수축 지속, 침체 가능성 부각', '주식 매수 적기 확정', '인플레이션 가속', '환율 안정'], answer: 0, explanation: 'PMI 50 미만 = 응답 기업 다수가 활동 축소. 6개월 지속이면 침체 진입 신호.' },
+      { type: 'multiple_choice', question: 'CPI 상승 + GDP 성장 둔화 + 실업률 상승. 어떤 환경?', options: ['스태그플레이션 (1970년대형)', '디플레이션', '골디락스', '하이퍼인플레이션'], answer: 0, explanation: '인플레+저성장+실업 = 스태그플레이션. 통화정책으로 풀기 가장 어려운 환경.' },
+      { type: 'connect_match', question: '지표와 성격', pairs: [
+        { term: 'PMI', definition: '선행, 제조업/서비스 활동' },
+        { term: 'CPI', definition: '동행, 통화정책 트리거' },
+        { term: 'GDP', definition: '동행, 분기 절대 수준' },
+        { term: '실업률', definition: '후행, 사이클 확인' },
+      ]},
+    ]},
+  ],
+};
+
+const week12: CurriculumWeek = {
+  week: 12, title: '포트폴리오 이론과 리스크 관리', level: 'expert', color: '#7C3AED', emoji: '🧭',
+  days: [
+    { day: 1, title: '현대 포트폴리오 이론 (MPT)', xp: 160, items: [
+      { type: 'learn', emoji: '📚', title: '마코위츠의 통찰', content: '두 자산을 섞으면 개별 위험의 평균보다 낮은 위험 달성 가능. 핵심은 상관계수 ρ. ρ < 1이면 분산효과 발생. 효율적 프론티어 = 위험 대비 최대 수익 곡선.' },
+      { type: 'learn', emoji: '📐', title: '2자산 분산 공식', content: 'σ²_p = w1²σ1² + w2²σ2² + 2·w1·w2·ρ·σ1·σ2. ρ = -1이면 위험 0(완전 헤지) 가능. 현실은 보통 0~+0.7.' },
+      { type: 'calculation', question: 'ρ = +1 (완전 양의 상관)인 두 자산을 섞으면 분산효과는?', options: ['최대', '없음 — 단순 가중평균 위험', '음수 위험', '항상 0'], answer: 1, formula: 'ρ=1이면 σ_p = w1σ1 + w2σ2. 분산효과 0' },
+      { type: 'multiple_choice', question: 'ρ = -1인 두 자산을 적절한 비중으로 섞으면 이론적 위험은?', options: ['항상 0 가능', '최대화', '변동 없음', '의미 없음'], answer: 0, explanation: '완전 음의 상관이면 한쪽 손실을 다른 쪽 이익이 정확히 상쇄. 이론적으로 σ=0 포트폴리오 구성 가능.' },
+      { type: 'multiple_choice', question: '효율적 프론티어 위에 있다는 의미는?', options: ['주어진 위험에서 최대 기대수익 달성', '모든 자산을 100% 보유', '절대 손실 없음', '베타가 1'], answer: 0, explanation: '같은 위험에서 그보다 높은 수익은 불가, 같은 수익에서 그보다 낮은 위험은 불가. 파레토 최적.' },
+      { type: 'multiple_choice', question: '실무에서 단순 분산투자만으로도 위험이 충분히 낮아지지 않는 이유는?', options: ['종목 간 상관관계가 위기 시 1에 가까워지는 경향(상관계수 위기 상승)', '거래수수료', '환율', '세금'], answer: 0, explanation: '평시 ρ=0.3이라도 금융위기 때 ρ→0.9. 분산효과는 평시 측정값이 위기에 무력화될 수 있음.' },
+      { type: 'connect_match', question: '상관계수 의미', pairs: [
+        { term: 'ρ = +1', definition: '완전 동조, 분산효과 없음' },
+        { term: 'ρ = 0', definition: '무상관, 분산효과 있음' },
+        { term: 'ρ = -1', definition: '완전 반대, 위험 0 가능' },
+        { term: '0 < ρ < 1', definition: '부분 분산효과 (현실)' },
+      ]},
+    ]},
+    { day: 2, title: 'CAPM과 베타', xp: 160, items: [
+      { type: 'learn', emoji: '📈', title: 'CAPM 직관', content: '시장위험에 대한 보상만 받는다는 이론. 분산 가능한 개별 위험은 보상 없음. 체계적 위험(베타)만 가격에 반영됨.' },
+      { type: 'learn', emoji: '🎚️', title: '베타 해석', content: 'β = 1: 시장과 동일. β > 1: 시장보다 변동성 큼(공격적). β < 1: 안정적(방어적). β < 0: 시장과 반대(금/일부 헤지자산).' },
+      { type: 'calculation', question: 'Rf=3%, β=1.5, 시장수익률 10%. CAPM 기대수익률은?', options: ['10.5%', '12.0%', '13.5%', '15.0%'], answer: 2, formula: 'Re = 3% + 1.5×(10%-3%) = 3% + 10.5% = 13.5%' },
+      { type: 'calculation', question: '시장이 -8%일 때 β=0.7 종목의 예상수익률 변화는? (Rf=2%)', options: ['약 -5%', '약 -7%', '약 -8%', '약 -11%'], answer: 0, formula: 'Re = 2% + 0.7×(-8%-2%) = 2% - 7% = -5%' },
+      { type: 'multiple_choice', question: '같은 기대수익률에서 β=2 vs β=0.5 종목 중 효율적인 것은?', options: ['β=2 (수익 잠재력)', 'β=0.5 (낮은 위험으로 같은 수익 — 알파 존재 시사)', '동일', '판단불가'], answer: 1, explanation: '낮은 베타로 같은 수익이면 위험조정수익(샤프)가 높음. 실제로 \'저변동성 이상현상\'으로 학계에서 잘 알려진 효과.' },
+      { type: 'multiple_choice', question: '실무에서 CAPM의 가장 큰 한계는?', options: ['β 추정의 시간 안정성 결여 + 단일요인 모델 한계 (FF 3·5요인 등장 배경)', '계산 복잡', '데이터 부족', '국내 미적용'], answer: 0, explanation: '베타가 시기·방법에 따라 크게 변하고, 단일 요인으로 수익을 모두 설명하기 어려워 다요인 모델이 발전.' },
+    ]},
+    { day: 3, title: '샤프비율 / 정보비율 / 알파', xp: 160, items: [
+      { type: 'learn', emoji: '📏', title: '샤프비율', content: 'Sharpe = (Rp - Rf) / σp. 위험 1단위당 초과수익. 같은 수익이면 위험 낮을수록, 같은 위험이면 수익 높을수록 우수. 1.0 이상이면 양호, 2.0 이상이면 우수.' },
+      { type: 'learn', emoji: '🎯', title: '알파와 정보비율', content: '알파(α) = 벤치마크 대비 초과수익. 정보비율(IR) = α / 추적오차(TE). IR 0.5 이상이면 능숙한 액티브 매니저로 평가.' },
+      { type: 'calculation', question: '포트폴리오 수익 12%, Rf 3%, σ 15%. 샤프비율은?', options: ['0.4', '0.6', '0.8', '1.0'], answer: 1, formula: '(12-3)/15 = 9/15 = 0.6' },
+      { type: 'calculation', question: 'A: 수익 15%, σ 20%. B: 수익 10%, σ 8%. Rf=2%. 샤프 비교는?', options: ['A 우월', 'B 우월', '동일', '판단불가'], answer: 1, formula: 'A: (15-2)/20=0.65. B: (10-2)/8=1.0. B의 위험조정수익이 우수' },
+      { type: 'multiple_choice', question: '두 펀드가 같은 알파(α=2%)이지만 추적오차(TE)가 5% vs 10%면 더 우수한 펀드는?', options: ['TE 5% (정보비율 0.4)', 'TE 10% (정보비율 0.2)', '동일', '판단불가'], answer: 0, explanation: 'IR이 높을수록 일관성 있는 알파 창출. 운에 가까운 알파보다 실력에 가깝다는 신호.' },
+      { type: 'multiple_choice', question: '높은 알파가 운인지 실력인지 판단할 가장 합리적 방법은?', options: ['IR과 알파의 통계적 유의성(t-stat) + 충분한 기간', '한 분기 수익', '뉴스 평판', '운용역 학력'], answer: 0, explanation: '단기 알파는 운 가능. 장기간(5년+) 일관된 IR이 실력의 증거.' },
+      { type: 'multiple_choice', question: '\'시장보다 높은 수익\'을 봤을 때 가장 먼저 확인할 것은?', options: ['위험조정 수익(샤프) — 더 큰 위험으로 더 큰 수익을 낸 것일 수 있음', '단순 수익률', '운용역 SNS', '자산 규모'], answer: 0, explanation: '레버리지·고베타로 만든 \'알파\'는 진짜 알파가 아닙니다. 위험조정이 본질.' },
+    ]},
+    { day: 4, title: '옵션 기초와 헤징', xp: 160, items: [
+      { type: 'learn', emoji: '📞', title: '콜과 풋', content: '콜옵션(Call): 살 권리. 주가 ↑ 수익. 풋옵션(Put): 팔 권리. 주가 ↓ 수익. 옵션 매수자는 손실 한정(프리미엄), 매도자는 손실 무한(콜 매도) 가능.' },
+      { type: 'learn', emoji: '🛡️', title: '대표 헤징 전략', content: 'Protective Put(보호적 풋): 보유 주식 + 풋 매수 → 하방 방어. Covered Call(커버드 콜): 보유 주식 + 콜 매도 → 횡보장 수익. Collar: 풋 매수 + 콜 매도 동시.' },
+      { type: 'calculation', question: '행사가 50,000원 콜 매수(프리미엄 2,000원). 만기 주가 55,000원. 손익은?', options: ['+3,000원', '+5,000원', '-2,000원', '+7,000원'], answer: 0, formula: 'Payoff = max(55000-50000, 0) - 2000 = 5000-2000 = +3,000원' },
+      { type: 'calculation', question: '풋 매수(행사가 50,000, 프리미엄 1,500). 만기 주가 47,000원. 손익은?', options: ['-1,500원', '+1,500원', '+3,000원', '+4,500원'], answer: 1, formula: 'Payoff = max(50000-47000, 0) - 1500 = 3000-1500 = +1,500원' },
+      { type: 'multiple_choice', question: '주식 1,000주 보유. 단기 변동성 우려로 하방을 막고 싶다면 가장 적합한 전략은?', options: ['보호적 풋(Protective Put) 매수', '콜 매도 단독', '주식 추가 매수', '레버리지 ETF'], answer: 0, explanation: '보유 + 풋매수 = 보험 가입 효과. 프리미엄이 비용이지만 큰 하락 보호.' },
+      { type: 'multiple_choice', question: '커버드 콜(보유 + 콜 매도)이 가장 효과적인 시장 환경은?', options: ['급등장', '횡보·완만한 상승장', '급락장', '고변동성'], answer: 1, explanation: '횡보장에서는 매도한 콜이 행사되지 않아 프리미엄 수익만 누적. 급등 시 수익 상한 제한이 단점.' },
+      { type: 'multiple_choice', question: '옵션 매도(특히 nakeded 콜)의 가장 큰 위험은?', options: ['이론적으로 무한 손실', '프리미엄 수익이 적음', '거래 불가', '세금'], answer: 0, explanation: '주가는 무한 상승 가능 → 콜 매도자의 손실도 무한. 반드시 보유주식이나 다른 옵션으로 헷지 필요.' },
+    ]},
+    { day: 5, title: '종합 시뮬레이션 — 의사결정', xp: 280, items: [
+      { type: 'learn', emoji: '🧩', title: '의사결정 프레임', content: '①현재 시장 환경 진단(금리/인플레/경기) → ②자산배분 비중 결정 → ③섹터 로테이션 → ④종목 선정(밸류에이션/품질) → ⑤리스크 한도 설정 → ⑥리밸런싱 규칙.' },
+      { type: 'multiple_choice', question: '시나리오 1: Fed 금리 인상 임박, CPI 4%, 실업률 3.5%, PMI 52. 가장 적합한 자산배분은?', options: ['장기채 비중 확대', '단기채/현금 비중 확대 + 가격전가력 강한 주식 유지', '레버리지 매수', '신흥국 비중 확대'], answer: 1, explanation: '금리 상승 환경 = 듀레이션 리스크 회피. 주식은 인플레 방어력 있는 우량 기업 위주.' },
+      { type: 'multiple_choice', question: '시나리오 2: 인플레 5% + GDP -1% + 실업률 상승 (스태그플레이션). 가장 위험한 포지션은?', options: ['실물자산 + 가격전가력 우량주', '장기 명목채 + 무이익 성장주', '에너지/원자재', '필수소비재'], answer: 1, explanation: '스태그플레이션은 1970년대 패턴: 명목채와 성장주 동시 폭락. 실물자산과 가격전가 기업이 살아남음.' },
+      { type: 'multiple_choice', question: '시나리오 3: 신생 포트폴리오 매니저 — IR 0.8, α 6%, 5년 트랙. 평가는?', options: ['일관된 알파, 능숙한 매니저로 평가 가능 (운 vs 실력 검증 충분)', '운에 불과', '판단 불가', '평범'], answer: 0, explanation: 'IR 0.5 이상 + 5년 일관된 트랙 = 학계에서 \'실력\' 인정 기준. 다만 향후 지속성은 별개.' },
+      { type: 'calculation', question: 'A주식 60%(σ 20%), B채권 40%(σ 5%), ρ=0. 포트폴리오 σ는?', options: ['10%', '약 12.2%', '15%', '17%'], answer: 1, formula: 'σ²_p = 0.6²×20² + 0.4²×5² + 0 = 144 + 4 = 148. σ_p ≈ √148 ≈ 12.2%' },
+      { type: 'calculation', question: '동일 포트폴리오의 기대수익이 8%, Rf 2%. 샤프비율은?', options: ['약 0.30', '약 0.49', '약 0.60', '약 0.80'], answer: 1, formula: '(8-2)/12.2 ≈ 0.49' },
+      { type: 'multiple_choice', question: '12주 커리큘럼 종합 — 장기적으로 가장 중요한 단 하나의 원칙은?', options: ['단타 빈도 극대화', '명확한 투자 프로세스 + 위험 관리 + 일관된 실행', '레버리지 활용', '인플루언서 추종'], answer: 1, explanation: '워런 버핏, 레이 달리오 모두 공통: 프로세스·원칙·일관성. 단일 거래의 결과보다 의사결정 품질이 장기 성과를 결정.' },
+      { type: 'connect_match', question: '12주 핵심 정리', pairs: [
+        { term: 'DCF', definition: '미래 현금흐름의 현재가치 합' },
+        { term: 'WACC', definition: '가중평균 자본조달비용' },
+        { term: '효율적 프론티어', definition: '위험 대비 최대 수익 곡선' },
+        { term: '샤프비율', definition: '위험 1단위당 초과수익' },
+      ]},
+    ]},
+  ],
+};
+
 // ── 전체 커리큘럼 배열 ───────────────────────────
 
 export const CURRICULUM: CurriculumWeek[] = [
   week1, week2, week3, week4,
   week5, week6, week7, week8,
+  week9, week10, week11, week12,
 ];
 
 // ── 통계 ─────────────────────────────────────────

@@ -2,7 +2,7 @@
  * 관리자 거래 로그 화면 — 필터 + 요약 + 전체 목록
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -16,10 +16,11 @@ import { Text } from '../../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { collection, query, onSnapshot } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { Colors } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
 import StockLogo from '../../components/StockLogo';
-import { getAllUserProfiles } from '../../lib/firestoreService';
 import { STOCKS } from '../../store/appStore';
 
 type TradeType = 'all' | 'buy' | 'sell';
@@ -56,37 +57,43 @@ export default function AdminTradeLogScreen() {
   const [typeFilter, setTypeFilter] = useState<TradeType>('all');
   const [search, setSearch] = useState('');
 
-  const loadTrades = useCallback(async () => {
-    try {
-      const users = await getAllUserProfiles();
-      const allTrades: EnrichedTrade[] = users.flatMap((u: any) =>
-        (u.transactions ?? []).map((t: any, idx: number) => {
-          const ts = typeof t.createdAt === 'string'
-            ? new Date(t.createdAt).getTime()
-            : (t.createdAt ?? Date.now());
-          return {
-            id: `${u.uid}-${ts}-${idx}`,
-            uid: u.uid,
-            userName: u.name ?? (u as any).displayName ?? '알 수 없음',
-            ticker: t.ticker,
-            type: t.type as 'buy' | 'sell',
-            price: t.price ?? 0,
-            qty: t.quantity ?? t.qty ?? 0,
-            timestamp: ts,
-            reason: t.reason ?? '미입력',
-          };
-        })
-      );
-      allTrades.sort((a, b) => b.timestamp - a.timestamp);
-      setTrades(allTrades);
-    } catch {
-      setTrades([]);
-    } finally {
-      setLoading(false);
-    }
+  // ── 실시간 구독: users 컬렉션 변경 시 거래 로그 자동 갱신 ──
+  useEffect(() => {
+    const q = query(collection(db, 'users'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const users = snapshot.docs.map(d => ({ uid: d.id, ...(d.data() as any) }));
+        const allTrades: EnrichedTrade[] = users.flatMap((u: any) =>
+          (u.transactions ?? []).map((t: any, idx: number) => {
+            const ts = typeof t.createdAt === 'string'
+              ? new Date(t.createdAt).getTime()
+              : (t.createdAt ?? Date.now());
+            return {
+              id: `${u.uid}-${ts}-${idx}`,
+              uid: u.uid,
+              userName: u.name ?? u.displayName ?? '알 수 없음',
+              ticker: t.ticker,
+              type: t.type as 'buy' | 'sell',
+              price: t.price ?? 0,
+              qty: t.quantity ?? t.qty ?? 0,
+              timestamp: ts,
+              reason: t.reason ?? '미입력',
+            };
+          })
+        );
+        allTrades.sort((a, b) => b.timestamp - a.timestamp);
+        setTrades(allTrades);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('거래 로그 구독 오류:', error);
+        setTrades([]);
+        setLoading(false);
+      },
+    );
+    return () => unsubscribe();
   }, []);
-
-  useEffect(() => { loadTrades(); }, []);
 
   // ── 필터 적용 ─────────────────────────────────
   const filtered = useMemo(() => {

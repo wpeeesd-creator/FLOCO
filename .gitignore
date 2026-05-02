@@ -18,3 +18,5 @@ dist/
 
 functions/node_modules/
 ..bfg-report/
+
+functions/lib/

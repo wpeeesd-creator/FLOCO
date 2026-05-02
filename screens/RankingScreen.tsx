@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { collection, query, where, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
@@ -69,14 +69,14 @@ export default function RankingScreen() {
 
     const q = query(
       collection(db, 'users'),
-      where('role', '==', 'user'),
       limit(100),
     );
 
     const unsubscribe = onSnapshot(q,
       (snapshot) => {
+        // backend rankingTracker.ts와 동일 기준: admin만 제외
         const users = snapshot.docs
-          .filter(d => d.data()?.role === 'user')
+          .filter(d => d.data()?.role !== 'admin')
           .map(d => ({ uid: d.id, data: d.data() }));
         setRawUsers(users);
         setIsLoading(false);
