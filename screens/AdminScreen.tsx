@@ -3,6 +3,7 @@ import { View, TouchableOpacity, ScrollView, Alert, FlatList, TextInput, Platfor
 import { Text } from '../components/ui/Text';
 import { collection, getDocs, updateDoc, doc, query, orderBy, where } from 'firebase/firestore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { db } from '../lib/firebase';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +24,7 @@ export default function AdminScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { logout } = useAuth();
+  const navigation = useNavigation<any>();
   const [tab, setTab] = useState<TabType>('users');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [trades, setTrades] = useState<any[]>([]);
@@ -152,6 +154,15 @@ export default function AdminScreen() {
             <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>전체 초기화</Text>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('관리자종합')}
+          style={{ marginTop: 12, backgroundColor: theme.primary, borderRadius: 12, paddingVertical: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View>
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>📊 종합 대시보드</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 }}>사용자·거래·학습·자산·커뮤니티 실시간 통계</Text>
+          </View>
+          <Text style={{ color: '#fff', fontSize: 22, fontWeight: 'bold' }}>›</Text>
+        </TouchableOpacity>
         <View style={{ flexDirection: 'row', marginTop: 12, gap: 8 }}>
           {(['users', 'trades', 'control'] as TabType[]).map(t => (
             <TouchableOpacity key={t} onPress={() => setTab(t)}

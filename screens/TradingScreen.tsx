@@ -15,6 +15,7 @@ import { useAppStore, STOCKS } from '../store/appStore';
 import { Colors, Typography, Button, Card, Toast } from '../components/ui';
 import { validateTradeQty } from '../lib/errorHandler';
 import { useTheme } from '../context/ThemeContext';
+import { validateReason, getReasonStatus } from '../utils/reasonValidator';
 
 export default function TradingScreen() {
   const navigation = useNavigation<any>();
@@ -78,12 +79,13 @@ export default function TradingScreen() {
       return;
     }
 
-    const trimmedReason = reasonStr.trim();
-    if (trimmedReason.length === 0) {
-      showToast('거래 이유를 입력해주세요', 'error');
+    const reasonResult = validateReason(reasonStr);
+    if (!reasonResult.valid) {
+      Alert.alert('이유 입력 확인', reasonResult.message);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
+    const trimmedReason = reasonStr.trim();
 
     const result = await (tradeType === 'buy'
       ? buyStock(ticker, qty, stock.price, trimmedReason)
@@ -196,7 +198,17 @@ export default function TradingScreen() {
             maxLength={200}
             textAlignVertical="top"
           />
-          <Text style={styles.reasonCounter}>{reasonStr.length}/200</Text>
+          {(() => {
+            const status = getReasonStatus(reasonStr);
+            return (
+              <View style={styles.reasonStatusRow}>
+                <Text style={{ fontSize: 13, color: status.color, flex: 1 }}>
+                  {status.text}
+                </Text>
+                <Text style={styles.reasonCounter}>{reasonStr.length}/200</Text>
+              </View>
+            );
+          })()}
         </Card>
 
         {/* ── Order Summary ────────────────────── */}
@@ -399,8 +411,13 @@ const styles = StyleSheet.create({
   reasonCounter: {
     fontSize: 11,
     color: Colors.textSub,
-    marginTop: 6,
     textAlign: 'right',
+  },
+  reasonStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 8,
   },
 
   // Summary

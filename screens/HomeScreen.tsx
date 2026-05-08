@@ -722,6 +722,11 @@ export default function HomeScreen() {
       color: theme.textSecondary,
       marginTop: 2,
     },
+    holdingAvg: {
+      fontSize: 11,
+      color: theme.textTertiary,
+      marginTop: 1,
+    },
     holdingAmts: {
       alignItems: 'flex-end',
     },
@@ -1305,6 +1310,11 @@ export default function HomeScreen() {
                       <View style={styles.holdingMeta}>
                         <Text style={styles.holdingName}>{h.stock.name}</Text>
                         <Text style={styles.holdingQty}>{h.qty.toLocaleString()}주</Text>
+                        {(h.avgPrice ?? 0) > 0 && (
+                          <Text style={styles.holdingAvg}>
+                            평균 ₩{Math.round(h.avgPrice).toLocaleString()}
+                          </Text>
+                        )}
                       </View>
                       <View style={styles.holdingAmts}>
                         <Text style={styles.holdingEval}>

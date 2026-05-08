@@ -3,6 +3,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import AdminScreen from '../screens/AdminScreen';
+import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+import AdminUserTradesScreen from '../screens/admin/AdminUserTradesScreen';
+import AdminUserDetailScreen from '../screens/admin/AdminUserDetailScreen';
 import AdminStatsScreen from '../screens/admin/AdminStatsScreen';
 import AdminTradeLogScreen from '../screens/admin/AdminTradeLogScreen';
 import AdminReportScreen from '../screens/admin/AdminReportScreen';
@@ -10,23 +13,21 @@ import AdminLearningStatsScreen from '../screens/admin/AdminLearningStatsScreen'
 import AdminPopularStocksScreen from '../screens/admin/AdminPopularStocksScreen';
 import AdminEventScreen from '../screens/admin/AdminEventScreen';
 import RankingScreen from '../screens/RankingScreen';
-import ProfileScreen from '../screens/ProfileScreen';
-import SurveyScreen from '../screens/SurveyScreen';
-import SurveyResultScreen from '../screens/SurveyResultScreen';
 
 export type AdminTabParamList = {
   대시보드Tab: undefined;
-  랭킹관리Tab: undefined;
-  MYTab: undefined;
+  랭킹Tab: undefined;
+  거래내역Tab: undefined;
 };
 
 const Tab = createBottomTabNavigator<AdminTabParamList>();
 const DashboardStack = createNativeStackNavigator();
-const ProfileStack = createNativeStackNavigator();
+const TradesStack = createNativeStackNavigator();
 
 function DashboardNavigator() {
   return (
     <DashboardStack.Navigator id="AdminDashboardStack" screenOptions={{ headerShown: false }}>
+      <DashboardStack.Screen name="관리자종합" component={AdminDashboardScreen} />
       <DashboardStack.Screen name="대시보드메인" component={AdminScreen} />
       <DashboardStack.Screen name="관리자통계" component={AdminStatsScreen} />
       <DashboardStack.Screen name="거래로그" component={AdminTradeLogScreen} />
@@ -38,13 +39,12 @@ function DashboardNavigator() {
   );
 }
 
-function AdminProfileNavigator() {
+function TradesNavigator() {
   return (
-    <ProfileStack.Navigator id="AdminProfileStack" screenOptions={{ headerShown: false }}>
-      <ProfileStack.Screen name="프로필메인" component={ProfileScreen} />
-      <ProfileStack.Screen name="투자유형설문" component={SurveyScreen} />
-      <ProfileStack.Screen name="투자유형결과" component={SurveyResultScreen} />
-    </ProfileStack.Navigator>
+    <TradesStack.Navigator id="AdminTradesStack" screenOptions={{ headerShown: false }}>
+      <TradesStack.Screen name="사용자거래목록" component={AdminUserTradesScreen} />
+      <TradesStack.Screen name="사용자거래상세" component={AdminUserDetailScreen} />
+    </TradesStack.Navigator>
   );
 }
 
@@ -78,7 +78,7 @@ export default function AdminTabs() {
         }}
       />
       <Tab.Screen
-        name="랭킹관리Tab"
+        name="랭킹Tab"
         component={RankingScreen}
         options={{
           tabBarLabel: '랭킹',
@@ -88,12 +88,12 @@ export default function AdminTabs() {
         }}
       />
       <Tab.Screen
-        name="MYTab"
-        component={AdminProfileNavigator}
+        name="거래내역Tab"
+        component={TradesNavigator}
         options={{
-          tabBarLabel: 'MY',
+          tabBarLabel: '거래내역',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+            <Ionicons name="receipt-outline" size={size} color={color} />
           ),
         }}
       />

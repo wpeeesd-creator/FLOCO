@@ -31,6 +31,9 @@ import { BADGE_DEFINITIONS } from './BadgeScreen';
 import { fetchMultiplePrices, getExchangeRate } from '../utils/priceService';
 import { registerPushToken, removePushToken } from '../utils/pushToken';
 
+// 빌드 11에서 true로 변경 (Blaze 가입 + Cloud Functions 배포 후 재활성화)
+const PUSH_ENABLED = false;
+
 // Inline type — do NOT import from lib/investmentAnalysis
 interface InvestmentType {
   emoji: string;
@@ -628,18 +631,22 @@ export default function ProfileScreen() {
 
         {/* ── 설정 메뉴 ────────────────────────────────── */}
         <View style={[styles.card, styles.menuCard]}>
-          {/* 알림 설정 */}
-          <View style={styles.menuRow}>
-            <Ionicons name="notifications-outline" size={20} color={theme.text} style={styles.menuIcon} />
-            <Text style={styles.menuLabel}>알림 설정</Text>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={handleToggleNotifications}
-              trackColor={{ false: theme.border, true: theme.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-          <View style={styles.menuDivider} />
+          {/* 알림 설정 — PUSH_ENABLED=false 동안 숨김 (빌드 11에서 재활성화) */}
+          {PUSH_ENABLED && (
+            <>
+              <View style={styles.menuRow}>
+                <Ionicons name="notifications-outline" size={20} color={theme.text} style={styles.menuIcon} />
+                <Text style={styles.menuLabel}>알림 설정</Text>
+                <Switch
+                  value={notificationsEnabled}
+                  onValueChange={handleToggleNotifications}
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+              <View style={styles.menuDivider} />
+            </>
+          )}
 
           {/* 학교/기수 설정 */}
           <TouchableOpacity

@@ -42,6 +42,7 @@ import {
 } from '../utils/priceService';
 import { saveNotif } from '../utils/notificationService';
 import { updateMissionProgress } from '../lib/missionService';
+import { validateReason, getReasonStatus } from '../utils/reasonValidator';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -89,6 +90,25 @@ interface UserData {
 
 type TabName = '차트' | '호가' | '내 주식' | '종목정보';
 
+// 미국 서머타임 (DST): 3월 둘째 일요일 ~ 11월 첫째 일요일
+function isUSDST(): boolean {
+  const now = new Date();
+  const year = now.getFullYear();
+  const dstStart = new Date(year, 2, 1);
+  while (dstStart.getDay() !== 0) dstStart.setDate(dstStart.getDate() + 1);
+  dstStart.setDate(dstStart.getDate() + 7);
+  const dstEnd = new Date(year, 10, 1);
+  while (dstEnd.getDay() !== 0) dstEnd.setDate(dstEnd.getDate() + 1);
+  return now >= dstStart && now < dstEnd;
+}
+
+function getUSMarketHoursKST(): string {
+  // EDT(서머타임): KST 22:30 ~ 05:00 / EST: KST 23:30 ~ 06:00
+  return isUSDST()
+    ? 'NY 09:30~16:00 (KST 22:30~05:00 다음날)'
+    : 'NY 09:30~16:00 (KST 23:30~06:00 다음날)';
+}
+
 // ══════════════════════════════════════════════════
 //  KISChart (캔들 + 라인) — react-native-svg
 // ══════════════════════════════════════════════════
@@ -127,19 +147,24 @@ function KISChart({ data, width, height, type, period, isKR, riseColor, fallColo
     yTicks.push(allLow + (range * i) / 4);
   }
 
-  // X축 라벨 (5개)
+  // X축 라벨 (5개) — 1d는 시간(HH:MM), 그 외는 날짜
   const xStep = Math.max(1, Math.floor(data.length / 4));
   const xTicks: { idx: number; label: string }[] = [];
   for (let i = 0; i < data.length; i += xStep) {
+    const ts = data[i].timestamp;
     const d = data[i].date;
     const dateStr = d.length === 8
       ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
       : d;
-    const dt = new Date(dateStr);
+    const dt = ts ? new Date(ts * 1000) : new Date(dateStr);
     let label: string;
-    if (period === '1d' || period === '5d') label = `${dt.getMonth() + 1}/${dt.getDate()}`;
-    else if (period === '1mo' || period === '3mo') label = `${dt.getMonth() + 1}/${dt.getDate()}`;
-    else label = `${dt.getFullYear()}.${dt.getMonth() + 1}`;
+    if (period === '1d') {
+      label = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+    } else if (period === '5d' || period === '1mo' || period === '3mo') {
+      label = `${dt.getMonth() + 1}/${dt.getDate()}`;
+    } else {
+      label = `${dt.getFullYear()}.${dt.getMonth() + 1}`;
+    }
     xTicks.push({ idx: i, label });
   }
 
@@ -548,6 +573,19 @@ export default function StockDetailScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
+          onPress={() => { loadStockData(); loadChartData(); }}
+          disabled={priceLoading || chartLoading}
+          style={{ marginRight: 12 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          {(priceLoading || chartLoading) ? (
+            <ActivityIndicator size="small" color={DS.text} />
+          ) : (
+            <Ionicons name="refresh-outline" size={22} color={DS.text} />
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
           onPress={() => Alert.alert('준비 중', '주가 알림 기능은 다음 업데이트에서 제공될 예정이에요! 🔔')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
@@ -575,6 +613,11 @@ export default function StockDetailScreen() {
                 </Text>
               );
             })()}
+            {!isKR && (
+              <Text style={{ color: DS.textSub, fontSize: 11, marginTop: 2 }}>
+                🇺🇸 {getUSMarketHoursKST()}
+              </Text>
+            )}
           </>
         ) : null}
       </View>
@@ -1521,12 +1564,13 @@ function TradeSheet({
       }
     }
 
-    // 거래 이유 필수
-    const trimmedReason = reason.trim();
-    if (trimmedReason.length === 0) {
-      Alert.alert('알림', '거래 이유를 입력해주세요');
+    // 거래 이유 필수 (의미 있는 입력 검증)
+    const reasonResult = validateReason(reason);
+    if (!reasonResult.valid) {
+      Alert.alert('이유 입력 확인', reasonResult.message);
       return;
     }
+    const trimmedReason = reason.trim();
 
     try {
       setIsLoading(true);
@@ -1711,9 +1755,19 @@ function TradeSheet({
                     color: DS.text,
                   }}
                 />
-                <Text style={{ color: DS.textDim, fontSize: 11, textAlign: 'right', marginTop: 4 }}>
-                  {reason.length}/200
-                </Text>
+                {(() => {
+                  const status = getReasonStatus(reason);
+                  return (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
+                      <Text style={{ fontSize: 13, color: status.color, flex: 1 }}>
+                        {status.text}
+                      </Text>
+                      <Text style={{ color: DS.textDim, fontSize: 11, textAlign: 'right' }}>
+                        {reason.length}/200
+                      </Text>
+                    </View>
+                  );
+                })()}
               </View>
 
               {/* 주문 요약 */}
