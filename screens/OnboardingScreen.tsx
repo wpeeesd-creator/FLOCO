@@ -78,7 +78,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
     onComplete();
   };
 
-  const currentColor = slides[currentIndex]?.color ?? '#0066FF';
+  const currentColor = slides[currentIndex]?.color ?? '#3478F6';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

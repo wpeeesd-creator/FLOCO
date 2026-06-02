@@ -26,6 +26,7 @@ export interface PriceData {
   pbr: string;
   marketState: string;
   isKR: boolean;
+  dividendYield?: number;
 }
 
 export interface CandleData {
@@ -53,7 +54,7 @@ const YAHOO_HEADERS_V8 = {
   Accept: '*/*',
 };
 
-const QUOTE_FIELDS = 'regularMarketPrice,regularMarketChangePercent,regularMarketChange,regularMarketOpen,regularMarketDayHigh,regularMarketDayLow,regularMarketVolume,regularMarketPreviousClose,fiftyTwoWeekHigh,fiftyTwoWeekLow,trailingPE,priceToBook,marketState';
+const QUOTE_FIELDS = 'regularMarketPrice,regularMarketChangePercent,regularMarketChange,regularMarketOpen,regularMarketDayHigh,regularMarketDayLow,regularMarketVolume,regularMarketPreviousClose,fiftyTwoWeekHigh,fiftyTwoWeekLow,trailingPE,priceToBook,marketState,trailingAnnualDividendYield';
 
 const toPriceData = (item: any, isKR: boolean): PriceData => {
   const v7Price = item.regularMarketPrice ?? 0;
@@ -84,8 +85,155 @@ const toPriceData = (item: any, isKR: boolean): PriceData => {
   pbr: item.priceToBook?.toFixed(1) ?? '-',
   marketState: item.marketState ?? 'CLOSED',
   isKR,
+  dividendYield: typeof item.trailingAnnualDividendYield === 'number'
+    ? parseFloat((item.trailingAnnualDividendYield * 100).toFixed(2))
+    : undefined,
   };
 };
+
+// ══════════════════════════════════════════════════
+//  업비트 가격 (KRW마켓, 인증 불필요)
+// ══════════════════════════════════════════════════
+
+async function fetchUpbitPrices(tickers: string[]): Promise<Record<string, PriceData>> {
+  if (tickers.length === 0) return {};
+  const markets = tickers.map(t => `KRW-${t}`).join(',');
+  try {
+    const res = await fetch(`https://api.upbit.com/v1/ticker?markets=${markets}`);
+    if (!res.ok) throw new Error(`Upbit HTTP ${res.status}`);
+    const data: any[] = await res.json();
+    const map: Record<string, PriceData> = {};
+    for (const item of data) {
+      const ticker = String(item.market ?? '').replace(/^KRW-/, '');
+      if (!ticker) continue;
+      map[ticker] = {
+        price: item.trade_price ?? 0,
+        change: parseFloat(((item.signed_change_rate ?? 0) * 100).toFixed(2)),
+        changeAmount: item.signed_change_price ?? 0,
+        open: item.opening_price ?? 0,
+        high: item.high_price ?? 0,
+        low: item.low_price ?? 0,
+        previousClose: item.prev_closing_price ?? 0,
+        volume: item.acc_trade_volume_24h ?? 0,
+        week52High: item.highest_52_week_price ?? 0,
+        week52Low: item.lowest_52_week_price ?? 0,
+        per: '-',
+        pbr: '-',
+        marketState: 'REGULAR',
+        isKR: true,
+      };
+    }
+    console.log(`✅ 업비트 가격: ${Object.keys(map).length}개`);
+    return map;
+  } catch (e) {
+    console.warn('업비트 가격 실패:', e);
+    return {};
+  }
+}
+
+// 업비트 캔들 (코인 차트). ChartPeriod 별 endpoint + count 매핑.
+// 업비트는 최신순 반환 → 오래된→최신 순으로 reverse.
+export async function fetchUpbitCandles(
+  ticker: string,
+  period: ChartPeriod,
+): Promise<CandleData[]> {
+  const market = `KRW-${ticker}`;
+  const map: Record<ChartPeriod, { path: string; count: number }> = {
+    '1d':  { path: 'minutes/30', count: 48 },
+    '5d':  { path: 'minutes/240', count: 30 },
+    '1mo': { path: 'days',  count: 30 },
+    '3mo': { path: 'days',  count: 90 },
+    '1y':  { path: 'weeks', count: 52 },
+    '5y':  { path: 'months', count: 60 },
+  };
+  const { path, count } = map[period];
+  try {
+    const res = await fetch(`https://api.upbit.com/v1/candles/${path}?market=${market}&count=${count}`);
+    if (!res.ok) throw new Error(`Upbit 캔들 HTTP ${res.status}`);
+    const data: any[] = await res.json();
+    return data
+      .map(item => ({
+        date: String(item.candle_date_time_kst ?? ''),
+        timestamp: Math.floor((item.timestamp ?? 0) / 1000),
+        open: item.opening_price ?? 0,
+        high: item.high_price ?? 0,
+        low: item.low_price ?? 0,
+        close: item.trade_price ?? 0,
+        volume: item.candle_acc_trade_volume ?? 0,
+      }))
+      .filter(d => d.close > 0)
+      .reverse();
+  } catch (e) {
+    console.warn('업비트 캔들 실패:', e);
+    return [];
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  Yahoo 인덱스 가격 (^KS11, ^GSPC, KRW=X 등 — .KS suffix 없이 원본 그대로)
+// ══════════════════════════════════════════════════
+
+async function fetchYahooIndex(tickers: string[]): Promise<Record<string, PriceData>> {
+  if (tickers.length === 0) return {};
+  const symbols = tickers.join(',');
+  try {
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}&fields=${QUOTE_FIELDS}`,
+      { headers: YAHOO_HEADERS_V7 },
+    );
+    const data = await res.json();
+    const results = data.quoteResponse?.result ?? [];
+    if (results.length > 0) {
+      const map: Record<string, PriceData> = {};
+      for (const item of results) {
+        map[item.symbol] = toPriceData(item, false);
+      }
+      console.log(`✅ 인덱스 가격: ${Object.keys(map).length}개`);
+      return map;
+    }
+  } catch (e) {
+    console.warn('[priceService] fetchYahooIndex v7 실패, v8 fallback');
+  }
+  // v8 fallback (각 ticker 개별 호출)
+  const map: Record<string, PriceData> = {};
+  await Promise.allSettled(
+    tickers.map(async (ticker) => {
+      try {
+        const enc = encodeURIComponent(ticker);
+        const res = await fetch(
+          `https://query2.finance.yahoo.com/v8/finance/chart/${enc}?interval=1d&range=2d`,
+          { headers: YAHOO_HEADERS_V8 },
+        );
+        const data = await res.json();
+        const result = data.chart?.result?.[0];
+        const meta = result?.meta;
+        if (!meta?.regularMarketPrice) return;
+        const price = meta.regularMarketPrice;
+        const closes = result?.indicators?.quote?.[0]?.close ?? [];
+        let prev = meta.chartPreviousClose ?? meta.previousClose ?? price;
+        if (closes.length >= 2 && closes[0] != null) prev = closes[0];
+        const change = prev > 0 ? parseFloat(((price - prev) / prev * 100).toFixed(2)) : 0;
+        map[ticker] = {
+          price,
+          change,
+          changeAmount: parseFloat((price - prev).toFixed(2)),
+          open: meta.regularMarketOpen ?? prev,
+          high: meta.regularMarketDayHigh ?? price,
+          low: meta.regularMarketDayLow ?? price,
+          previousClose: prev,
+          volume: meta.regularMarketVolume ?? 0,
+          week52High: meta.fiftyTwoWeekHigh ?? 0,
+          week52Low: meta.fiftyTwoWeekLow ?? 0,
+          per: '-',
+          pbr: '-',
+          marketState: meta.marketState ?? 'CLOSED',
+          isKR: false,
+        };
+      } catch {}
+    }),
+  );
+  return map;
+}
 
 // ══════════════════════════════════════════════════
 //  단일 종목 가격 (v7 → v8 fallback)
@@ -94,7 +242,12 @@ const toPriceData = (item: any, isKR: boolean): PriceData => {
 export const fetchSinglePrice = async (
   ticker: string,
   isKR: boolean,
+  type?: 'stock' | 'etf' | 'crypto' | 'index',
 ): Promise<PriceData | null> => {
+  if (type === 'crypto') {
+    const result = await fetchUpbitPrices([ticker]);
+    return result[ticker] ?? null;
+  }
   const yahooTicker = isKR ? `${ticker}.KS` : ticker;
 
   // v7 시도
@@ -190,46 +343,65 @@ export const getExchangeRate = async (): Promise<number> => {
 // ══════════════════════════════════════════════════
 
 export const fetchMultiplePrices = async (
-  stocks: Array<{ ticker: string; isKR: boolean }>,
+  stocks: Array<{ ticker: string; isKR: boolean; type?: 'stock' | 'etf' | 'crypto' | 'index' }>,
 ): Promise<Record<string, PriceData>> => {
   if (stocks.length === 0) return {};
 
-  const yahooTickers = stocks
-    .map(s => s.isKR ? `${s.ticker}.KS` : s.ticker)
-    .join(',');
+  const cryptoStocks = stocks.filter(s => s.type === 'crypto');
+  const indexStocks = stocks.filter(s => s.type === 'index');
+  const nonCryptoStocks = stocks.filter(s => s.type !== 'crypto' && s.type !== 'index');
 
-  try {
-    const res = await fetch(
-      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${yahooTickers}&fields=${QUOTE_FIELDS}`,
-      { headers: YAHOO_HEADERS_V7 },
-    );
-    const data = await res.json();
-    const results = data.quoteResponse?.result ?? [];
+  const cryptoPromise = cryptoStocks.length > 0
+    ? fetchUpbitPrices(cryptoStocks.map(s => s.ticker))
+    : Promise.resolve<Record<string, PriceData>>({});
 
-    if (results.length > 0) {
-      const map: Record<string, PriceData> = {};
-      results.forEach((item: any) => {
-        const t = item.symbol.replace('.KS', '');
-        const kr = item.symbol.endsWith('.KS');
-        map[t] = toPriceData(item, kr);
-      });
-      console.log(`✅ 다중 가격: ${Object.keys(map).length}개`);
-      return map;
+  const indexPromise = indexStocks.length > 0
+    ? fetchYahooIndex(indexStocks.map(s => s.ticker))
+    : Promise.resolve<Record<string, PriceData>>({});
+
+  const stockPromise = (async (): Promise<Record<string, PriceData>> => {
+    if (nonCryptoStocks.length === 0) return {};
+
+    const yahooTickers = nonCryptoStocks
+      .map(s => s.isKR ? `${s.ticker}.KS` : s.ticker)
+      .join(',');
+
+    try {
+      const res = await fetch(
+        `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${yahooTickers}&fields=${QUOTE_FIELDS}`,
+        { headers: YAHOO_HEADERS_V7 },
+      );
+      const data = await res.json();
+      const results = data.quoteResponse?.result ?? [];
+
+      if (results.length > 0) {
+        const map: Record<string, PriceData> = {};
+        results.forEach((item: any) => {
+          const t = item.symbol.replace('.KS', '');
+          const kr = item.symbol.endsWith('.KS');
+          map[t] = toPriceData(item, kr);
+        });
+        console.log(`✅ 다중 가격: ${Object.keys(map).length}개`);
+        return map;
+      }
+    } catch {
+      console.log('v7 다중 실패, 개별 호출');
     }
-  } catch {
-    console.log('v7 다중 실패, 개별 호출');
-  }
 
-  // 개별 fallback
-  const map: Record<string, PriceData> = {};
-  await Promise.allSettled(
-    stocks.map(async ({ ticker, isKR }) => {
-      const d = await fetchSinglePrice(ticker, isKR);
-      if (d) map[ticker] = d;
-    }),
-  );
-  console.log(`✅ 개별 가격: ${Object.keys(map).length}개`);
-  return map;
+    // 개별 fallback
+    const map: Record<string, PriceData> = {};
+    await Promise.allSettled(
+      nonCryptoStocks.map(async ({ ticker, isKR }) => {
+        const d = await fetchSinglePrice(ticker, isKR);
+        if (d) map[ticker] = d;
+      }),
+    );
+    console.log(`✅ 개별 가격: ${Object.keys(map).length}개`);
+    return map;
+  })();
+
+  const [stockMap, cryptoMap, indexMap] = await Promise.all([stockPromise, cryptoPromise, indexPromise]);
+  return { ...stockMap, ...cryptoMap, ...indexMap };
 };
 
 // ══════════════════════════════════════════════════

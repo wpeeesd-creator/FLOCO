@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text } from 'react-native';
+import { Image } from 'expo-image';
 
 const STOCK_LOGOS: Record<string, { bg: string; text: string; label: string }> = {
   // 국내
@@ -72,6 +73,27 @@ interface StockLogoProps {
 }
 
 export default function StockLogo({ ticker, size = 44 }: StockLogoProps) {
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
+
+  const isUS = /^[A-Z]+$/.test(ticker);
+  const isKR = /^\d{6}$/.test(ticker);
+  const url = (isUS || isKR)
+    ? `https://static.toss.im/png-icons/securities/icn-sec-fill-${ticker}.png`
+    : null;
+
+  if (url && !imageLoadFailed) {
+    return (
+      <Image
+        source={url}
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+        contentFit="cover"
+        transition={150}
+        cachePolicy="memory-disk"
+        onError={() => setImageLoadFailed(true)}
+      />
+    );
+  }
+
   const logo = STOCK_LOGOS[ticker];
   const bgColor = logo?.bg ?? '#8E8E93';
   const textColor = logo?.text ?? '#FFFFFF';

@@ -3,7 +3,7 @@
  * Yahoo Finance 실시간 가격 + Firestore 포트폴리오/관심종목
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -22,8 +22,10 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useAppStore, STOCKS, type Stock } from '../store/appStore';
 import { Colors } from '../components/ui';
+import StockLogo from '../components/StockLogo';
 import { useTheme } from '../context/ThemeContext';
-import { fetchMultiplePrices } from '../utils/priceService';
+import { fetchMultiplePrices, type PriceData } from '../utils/priceService';
+import { MARKET_INDICES } from '../data/marketIndices';
 
 // ── 타입 ──────────────────────────────────────────
 type InvestTab = '전체' | '보유' | '관심' | '발견';
@@ -36,6 +38,16 @@ const US_STOCKS = STOCKS.filter(s => !s.krw);
 const KR_SECTORS = ['전체', ...Array.from(new Set(KR_STOCKS.map(s => s.sector)))];
 const US_SECTORS = ['전체', ...Array.from(new Set(US_STOCKS.map(s => s.sector)))];
 
+const SECTOR_EMOJI: Record<string, string> = {
+  '반도체': '💾', 'IT': '💻', '바이오': '🧬', '자동차': '🚗', '2차전지': '🔋',
+  '금융': '🏦', '게임': '🎮', '엔터': '🎤', '방산': '🛡️', '화학': '⚗️',
+  '식품': '🍽️', '건설': '🏗️', '유통': '🛒', '에너지': '⚡',
+  '기술': '💻', '헬스케어': '⚕️', '산업재': '🏭', '소비재': '🛍️',
+  '항공우주': '✈️', '부동산': '🏢', '유틸리티': '💡', '식음료': '🍔',
+  'ETF': '📊', '미디어': '🎬', '여행': '🛫', '리츠': '🏘️', '원자재': '🪨',
+  '통신': '📡', '클라우드': '☁️', '핀테크': '💳',
+};
+
 // ══════════════════════════════════════════════════
 //  InvestScreen
 // ══════════════════════════════════════════════════
@@ -46,12 +58,116 @@ export default function InvestScreen() {
   const { holdings, cash } = useAppStore();
 
   const [selectedTab, setSelectedTab] = useState<InvestTab>('전체');
+  const [discoverSubTab, setDiscoverSubTab] = useState<'realtime' | 'trending' | 'investor'>('realtime');
+  const [realtimeSortBy, setRealtimeSortBy] = useState<'value' | 'volume' | 'change'>('value');
+  const [realtimeMarket, setRealtimeMarket] = useState<'all' | 'kr' | 'us'>('all');
+  const [trendingMarket, setTrendingMarket] = useState<'kr' | 'us'>('kr');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMarket, setSelectedMarket] = useState<MarketFilter>('KR');
   const [selectedSector, setSelectedSector] = useState('전체');
   const [prices, setPrices] = useState<Record<string, any>>({});
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [indexPrices, setIndexPrices] = useState<Record<string, PriceData>>({});
+  const exchangeRate = useAppStore(s => s.exchangeRate);
+
+  // 인덱스 30초 폴링
+  useEffect(() => {
+    const fetchIndices = async () => {
+      const stocks = MARKET_INDICES.map(idx => ({
+        ticker: idx.ticker,
+        isKR: idx.isKR,
+        type: 'index' as const,
+      }));
+      const result = await fetchMultiplePrices(stocks);
+      setIndexPrices(result);
+    };
+    fetchIndices();
+    const interval = setInterval(fetchIndices, 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 섹터별 평균 등락률 (시장 분리 + riseCount + sampleTickers)
+  const trendingSectorsByMarket = useMemo(() => {
+    const sectorMap: Record<string, {
+      total: number;
+      count: number;
+      riseCount: number;
+      sampleTickers: string[];
+    }> = {};
+    for (const stock of STOCKS) {
+      if (!stock.sector) continue;
+      if (stock.type === 'crypto' || stock.type === 'index') continue;
+      if (trendingMarket === 'kr' && !stock.krw) continue;
+      if (trendingMarket === 'us' && stock.krw) continue;
+      const pd = prices[stock.ticker];
+      if (!pd) continue;
+      if (!sectorMap[stock.sector]) {
+        sectorMap[stock.sector] = { total: 0, count: 0, riseCount: 0, sampleTickers: [] };
+      }
+      sectorMap[stock.sector].total += pd.change ?? 0;
+      sectorMap[stock.sector].count += 1;
+      if ((pd.change ?? 0) > 0) sectorMap[stock.sector].riseCount += 1;
+      if (sectorMap[stock.sector].sampleTickers.length < 3) {
+        sectorMap[stock.sector].sampleTickers.push(stock.ticker);
+      }
+    }
+    return Object.entries(sectorMap)
+      .filter(([, v]) => v.count >= 3)
+      .map(([sector, { total, count, riseCount, sampleTickers }]) => ({
+        sector,
+        avgChange: total / count,
+        count,
+        riseCount,
+        sampleTickers,
+      }))
+      .sort((a, b) => Math.abs(b.avgChange) - Math.abs(a.avgChange));
+  }, [prices, trendingMarket]);
+
+  // 실시간 차트 TOP 20 (정렬 기준별)
+  const realtimeTop20 = useMemo(() => {
+    const items = STOCKS
+      .filter(s => s.type !== 'crypto' && s.type !== 'index')
+      .filter(s => {
+        if (realtimeMarket === 'kr') return s.krw === true;
+        if (realtimeMarket === 'us') return s.krw === false;
+        return true;
+      })
+      .map(stock => {
+        const pd = prices[stock.ticker];
+        if (!pd || !pd.price) return null;
+        const value = pd.price * (pd.volume ?? 0) * (stock.krw ? 1 : exchangeRate);
+        return {
+          stock,
+          price: pd.price,
+          change: pd.change ?? 0,
+          volume: pd.volume ?? 0,
+          value,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    if (realtimeSortBy === 'value') items.sort((a, b) => b.value - a.value);
+    else if (realtimeSortBy === 'volume') items.sort((a, b) => b.volume - a.volume);
+    else items.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+
+    return items.slice(0, 20);
+  }, [prices, exchangeRate, realtimeSortBy, realtimeMarket]);
+
+  // 거래대금 TOP 5 (KRW 환산)
+  const top5ByValue = useMemo(() => {
+    return STOCKS
+      .filter(s => s.type !== 'crypto' && s.type !== 'index')
+      .map(stock => {
+        const pd = prices[stock.ticker];
+        if (!pd || !pd.price || !pd.volume) return null;
+        const value = pd.price * pd.volume * (stock.krw ? 1 : exchangeRate);
+        return { stock, value, change: pd.change ?? 0, price: pd.price };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [prices, exchangeRate]);
 
   // ── Firestore 사용자 데이터 ─────────────────────
   const [userData, setUserData] = useState<any>(null);
@@ -164,6 +280,51 @@ export default function InvestScreen() {
       <View style={s.header}>
         <Text style={s.headerTitle}>투자</Text>
       </View>
+
+      {/* ── 인덱스 띠 ── */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{
+          backgroundColor: theme.bgCard,
+          borderBottomWidth: 1,
+          borderBottomColor: Colors.border,
+          flexGrow: 0,
+          flexShrink: 0,
+        }}
+        contentContainerStyle={{
+          paddingVertical: 10,
+          paddingHorizontal: 16,
+          gap: 18,
+          alignItems: 'center',
+        }}
+      >
+        {MARKET_INDICES.map(idx => {
+          const data = indexPrices[idx.ticker];
+          if (!data) {
+            return (
+              <View key={idx.ticker} style={{ minWidth: 90 }}>
+                <Text style={{ fontSize: 11, color: Colors.textSub }}>{idx.name}</Text>
+                <Text style={{ fontSize: 13, color: Colors.textSub, marginTop: 2 }}>—</Text>
+              </View>
+            );
+          }
+          const isUp = (data.change ?? 0) >= 0;
+          return (
+            <View key={idx.ticker} style={{ minWidth: 90 }}>
+              <Text style={{ fontSize: 11, color: Colors.textSub }}>{idx.name}</Text>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.text, marginTop: 2 }}>
+                {idx.ticker === 'KRW=X'
+                  ? `₩${data.price.toFixed(2)}`
+                  : data.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </Text>
+              <Text style={{ fontSize: 11, color: isUp ? theme.red : theme.blue, marginTop: 1 }}>
+                {isUp ? '▲' : '▼'} {Math.abs(data.change).toFixed(2)}%
+              </Text>
+            </View>
+          );
+        })}
+      </ScrollView>
 
       {/* ── 메인 탭 ── */}
       <View style={s.tabBar}>
@@ -296,8 +457,8 @@ export default function InvestScreen() {
                   style={s.stockRow}
                   activeOpacity={0.7}
                 >
-                  <View style={[s.stockLogo, { backgroundColor: (item as any).bg ?? '#8E8E93' }]}>
-                    <Text style={[s.stockLogoText, { color: theme.bgCard }]}>{item.logo || item.ticker.slice(0, 2)}</Text>
+                  <View style={{ marginRight: 12 }}>
+                    <StockLogo ticker={item.ticker} size={44} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.stockName}>{item.name}</Text>
@@ -410,8 +571,8 @@ export default function InvestScreen() {
                     activeOpacity={0.7}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <View style={[s.stockLogo, { backgroundColor: (stock as any).bg ?? '#8E8E93' }]}>
-                        <Text style={[s.stockLogoText, { color: theme.bgCard }]}>{stock.logo || stock.ticker.slice(0, 2)}</Text>
+                      <View style={{ marginRight: 12 }}>
+                        <StockLogo ticker={stock.ticker} size={44} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={s.stockName}>{stock.name}</Text>
@@ -517,8 +678,8 @@ export default function InvestScreen() {
                     style={s.stockRow}
                     activeOpacity={0.7}
                   >
-                    <View style={[s.stockLogo, { backgroundColor: (stock as any).bg ?? '#8E8E93' }]}>
-                      <Text style={[s.stockLogoText, { color: theme.bgCard }]}>{stock.logo || stock.ticker.slice(0, 2)}</Text>
+                    <View style={{ marginRight: 12 }}>
+                      <StockLogo ticker={stock.ticker} size={44} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={s.stockName}>{stock.name}</Text>
@@ -561,86 +722,292 @@ export default function InvestScreen() {
 
       {/* ════════════════ 발견 탭 ════════════════ */}
       {selectedTab === '발견' && (
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16 }}>
-          {/* 급등 종목 */}
-          <Text style={s.discoverTitle}>급등 종목</Text>
-          {[...KR_STOCKS, ...US_STOCKS]
-            .filter(st => prices[st.ticker])
-            .sort((a, b) => (prices[b.ticker]?.change ?? 0) - (prices[a.ticker]?.change ?? 0))
-            .slice(0, 5)
-            .map(stock => {
-              const priceData = prices[stock.ticker];
-              return (
-                <TouchableOpacity
-                  key={stock.ticker}
-                  onPress={() => {
-                    const pd = prices[stock.ticker];
-                    navigation.navigate('종목상세', {
-                      ticker: stock.ticker,
-                      price: pd?.price,
-                      change: pd?.change,
-                      changeAmount: pd?.changeAmount,
-                    });
-                  }}
-                  style={s.discoverCard}
-                  activeOpacity={0.7}
-                >
-                  <View style={[s.stockLogoSm, { backgroundColor: (stock as any).bg ?? '#8E8E93' }]}>
-                    <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 11 }}>
-                      {stock.logo || stock.ticker.slice(0, 2)}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.stockName}>{stock.name}</Text>
-                    <Text style={s.stockSub}>{stock.sector}</Text>
-                  </View>
-                  <Text style={{ color: Colors.green, fontWeight: 'bold', fontSize: 16 }}>
-                    +{priceData?.change?.toFixed(2)}%
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+        <View style={{ flex: 1 }}>
+          {/* 하위 탭 바 */}
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: theme.bgCard }}>
+            {[
+              { id: 'realtime', label: '실시간 차트' },
+              { id: 'trending', label: '지금 뜨는 카테고리' },
+              { id: 'investor', label: '국내 투자자 동향' },
+            ].map(tab => (
+              <TouchableOpacity
+                key={tab.id}
+                onPress={() => setDiscoverSubTab(tab.id as 'realtime' | 'trending' | 'investor')}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  borderBottomWidth: discoverSubTab === tab.id ? 2 : 0,
+                  borderBottomColor: Colors.text,
+                }}
+              >
+                <Text style={{
+                  color: discoverSubTab === tab.id ? Colors.text : Colors.textSub,
+                  fontWeight: discoverSubTab === tab.id ? '700' : '400',
+                  fontSize: 13,
+                }}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-          {/* 급락 종목 */}
-          <Text style={[s.discoverTitle, { marginTop: 20 }]}>급락 종목</Text>
-          {[...KR_STOCKS, ...US_STOCKS]
-            .filter(st => prices[st.ticker])
-            .sort((a, b) => (prices[a.ticker]?.change ?? 0) - (prices[b.ticker]?.change ?? 0))
-            .slice(0, 5)
-            .map(stock => {
-              const priceData = prices[stock.ticker];
-              return (
-                <TouchableOpacity
-                  key={stock.ticker}
-                  onPress={() => {
-                    const pd = prices[stock.ticker];
-                    navigation.navigate('종목상세', {
-                      ticker: stock.ticker,
-                      price: pd?.price,
-                      change: pd?.change,
-                      changeAmount: pd?.changeAmount,
-                    });
-                  }}
-                  style={s.discoverCard}
-                  activeOpacity={0.7}
-                >
-                  <View style={[s.stockLogoSm, { backgroundColor: (stock as any).bg ?? '#8E8E93' }]}>
-                    <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 11 }}>
-                      {stock.logo || stock.ticker.slice(0, 2)}
+          {discoverSubTab === 'realtime' && (
+            <View style={{ flex: 1 }}>
+              {/* 시장 토글 */}
+              <View style={{
+                flexDirection: 'row',
+                padding: 12,
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+                gap: 8,
+              }}>
+                {([
+                  { id: 'all', label: '전체' },
+                  { id: 'kr', label: '국내' },
+                  { id: 'us', label: '미국' },
+                ] as const).map(m => (
+                  <TouchableOpacity
+                    key={m.id}
+                    onPress={() => setRealtimeMarket(m.id)}
+                    style={{
+                      paddingVertical: 6,
+                      paddingHorizontal: 12,
+                      borderRadius: 16,
+                      backgroundColor: realtimeMarket === m.id ? Colors.text : theme.bgCard,
+                      borderWidth: 1,
+                      borderColor: realtimeMarket === m.id ? Colors.text : Colors.border,
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 12,
+                      color: realtimeMarket === m.id ? '#fff' : Colors.text,
+                      fontWeight: '600',
+                    }}>
+                      {m.label}
                     </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* 정렬 옵션 */}
+              <View style={{
+                flexDirection: 'row',
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                gap: 16,
+              }}>
+                {([
+                  { id: 'value', label: '거래대금' },
+                  { id: 'volume', label: '거래량' },
+                  { id: 'change', label: '등락률' },
+                ] as const).map(sort => (
+                  <TouchableOpacity key={sort.id} onPress={() => setRealtimeSortBy(sort.id)}>
+                    <Text style={{
+                      fontSize: 13,
+                      color: realtimeSortBy === sort.id ? Colors.text : Colors.textSub,
+                      fontWeight: realtimeSortBy === sort.id ? '700' : '400',
+                    }}>
+                      {sort.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* 종목 리스트 */}
+              <ScrollView style={{ flex: 1 }}>
+                <Text style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  fontSize: 11,
+                  color: Colors.textSub,
+                }}>
+                  순위 · {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 기준
+                </Text>
+
+                {realtimeTop20.map((item, idx) => (
+                  <TouchableOpacity
+                    key={item.stock.ticker}
+                    onPress={() => navigation.navigate('종목상세', { ticker: item.stock.ticker })}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderBottomWidth: 1,
+                      borderBottomColor: Colors.border,
+                    }}
+                  >
+                    <Text style={{ width: 28, fontSize: 14, color: Colors.textSub, fontWeight: '600' }}>
+                      {idx + 1}
+                    </Text>
+                    <StockLogo ticker={item.stock.ticker} size={36} />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.text }}>
+                        {item.stock.name}
+                      </Text>
+                      {realtimeSortBy === 'value' && (
+                        <Text style={{ fontSize: 11, color: Colors.textSub, marginTop: 2 }}>
+                          거래대금 {Math.round(item.value / 100_000_000).toLocaleString()}억
+                        </Text>
+                      )}
+                      {realtimeSortBy === 'volume' && (
+                        <Text style={{ fontSize: 11, color: Colors.textSub, marginTop: 2 }}>
+                          거래량 {item.volume.toLocaleString()}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.text }}>
+                        {item.stock.krw
+                          ? `${Math.round(item.price).toLocaleString()}원`
+                          : `$${item.price.toFixed(2)}`}
+                      </Text>
+                      <Text style={{
+                        fontSize: 12,
+                        color: item.change >= 0 ? theme.red : theme.blue,
+                        marginTop: 2,
+                      }}>
+                        {item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+
+                {realtimeTop20.length === 0 && (
+                  <View style={{ padding: 40, alignItems: 'center' }}>
+                    <Text style={{ color: Colors.textSub }}>데이터 로딩 중...</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.stockName}>{stock.name}</Text>
-                    <Text style={s.stockSub}>{stock.sector}</Text>
+                )}
+                <View style={{ height: 80 }} />
+              </ScrollView>
+            </View>
+          )}
+
+          {discoverSubTab === 'trending' && (
+            <View style={{ flex: 1 }}>
+              {/* 국내/미국 토글 */}
+              <View style={{
+                flexDirection: 'row',
+                padding: 12,
+                gap: 8,
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+              }}>
+                {([
+                  { id: 'kr', label: '국내' },
+                  { id: 'us', label: '미국' },
+                ] as const).map(m => (
+                  <TouchableOpacity
+                    key={m.id}
+                    onPress={() => setTrendingMarket(m.id)}
+                    style={{
+                      paddingVertical: 8,
+                      paddingHorizontal: 20,
+                      borderRadius: 20,
+                      backgroundColor: trendingMarket === m.id ? Colors.text : theme.bgCard,
+                      borderWidth: 1,
+                      borderColor: trendingMarket === m.id ? Colors.text : Colors.border,
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 13,
+                      color: trendingMarket === m.id ? '#fff' : Colors.text,
+                      fontWeight: '600',
+                    }}>
+                      {m.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* 시간 기준 */}
+              <View style={{
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.text }}>
+                  {trendingMarket === 'kr' ? '국내' : '미국'}
+                </Text>
+                <Text style={{ fontSize: 11, color: Colors.textSub }}>
+                  {new Date().toLocaleString('ko-KR', {
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })} 기준
+                </Text>
+              </View>
+
+              {/* 섹터 리스트 */}
+              <ScrollView style={{ flex: 1 }}>
+                {trendingSectorsByMarket.map((ts, idx) => {
+                  const isUp = ts.avgChange >= 0;
+                  const emoji = SECTOR_EMOJI[ts.sector] ?? '📈';
+                  return (
+                    <TouchableOpacity
+                      key={ts.sector}
+                      onPress={() => {
+                        setSelectedTab('전체');
+                        setSelectedSector(ts.sector);
+                      }}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 16,
+                        paddingVertical: 14,
+                        borderBottomWidth: 1,
+                        borderBottomColor: Colors.border,
+                      }}
+                    >
+                      <Text style={{
+                        width: 28,
+                        fontSize: 16,
+                        color: isUp ? theme.red : theme.blue,
+                        fontWeight: '600',
+                      }}>
+                        {idx + 1}
+                      </Text>
+                      <Text style={{ fontSize: 24, marginRight: 12 }}>{emoji}</Text>
+                      <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: Colors.text }}>
+                        {ts.sector}
+                      </Text>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 12, color: Colors.textSub }}>
+                          {ts.count}개 중 {ts.riseCount}개
+                        </Text>
+                        <Text style={{
+                          fontSize: 13,
+                          color: isUp ? theme.red : theme.blue,
+                          fontWeight: '600',
+                          marginTop: 2,
+                        }}>
+                          {isUp ? '+' : ''}{ts.avgChange.toFixed(2)}%
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+
+                {trendingSectorsByMarket.length === 0 && (
+                  <View style={{ padding: 40, alignItems: 'center' }}>
+                    <Text style={{ color: Colors.textSub }}>데이터 로딩 중...</Text>
                   </View>
-                  <Text style={{ color: Colors.red, fontWeight: 'bold', fontSize: 16 }}>
-                    {priceData?.change?.toFixed(2)}%
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          <View style={{ height: 100 }} />
-        </ScrollView>
+                )}
+                <View style={{ height: 80 }} />
+              </ScrollView>
+            </View>
+          )}
+
+          {discoverSubTab === 'investor' && (
+            <View style={{ flex: 1, padding: 16 }}>
+              <Text style={{ color: Colors.textSub }}>국내 투자자 동향 - 작업 중</Text>
+            </View>
+          )}
+        </View>
       )}
     </SafeAreaView>
   );

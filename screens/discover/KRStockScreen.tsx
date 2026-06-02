@@ -210,9 +210,7 @@ export default function KRStockScreen() {
                   onPress={() => navigation.navigate('종목상세D', { ticker: s.ticker })}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.logoCircle, { backgroundColor: sUp ? '#F0FFF4' : '#FFF5F5' }]}>
-                    <Text style={{ fontSize: 20 }}>{s.logo}</Text>
-                  </View>
+                  <StockLogo ticker={s.ticker} size={44} />
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.stockName}>{s.name}</Text>
                     <Text style={styles.stockTicker}>{s.ticker} · {s.sector}</Text>

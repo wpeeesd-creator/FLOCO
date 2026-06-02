@@ -14,6 +14,7 @@ import {
 import { Text } from '../../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { STOCKS } from '../../store/appStore';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
@@ -25,7 +26,7 @@ import { db } from '../../lib/firebase';
 import { Colors } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { getPost, deletePost, type CommunityPost } from '../../lib/firestoreService';
+import { getPost, deletePost, normalizeLikes, isLikedByMe, getLikeCount, type CommunityPost } from '../../lib/firestoreService';
 import { updateMissionProgress } from '../../lib/missionService';
 
 interface Comment {
@@ -104,14 +105,14 @@ export default function PostDetailScreen() {
     if (!user?.id || !post) return;
     try {
       const postRef = doc(db, 'posts', postId);
-      const postLikes = post.likes ?? [];
+      const postLikes = normalizeLikes(post.likes);
       const isLiked = postLikes.includes(user.id);
       await updateDoc(postRef, {
         likes: isLiked ? arrayRemove(user.id) : arrayUnion(user.id),
       });
       setPost(prev => {
         if (!prev) return null;
-        const prevLikes = prev.likes ?? [];
+        const prevLikes = normalizeLikes(prev.likes);
         return {
           ...prev,
           likes: isLiked ? prevLikes.filter(id => id !== user.id) : [...prevLikes, user.id],
@@ -138,7 +139,7 @@ export default function PostDetailScreen() {
       const userSnap = await getDoc(doc(db, 'users', user.id));
       const userData = userSnap.exists() ? userSnap.data() : {};
       const nickname = userData?.name ?? userData?.nickname ?? '익명';
-      const emoji = userData?.investmentType?.emoji ?? '📊';
+      const emoji = userData?.investmentType?.emoji ?? '';
 
       await addDoc(collection(db, 'posts', postId, 'comments'), {
         uid: user.id,
@@ -165,7 +166,7 @@ export default function PostDetailScreen() {
     if (!user?.id) return;
     const commentRef = doc(db, 'posts', postId, 'comments', commentId);
     const comment = comments.find(c => c.id === commentId);
-    const isLiked = comment?.likes?.includes(user.id);
+    const isLiked = comment ? isLikedByMe(comment.likes, user.id) : false;
     await updateDoc(commentRef, {
       likes: isLiked ? arrayRemove(user.id) : arrayUnion(user.id),
     });
@@ -226,7 +227,7 @@ export default function PostDetailScreen() {
     }
   };
 
-  const isLiked = user && post ? (post.likes ?? []).includes(user.id) : false;
+  const isLiked = post ? isLikedByMe(post.likes, user?.id) : false;
 
   const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: Colors.bg },
@@ -311,13 +312,16 @@ export default function PostDetailScreen() {
   });
 
   const renderComment = ({ item }: { item: Comment }) => {
-    const commentLiked = user ? item.likes.includes(user.id) : false;
+    const commentLiked = isLikedByMe(item.likes, user?.id);
+    const commentLikeCount = getLikeCount(item.likes);
     const isMyComment = user?.id === item.uid;
     return (
       <View style={styles.commentItem}>
         <View style={styles.commentRow}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarEmoji}>{item.investmentTypeEmoji || '📊'}</Text>
+          <View style={[styles.avatarCircle, { backgroundColor: theme.primary }]}>
+            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>
+              {(item.nickname ?? '?').charAt(0)}
+            </Text>
           </View>
           <View style={styles.commentBody}>
             <View style={styles.commentMeta}>
@@ -341,9 +345,9 @@ export default function PostDetailScreen() {
                   size={14}
                   color={commentLiked ? theme.red : Colors.textSub}
                 />
-                {item.likes.length > 0 && (
+                {commentLikeCount > 0 && (
                   <Text style={[styles.commentLikeCount, commentLiked && styles.commentLikeCountActive]}>
-                    {item.likes.length}
+                    {commentLikeCount}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -370,8 +374,10 @@ export default function PostDetailScreen() {
         <View style={styles.postSection}>
           {/* Author row */}
           <View style={styles.authorRow}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarEmoji}>{post.investmentTypeEmoji || '📊'}</Text>
+            <View style={[styles.avatarCircle, { backgroundColor: theme.primary }]}>
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>
+                {(post.nickname ?? '?').charAt(0)}
+              </Text>
             </View>
             <View style={styles.authorInfo}>
               <View style={styles.authorNameRow}>
@@ -393,9 +399,20 @@ export default function PostDetailScreen() {
           {post.tickers && post.tickers.length > 0 && (
             <View style={styles.tickerRow}>
               {post.tickers.map((ticker: string) => (
-                <View key={ticker} style={styles.tickerChip}>
+                <TouchableOpacity
+                  key={ticker}
+                  style={styles.tickerChip}
+                  onPress={() => {
+                    if (STOCKS.some(s => s.ticker === ticker)) {
+                      navigation.navigate('종목상세', { ticker });
+                    } else {
+                      Alert.alert('알림', '해당 종목 정보를 찾을 수 없어요.');
+                    }
+                  }}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                >
                   <Text style={styles.tickerChipText}>#{ticker}</Text>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           )}
@@ -410,7 +427,7 @@ export default function PostDetailScreen() {
                   color={isLiked ? theme.red : Colors.textSub}
                 />
                 <Text style={[styles.likeCount, isLiked && styles.likeCountActive]}>
-                  {(post.likes ?? []).length}
+                  {getLikeCount(post.likes)}
                 </Text>
               </TouchableOpacity>
               <View style={styles.commentCountRow}>
@@ -480,6 +497,20 @@ export default function PostDetailScreen() {
                 <Text style={styles.emptyCommentsText}>아직 댓글이 없어요</Text>
               </View>
             }
+            ListFooterComponent={
+              <Text style={{
+                textAlign: 'center',
+                fontSize: 10,
+                color: Colors.textSub,
+                paddingHorizontal: 16,
+                paddingTop: 24,
+                paddingBottom: 32,
+                lineHeight: 15,
+              }}>
+                본 글은 모의투자 학습용이며, 투자 권유가 아니에요.{'\n'}
+                실제 투자 결정은 본인 책임이에요.
+              </Text>
+            }
             contentContainerStyle={styles.listContent}
             keyboardShouldPersistTaps="handled"
           />
@@ -489,9 +520,9 @@ export default function PostDetailScreen() {
             keyboardVerticalOffset={0}
           >
             <View style={styles.inputBar}>
-              <View style={styles.inputAvatarSmall}>
-                <Text style={styles.inputAvatarEmoji}>
-                  {(user as any)?.investmentTypeEmoji ?? '📊'}
+              <View style={[styles.inputAvatarSmall, { backgroundColor: theme.primary }]}>
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
+                  {(user?.name ?? '?').charAt(0)}
                 </Text>
               </View>
               <TextInput

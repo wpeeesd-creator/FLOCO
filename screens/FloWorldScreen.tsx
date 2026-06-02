@@ -20,6 +20,7 @@ import { Text } from '../components/ui/Text';
 import { useNavigation } from '@react-navigation/native';
 import { useAppStore, FLO_EVENTS, STOCKS } from '../store/appStore';
 import { Colors, Typography, Badge, SectionHeader } from '../components/ui';
+import StockLogo from '../components/StockLogo';
 import { useTheme } from '../context/ThemeContext';
 import { fetchAllNews, fetchKRNews, formatNewsTime, type NewsItem } from '../lib/newsService';
 
@@ -214,9 +215,7 @@ export default function FloWorldScreen() {
                   activeOpacity={0.8}
                 >
                   <View style={styles.eventCardTop}>
-                    <View style={styles.stockLogo}>
-                      <Text style={{ fontSize: 22 }}>{stock.logo}</Text>
-                    </View>
+                    <StockLogo ticker={stock.ticker} size={40} />
                     <Text style={[Typography.body1, { fontWeight: '700', flex: 1 }]}>{stock.name}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={[Typography.body2, { fontWeight: '700', color: event.impact >= 0 ? Colors.green : Colors.red }]}>

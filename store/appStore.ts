@@ -13,6 +13,8 @@ import { updateMissionProgress } from '../lib/missionService';
 import { logStockPurchase, logStockSold, logLessonCompleted, logLevelUp } from '../lib/analytics';
 import { recordError, setUserId } from '../lib/crashlytics';
 import { US_STOCKS_EXPANDED } from '../data/usStocksExpanded';
+import { fetchMultiplePrices, getExchangeRate, type PriceData } from '../utils/priceService';
+import { calculateTotalAsset } from '../utils/assetCalculator';
 
 // 유저 onSnapshot unsubscribe 핸들 (모듈 스코프 — store state에 함수 저장 시 직렬화 이슈 회피)
 let userUnsubscribe: (() => void) | null = null;
@@ -22,12 +24,13 @@ let userUnsubscribe: (() => void) | null = null;
 export interface Stock {
   ticker: string;
   name: string;
-  market: '미국' | '한국';
+  market: '미국' | '한국' | '암호화폐';
   price: number;
   change: number;
   logo: string;
   krw: boolean;
   sector?: string;
+  type?: 'stock' | 'etf' | 'crypto' | 'index';
 }
 
 export interface Holding {
@@ -238,7 +241,6 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: '034220', name: 'LG디스플레이',     market: '한국', price: 14500,  change: -1.2,  logo: '📺', krw: true, sector: '전자' },
   { ticker: '247540', name: '에코프로비엠',     market: '한국', price: 198000, change: +2.8,  logo: '🔋', krw: true, sector: '2차전지' },
   { ticker: '086520', name: '에코프로',         market: '한국', price: 89000,  change: +3.1,  logo: '🔋', krw: true, sector: '2차전지' },
-  { ticker: '326030', name: '에이비엘바이오',   market: '한국', price: 28500,  change: +1.5,  logo: '🧬', krw: true, sector: '바이오' },
   { ticker: '195870', name: '해성디에스',       market: '한국', price: 78500,  change: +0.8,  logo: '🔧', krw: true, sector: '자동차' },
   { ticker: '064350', name: '현대로템',         market: '한국', price: 45800,  change: +2.1,  logo: '🚂', krw: true, sector: '방산' },
   { ticker: '032640', name: 'LG유플러스',       market: '한국', price: 11850,  change: -0.5,  logo: '📡', krw: true, sector: '통신' },
@@ -386,6 +388,44 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: '006360', name: 'GS건설',           market: '한국', price: 18200,  change: +0.4,  logo: '🏗️', krw: true, sector: '건설' },
   { ticker: '294870', name: 'HDC현대산업개발',   market: '한국', price: 22400,  change: +0.4,  logo: '🏗️', krw: true, sector: '건설' },
   { ticker: '375500', name: 'DL이앤씨',         market: '한국', price: 36800,  change: +0.5,  logo: '🏗️', krw: true, sector: '건설' },
+
+  // ── 미국 ETF (SPY/QQQ/ARKK는 기존에 있어 제외) ──
+  { ticker: 'VOO',  name: '뱅가드 S&P 500',          market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
+  { ticker: 'VTI',  name: '뱅가드 전체시장',         market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
+  { ticker: 'DIA',  name: '다우존스 ETF',           market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
+  { ticker: 'SCHD', name: '슈왑 배당 ETF',          market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
+  { ticker: 'VYM',  name: '뱅가드 고배당 ETF',       market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
+  { ticker: 'JEPI', name: 'JP모건 프리미엄 인컴',    market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
+  { ticker: 'SOXX', name: '반도체 ETF',             market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
+
+  // ── 한국 ETF ──
+  { ticker: '069500', name: 'KODEX 200',             market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
+  { ticker: '360750', name: 'TIGER 미국S&P500',      market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
+  { ticker: '379800', name: 'KODEX 미국S&P500',      market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
+  { ticker: '133690', name: 'TIGER 미국나스닥100',   market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
+  { ticker: '305720', name: 'KODEX 2차전지산업',     market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
+  { ticker: '091160', name: 'KODEX 반도체',          market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
+  { ticker: '102110', name: 'TIGER 200',             market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
+  { ticker: '251340', name: 'KODEX 코스닥150',       market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
+  { ticker: '411060', name: 'ACE 미국빅테크TOP7',    market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
+  { ticker: '458730', name: 'TIGER 미국배당다우존스', market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
+
+  // ── 암호화폐 ──
+  { ticker: 'BTC',   name: '비트코인',     market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'ETH',   name: '이더리움',     market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'XRP',   name: '리플',         market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'SOL',   name: '솔라나',       market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'DOGE',  name: '도지코인',     market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'ADA',   name: '에이다',       market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'TRX',   name: '트론',         market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'AVAX',  name: '아발란체',     market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'LINK',  name: '체인링크',     market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'DOT',   name: '폴카닷',       market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'MATIC', name: '폴리곤',       market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'SHIB',  name: '시바이누',     market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'LTC',   name: '라이트코인',   market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'BCH',   name: '비트코인캐시', market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
+  { ticker: 'ATOM',  name: '코스모스',     market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
 ];
 
 // STOCKS 가격은 Yahoo Finance 실시간 가격 로드 전 fallback으로만 사용됩니다.
@@ -498,6 +538,12 @@ interface AppState {
   trades: TradeRecord[];
   initialBalance: number; // 수익률 계산 기준점 (users.initialBalance 동기화)
 
+  // 시세 / 환율 (전역 source — 화면별 폴링을 store 단일 source로 통합)
+  // livePrices: ticker → 전체 PriceData (price, change, week52, per/pbr 등). 환산 전 raw 값.
+  livePrices: Record<string, PriceData>;
+  exchangeRate: number;               // USD→KRW
+  pricesLastUpdated: number;          // ms epoch
+
   // 듀오링고 알고리즘
   xp: number;
   level: number;
@@ -543,9 +589,40 @@ interface AppState {
   // 유저 데이터 hydrate / unhydrate (AuthContext에서 로그인/로그아웃 시 호출)
   hydrateUserData: (uid: string) => void;
   unhydrateUser: () => void;
+
+  // 시세 / 환율 refresh (호출자가 ticker 목록 전달 → store에 캐싱)
+  refreshPrices: (tickers: string[]) => Promise<void>;
+  refreshExchangeRate: () => Promise<void>;
 }
 
 // ── 스토어 구현 ──────────────────────────
+
+// users/{uid}.totalAsset 단일 write 진입점. threshold=0이면 무조건 write,
+// >0이면 변화량이 그 이상일 때만 write (불필요한 Firestore 쓰기 감소).
+async function writeTotalAssetIfChanged(uid: string, threshold: number = 100): Promise<void> {
+  if (!uid) return;
+  try {
+    const state = useAppStore.getState();
+    const priceMap: Record<string, number> = {};
+    for (const [k, v] of Object.entries(state.livePrices)) {
+      if (typeof v?.price === 'number') priceMap[k] = v.price;
+    }
+    const { totalAsset: newTotal } = calculateTotalAsset({
+      balance: state.cash,
+      portfolio: state.holdings as any,
+      livePrices: priceMap,
+      exchangeRate: state.exchangeRate,
+    });
+    const snap = await getDoc(doc(db, 'users', uid));
+    const oldTotal = snap.exists() ? (snap.data()?.totalAsset ?? 0) : 0;
+    if (Math.abs(newTotal - oldTotal) < threshold) return;
+    await updateDoc(doc(db, 'users', uid), {
+      totalAsset: Math.round(newTotal),
+    });
+  } catch (e) {
+    console.warn('[appStore] writeTotalAssetIfChanged failed:', e);
+  }
+}
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -567,6 +644,9 @@ export const useAppStore = create<AppState>()(
       completedEvents: [],
       achievements: [],
       isTradePending: false,
+      livePrices: {},
+      exchangeRate: 1380,
+      pricesLastUpdated: 0,
 
       // ── 유저 데이터 실시간 구독 (AuthContext가 로그인 시 호출) ──
       // users/{uid}를 직접 onSnapshot으로 구독하여 어느 화면에 먼저 진입하든
@@ -607,6 +687,7 @@ export const useAppStore = create<AppState>()(
 
             if (Object.keys(partial).length > 0) {
               set(partial);
+              writeTotalAssetIfChanged(uid, 100);
             }
           },
           (error) => {
@@ -730,6 +811,7 @@ export const useAppStore = create<AppState>()(
               createdAt: new Date().toISOString(),
             }),
           });
+          await writeTotalAssetIfChanged(userId, 0);
 
           set({ isTradePending: false });
           logStockPurchase(ticker, qty, price);
@@ -820,6 +902,7 @@ export const useAppStore = create<AppState>()(
               createdAt: new Date().toISOString(),
             }),
           });
+          await writeTotalAssetIfChanged(userId, 0);
 
           set({ isTradePending: false });
           logStockSold(ticker, qty, price);
@@ -964,6 +1047,40 @@ export const useAppStore = create<AppState>()(
         const prevLesson = LESSONS.find(l => l.step === lesson.step - 1);
         if (prevLesson && completedLessons.includes(prevLesson.id)) return 'active';
         return 'locked';
+      },
+
+      // ── 시세 refresh: tickers → fetchMultiplePrices → livePrices 갱신 ──
+      // STOCKS 메타에서 isKR 조회 (utils/assetCalculator.ts:27 동일 패턴, single source).
+      // 실패 시 기존 livePrices 유지 (덮어쓰지 않음).
+      refreshPrices: async (tickers) => {
+        if (!tickers || tickers.length === 0) return;
+        try {
+          const enriched = tickers.map(t => {
+            const meta = STOCKS.find(s => s.ticker === t);
+            return { ticker: t, isKR: meta?.krw ?? true, type: meta?.type ?? 'stock' };
+          });
+          const result = await fetchMultiplePrices(enriched);
+          set({
+            livePrices: { ...get().livePrices, ...result },
+            pricesLastUpdated: Date.now(),
+          });
+          const uid = get().userId;
+          if (uid) writeTotalAssetIfChanged(uid, 100);
+        } catch (e) {
+          console.warn('[appStore] refreshPrices failed:', e);
+        }
+      },
+
+      // ── 환율 refresh (Yahoo KRW=X, 실패 시 기존 값 유지) ──
+      refreshExchangeRate: async () => {
+        try {
+          const rate = await getExchangeRate();
+          if (typeof rate === 'number' && rate > 0) {
+            set({ exchangeRate: rate });
+          }
+        } catch (e) {
+          console.warn('[appStore] refreshExchangeRate failed:', e);
+        }
       },
     }),
     {

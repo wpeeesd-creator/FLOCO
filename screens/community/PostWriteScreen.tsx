@@ -18,17 +18,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { createPost, getUserProfile } from '../../lib/firestoreService';
 import { STOCKS } from '../../store/appStore';
+import { Info } from 'lucide-react-native';
 
-const WRITE_TAGS = ['#모의투자', '#주식공부', '#수익인증', '#질문있어요', '#경제뉴스'] as const;
+const WRITE_TAGS = ['질문', '포트폴리오', '시장뉴스'] as const;
 type WriteTag = typeof WRITE_TAGS[number];
-
-const TAG_TO_CATEGORY: Record<WriteTag, string> = {
-  '#모의투자': '투자인증',
-  '#주식공부': '분석',
-  '#수익인증': '투자인증',
-  '#질문있어요': '질문',
-  '#경제뉴스': '자유',
-};
 
 interface Props {
   navigation: any;
@@ -145,8 +138,8 @@ export default function PostWriteScreen({ navigation }: Props) {
     try {
       const profile = await getUserProfile(user.id);
       const nickname = profile?.name ?? user.name;
-      const investmentTypeEmoji = (profile as any)?.investmentTypeEmoji ?? '📈';
-      const category = TAG_TO_CATEGORY[selectedTags[0]] as any;
+      const investmentTypeEmoji = (profile as any)?.investmentTypeEmoji ?? '';
+      const category = selectedTags[0];
       const fullContent = title.trim()
         ? `${title.trim()}\n\n${content.trim()}`
         : content.trim();
@@ -203,6 +196,30 @@ export default function PostWriteScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* Disclaimer */}
+          <View style={{
+            marginHorizontal: 16,
+            marginTop: 12,
+            padding: 12,
+            borderRadius: 8,
+            backgroundColor: theme.bgCard,
+            borderWidth: 1,
+            borderColor: Colors.border,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <Info size={14} color={Colors.text} />
+              <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.text }}>
+                글 작성 전 확인해주세요
+              </Text>
+            </View>
+            <Text style={{ fontSize: 11, color: Colors.textSub, lineHeight: 17 }}>
+              • FLOCO는 모의투자 학습 앱이에요{'\n'}
+              • 특정 종목 매수 권유는 자제해주세요{'\n'}
+              • 실제 투자 결정은 본인 책임이에요{'\n'}
+              • 욕설/비방/허위정보는 신고될 수 있어요
+            </Text>
+          </View>
+
           {/* Tag Selection */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>태그 선택</Text>

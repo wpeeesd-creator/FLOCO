@@ -18,11 +18,11 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useTheme } from '../../context/ThemeContext';
 import StockLogo from '../../components/StockLogo';
-import { STOCKS } from '../../store/appStore';
+import { STOCKS, useAppStore } from '../../store/appStore';
 import { calculateTotalAsset } from '../../utils/assetCalculator';
 
 const BUY_BG = '#FF3B30';
-const SELL_BG = '#0066FF';
+const SELL_BG = '#3478F6';
 
 interface TradeItem {
   id: string;
@@ -65,6 +65,7 @@ export default function AdminUserDetailScreen() {
 
   const [userDoc, setUserDoc] = useState<any | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const { livePrices, exchangeRate, refreshPrices, refreshExchangeRate } = useAppStore();
 
   useEffect(() => {
     if (!uid) {
@@ -84,6 +85,14 @@ export default function AdminUserDetailScreen() {
     );
     return () => unsub();
   }, [uid]);
+
+  // ── 시세 / 환율 (store) — 진입 시 1회만 fetch (관리자 화면이라 폴링 불필요) ──
+  useEffect(() => {
+    refreshExchangeRate();
+    const portfolio = (userDoc?.portfolio ?? []) as Array<any>;
+    const tickers = portfolio.map((p: any) => p?.ticker).filter(Boolean);
+    if (tickers.length > 0) refreshPrices(tickers);
+  }, [userDoc?.portfolio, refreshPrices, refreshExchangeRate]);
 
   const displayName = userDoc?.nickname ?? userDoc?.name ?? userDoc?.displayName ?? paramName ?? '익명';
 
@@ -114,11 +123,16 @@ export default function AdminUserDetailScreen() {
 
     const balance = Number(userDoc?.balance ?? 10_000_000);
     const portfolio = (userDoc?.portfolio ?? []) as Array<any>;
+    // store.livePrices(PriceData) → calculateTotalAsset가 요구하는 number map으로 평탄화
+    const livePriceMap: Record<string, number> = {};
+    for (const [k, v] of Object.entries(livePrices)) {
+      if (typeof v?.price === 'number') livePriceMap[k] = v.price;
+    }
     const { totalAsset } = calculateTotalAsset({
       balance,
       portfolio,
-      livePrices: {},
-      exchangeRate: 1380,
+      livePrices: livePriceMap,
+      exchangeRate,
     });
 
     return {
@@ -127,7 +141,7 @@ export default function AdminUserDetailScreen() {
       sellCount,
       totalAsset,
     };
-  }, [trades, userDoc]);
+  }, [trades, userDoc, livePrices, exchangeRate]);
 
   const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.bg },

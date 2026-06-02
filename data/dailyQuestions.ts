@@ -105,3 +105,43 @@ export function getTodayQuestion(): DailyQuestion {
 export function getTodayQuestionKey(): string {
   return `dq_${getTodayQuestion().id}_${new Date().toDateString()}`;
 }
+
+// ── 데일리 OX 5문제 ─────────────────────────────────
+// 매일 5문제 풀고 정답 수 × 1,000원 보상.
+// 풀이 가능 여부는 users/{uid}/learning/data.dailyQuiz.lastDate 비교.
+
+export type DailyOXQuestion = {
+  id: string;
+  question: string;
+  answer: 'O' | 'X';
+  explanation: string;
+};
+
+export const DAILY_OX_POOL: DailyOXQuestion[] = [
+  { id: 'ox_01', question: '주식을 사면 그 회사의 일부를 소유하는 거야.', answer: 'O', explanation: '주식 1주 = 회사 소유권의 작은 한 조각이야!' },
+  { id: 'ox_02', question: 'PER이 높을수록 항상 좋은 주식이야.', answer: 'X', explanation: 'PER이 높으면 이익 대비 비싸다는 뜻. 성장 기대가 큰 경우도 있지만 무조건 좋다는 X.' },
+  { id: 'ox_03', question: '한국 주식은 하루에 ±30%까지만 움직일 수 있어.', answer: 'O', explanation: '한국은 상하한가 ±30%로 제한돼. 미국은 제한 없음!' },
+  { id: 'ox_04', question: '배당금은 회사가 손실 나도 무조건 줘야 해.', answer: 'X', explanation: '배당은 회사가 이익 났을 때 주주에게 나눠주는 거. 의무 X.' },
+  { id: 'ox_05', question: '코스피는 한국 대형주 중심, 코스닥은 중소·벤처기업 중심이야.', answer: 'O', explanation: '맞아! 삼성전자/현대차는 코스피, 카카오게임즈/펄어비스 등은 코스닥.' },
+  { id: 'ox_06', question: '한 종목에 전 재산 다 넣는 게 안전한 투자야.', answer: 'X', explanation: '"계란을 한 바구니에 담지 마라"! 분산 투자가 안전해.' },
+  { id: 'ox_07', question: '금리가 오르면 일반적으로 주가는 하락 압력을 받아.', answer: 'O', explanation: '금리 ↑ → 채권 매력 ↑, 기업 차입비용 ↑, 미래이익 할인율 ↑ → 주가 ↓ 경향.' },
+  { id: 'ox_08', question: 'ETF는 원금 보장 상품이야.', answer: 'X', explanation: 'ETF도 주식처럼 가격이 떨어지면 손실 봐. 원금 보장 X.' },
+  { id: 'ox_09', question: '시가는 하루 거래의 첫 가격, 종가는 마지막 가격이야.', answer: 'O', explanation: '시가/종가 정의 정확해!' },
+  { id: 'ox_10', question: '거래량이 많다는 것은 그 종목에 관심이 적다는 뜻이야.', answer: 'X', explanation: '반대! 거래량 많음 = 사고파는 사람 많음 = 관심 ↑.' },
+  { id: 'ox_11', question: '손절은 손실을 감수하고 매도하는 거야.', answer: 'O', explanation: '미리 정한 손절선에서 빠지는 게 리스크 관리의 기본!' },
+  { id: 'ox_12', question: '美 달러 강세는 한국 수출 기업에 무조건 악재야.', answer: 'X', explanation: '오히려 호재일 수 있어! 같은 달러 매출이 더 많은 원화로 환산되거든.' },
+  { id: 'ox_13', question: '복리는 이자에도 이자가 붙는 마법이야.', answer: 'O', explanation: '72의 법칙: 72 ÷ 연이율 = 원금 2배 되는 기간(년)!' },
+  { id: 'ox_14', question: '인플레이션이 심하면 현금의 실질 가치는 올라가.', answer: 'X', explanation: '반대! 물가 ↑ = 같은 돈으로 살 수 있는 것 ↓ = 현금 가치 ↓.' },
+  { id: 'ox_15', question: '주식 분할은 1주를 여러 주로 나누는 거야.', answer: 'O', explanation: '100만원 주식을 10:1 분할하면 10만원짜리 10주가 돼. 총 가치는 같음.' },
+];
+
+/** 오늘의 OX 5문제 (날짜 기반 순환) */
+export function getTodayOXQuestions(): DailyOXQuestion[] {
+  const dayIndex = Math.floor(Date.now() / (1000 * 60 * 60 * 24));
+  const start = (dayIndex * 5) % DAILY_OX_POOL.length;
+  const result: DailyOXQuestion[] = [];
+  for (let i = 0; i < 5; i++) {
+    result.push(DAILY_OX_POOL[(start + i) % DAILY_OX_POOL.length]);
+  }
+  return result;
+}

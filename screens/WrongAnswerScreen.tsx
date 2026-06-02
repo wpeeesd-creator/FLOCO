@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
+import { HelpCircle, NotebookPen, Target } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { getLearningData } from '../lib/learningService';
 import {
@@ -102,7 +103,7 @@ export default function WrongAnswerScreen() {
       <View style={styles.card}>
         <View style={styles.cardRow}>
           <View style={styles.iconBox}>
-            <Text style={styles.iconEmoji}>❓</Text>
+            <HelpCircle size={20} color={Colors.textSub ?? '#6B7280'} />
           </View>
           <View style={styles.cardContent}>
             <Text style={styles.categoryLabel}>{item.categoryTitle} · {item.levelTitle}</Text>
@@ -161,10 +162,10 @@ export default function WrongAnswerScreen() {
     },
     iconEmoji: { fontSize: 20 },
     cardContent: { flex: 1 },
-    categoryLabel: { fontSize: 12, fontWeight: '600', color: Colors.primary ?? '#0066FF', marginBottom: 2 },
+    categoryLabel: { fontSize: 12, fontWeight: '600', color: Colors.primary ?? '#3478F6', marginBottom: 2 },
     questionPreview: { fontSize: 14, fontWeight: '600', color: Colors.text, lineHeight: 20 },
     studyLink: { marginTop: 10, alignSelf: 'flex-end' },
-    studyLinkText: { fontSize: 13, fontWeight: '600', color: Colors.primary ?? '#0066FF' },
+    studyLinkText: { fontSize: 13, fontWeight: '600', color: Colors.primary ?? '#3478F6' },
     emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
     emptyEmoji: { fontSize: 56 },
     emptyText: { fontSize: 16, fontWeight: '600', color: Colors.textSub ?? '#6B7280' },
@@ -177,7 +178,10 @@ export default function WrongAnswerScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>📝 오답 노트</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <NotebookPen size={20} color={Colors.text} />
+          <Text style={styles.headerTitle}>오답 노트</Text>
+        </View>
         {wrongAnswers.length > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{wrongAnswers.length}</Text>
@@ -189,8 +193,8 @@ export default function WrongAnswerScreen() {
         <ActivityIndicator style={{ flex: 1 }} color={Colors.primary} />
       ) : wrongAnswers.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>🎯</Text>
-          <Text style={styles.emptyText}>오답이 없어요! 완벽해요 👍</Text>
+          <Target size={48} color={Colors.textSub ?? '#6B7280'} />
+          <Text style={styles.emptyText}>오답이 없어요! 완벽해요</Text>
         </View>
       ) : (
         <FlatList

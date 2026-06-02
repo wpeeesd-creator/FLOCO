@@ -16,9 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
-import { COURSES, LEVEL_COLOR } from '../data/learningContent';
+import { COURSES, EXPERT_COURSES, LEVEL_COLOR } from '../data/learningContent';
 import { Colors, Typography, Button } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
+import { CheckCircle2, XCircle, Trophy, PartyPopper, BookOpen, Target, BookMarked } from 'lucide-react-native';
 
 type Phase = 'lesson' | 'quiz' | 'result';
 
@@ -30,7 +31,7 @@ export default function LessonScreen() {
   const courseId = route.params?.courseId ?? '';
   const { user } = useAuth();
 
-  const course = COURSES.find(c => c.id === courseId);
+  const course = COURSES.find(c => c.id === courseId) ?? EXPERT_COURSES.find(c => c.id === courseId);
 
   const [phase, setPhase] = useState<Phase>('lesson');
   const [pageIdx, setPageIdx] = useState(0);
@@ -297,8 +298,8 @@ export default function LessonScreen() {
                       <Text style={styles.optionNumText}>{opt.id.toUpperCase()}</Text>
                     </View>
                     <Text style={styles.optionText}>{opt.text}</Text>
-                    {answered && correct && <Text style={{ marginLeft: 'auto' as any }}>✅</Text>}
-                    {answered && sel && !correct && <Text style={{ marginLeft: 'auto' as any }}>❌</Text>}
+                    {answered && correct && <View style={{ marginLeft: 'auto' as any }}><CheckCircle2 size={20} color="#22C55E" /></View>}
+                    {answered && sel && !correct && <View style={{ marginLeft: 'auto' as any }}><XCircle size={20} color="#EF4444" /></View>}
                   </TouchableOpacity>
                 );
               })}
@@ -308,7 +309,10 @@ export default function LessonScreen() {
           {/* 해설 */}
           {answered && (
             <View style={[styles.explanationBox, { borderLeftColor: isCorrect ? Colors.green : Colors.red }]}>
-              <Text style={styles.explanationTitle}>{isCorrect ? '✅ 정답!' : '❌ 오답'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {isCorrect ? <CheckCircle2 size={18} color="#22C55E" /> : <XCircle size={18} color="#EF4444" />}
+                <Text style={styles.explanationTitle}>{isCorrect ? '정답!' : '오답'}</Text>
+              </View>
               <Text style={styles.explanationText}>{currentQuiz.explanation}</Text>
             </View>
           )}
@@ -336,7 +340,13 @@ export default function LessonScreen() {
 
   return (
     <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
-      <Text style={{ fontSize: 72, marginBottom: 16 }}>{isPerfect ? '🏆' : score >= total * 0.6 ? '🎉' : '📖'}</Text>
+      <View style={{ marginBottom: 16 }}>
+        {isPerfect
+          ? <Trophy size={64} color="#EAB308" />
+          : score >= total * 0.6
+            ? <PartyPopper size={64} color={theme.primary} />
+            : <BookOpen size={64} color={theme.primary} />}
+      </View>
       <Text style={[Typography.h2, { textAlign: 'center', marginBottom: 8 }]}>{course.title}</Text>
       <Text style={[Typography.h1, { color, fontSize: 48, fontWeight: '900' }]}>{score} / {total}</Text>
       <Text style={[Typography.body1, { color: Colors.textSub, marginTop: 4 }]}>정답률 {pct}%</Text>
@@ -348,11 +358,15 @@ export default function LessonScreen() {
       </View>
 
       <View style={styles.resultMsgBox}>
-        <Text style={styles.resultMsg}>
-          {isPerfect ? '완벽해요! 모든 문제를 맞혔어요 🎯' :
-           score >= total * 0.6 ? '잘했어요! 다음 코스도 도전해봐요 💪' :
-           '조금 더 복습하면 완벽해질 거예요 📚'}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          {isPerfect ? <Target size={16} color={theme.primary} /> : null}
+          {!isPerfect && score < total * 0.6 ? <BookMarked size={16} color={theme.primary} /> : null}
+          <Text style={styles.resultMsg}>
+            {isPerfect ? '완벽해요! 모든 문제를 맞혔어요' :
+             score >= total * 0.6 ? '잘했어요! 다음 코스도 도전해봐요' :
+             '조금 더 복습하면 완벽해질 거예요'}
+          </Text>
+        </View>
       </View>
 
       <View style={{ width: '100%', gap: 12, marginTop: 8 }}>

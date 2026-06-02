@@ -26,6 +26,7 @@ import CourseListScreen from '../screens/CourseListScreen';
 import LessonScreen from '../screens/LessonScreen';
 import LessonDetailScreen from '../screens/LessonDetailScreen';
 import WrongAnswerScreen from '../screens/WrongAnswerScreen';
+import DailyQuizScreen from '../screens/DailyQuizScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import BadgeScreen from '../screens/BadgeScreen';
 import RewardHistoryScreen from '../screens/RewardHistoryScreen';
@@ -134,6 +135,7 @@ function LearnNavigator() {
       <LearnStack.Screen name="레슨" component={LessonScreen} />
       <LearnStack.Screen name="레슨상세" component={LessonDetailScreen} />
       <LearnStack.Screen name="오답노트" component={WrongAnswerScreen} />
+      <LearnStack.Screen name="데일리OX" component={DailyQuizScreen} />
     </LearnStack.Navigator>
   );
 }

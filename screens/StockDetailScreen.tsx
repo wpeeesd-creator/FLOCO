@@ -36,7 +36,7 @@ import { fetchStockNews } from '../lib/newsService';
 import StockLogo from '../components/StockLogo';
 import Svg, { Line as SvgLine, Rect, Path, Text as SvgText, G } from 'react-native-svg';
 import {
-  fetchSinglePrice, fetchChartData, getExchangeRate,
+  fetchSinglePrice, fetchChartData, fetchUpbitCandles, getExchangeRate,
   CHART_PERIODS,
   type CandleData, type ChartPeriod, type PriceData,
 } from '../utils/priceService';
@@ -360,7 +360,7 @@ export default function StockDetailScreen() {
     try {
       setPriceLoading(true);
       setPriceError(null);
-      const data = await fetchSinglePrice(ticker, isKR);
+      const data = await fetchSinglePrice(ticker, isKR, stock?.type);
       if (data) {
         setQuote(data);
       } else {
@@ -396,7 +396,9 @@ export default function StockDetailScreen() {
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const data = await fetchChartData(ticker, stock.krw, chartPeriod);
+        const data = stock?.type === 'crypto'
+          ? await fetchUpbitCandles(ticker, chartPeriod)
+          : await fetchChartData(ticker, stock.krw, chartPeriod);
         setChartData(data);
         setChartLoading(false);
         return; // 성공 시 즉시 종료
@@ -537,8 +539,24 @@ export default function StockDetailScreen() {
           <Text style={{ fontSize: 22, color: DS.text }}>←</Text>
         </TouchableOpacity>
 
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={s.headerName}>{stock.name}</Text>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 12 }}>
+          <StockLogo ticker={ticker} size={28} />
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={s.headerName}>{stock.name}</Text>
+              {stock?.type === 'etf' && (
+                <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: DS.textSub + '20' }}>
+                  <Text style={{ color: DS.textSub, fontSize: 10, fontWeight: '600' }}>ETF</Text>
+                </View>
+              )}
+              {stock?.type === 'crypto' && (
+                <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#F7931A' + '20' }}>
+                  <Text style={{ color: '#F7931A', fontSize: 10, fontWeight: '600' }}>코인</Text>
+                </View>
+              )}
+            </View>
+            <Text style={{ color: DS.textSub, fontSize: 12, marginTop: 1 }}>{ticker}</Text>
+          </View>
         </View>
 
         <TouchableOpacity
@@ -593,35 +611,6 @@ export default function StockDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 헤더 아래 가격 표시 */}
-      <View style={{ alignItems: 'center', paddingVertical: 4, backgroundColor: theme.bgCard }}>
-        {priceLoading ? (
-          <ActivityIndicator size="small" />
-        ) : hasPrice ? (
-          <>
-            <Text style={{ color: changeColor, fontSize: 13 }}>
-              {fmt(livePrice)}{!isKR && livePrice > 0 ? ` (₩${Math.round(livePrice * exchangeRate).toLocaleString()})` : ''} 오늘 {isPositive ? '+' : ''}{liveChange.toFixed(2)}%
-            </Text>
-            {ownedStock && (() => {
-              const myRate = ownedStock.avgPrice > 0
-                ? ((livePriceKRW - ownedStock.avgPrice) / ownedStock.avgPrice * 100)
-                : 0;
-              const myUp = myRate >= 0;
-              return (
-                <Text style={{ color: myUp ? DS.rise : DS.fall, fontSize: 12, marginTop: 1 }}>
-                  내 수익 {myUp ? '+' : ''}{myRate.toFixed(2)}%
-                </Text>
-              );
-            })()}
-            {!isKR && (
-              <Text style={{ color: DS.textSub, fontSize: 11, marginTop: 2 }}>
-                🇺🇸 {getUSMarketHoursKST()}
-              </Text>
-            )}
-          </>
-        ) : null}
-      </View>
-
       {/* ── 탭 메뉴 ── */}
       <View style={s.tabBar}>
         {(['차트', '호가', '내 주식', '종목정보'] as TabName[]).map(tab => (
@@ -659,7 +648,7 @@ export default function StockDetailScreen() {
                 </View>
               ) : hasPrice ? (
                 <>
-                  <Text style={{ color: changeColor, fontSize: 32, fontWeight: 'bold' }}>
+                  <Text style={{ color: DS.text, fontSize: 32, fontWeight: 'bold' }}>
                     {fmt(livePrice)}
                   </Text>
                   {!isKR && livePrice > 0 && (
@@ -669,9 +658,7 @@ export default function StockDetailScreen() {
                   )}
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
                     <Text style={{ color: changeColor, fontSize: 16 }}>
-                      오늘 {isPositive ? '▲' : '▼'}{' '}
-                      {Math.abs(liveChangeAmount).toLocaleString()}
-                      {'  '}{isPositive ? '+' : ''}{liveChange.toFixed(2)}%
+                      어제보다 {isPositive ? '▲' : '▼'} {fmt(Math.abs(liveChangeAmount))} ({isPositive ? '+' : ''}{liveChange.toFixed(2)}%)
                     </Text>
                     {ownedStock && (() => {
                       const myRate = ownedStock.avgPrice > 0
@@ -685,6 +672,37 @@ export default function StockDetailScreen() {
                       );
                     })()}
                   </View>
+                  {quote && quote.high > 0 && quote.low > 0 && (
+                    <View style={{ flexDirection: 'row', marginTop: 12, gap: 16, flexWrap: 'wrap' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ color: DS.textSub, fontSize: 12, marginRight: 6 }}>1일 범위</Text>
+                        <Text style={{ color: DS.text, fontSize: 12 }}>
+                          {fmt(quote.low)} ~ {fmt(quote.high)}
+                        </Text>
+                      </View>
+                      {quote.week52Low > 0 && quote.week52High > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text style={{ color: DS.textSub, fontSize: 12, marginRight: 6 }}>52주 범위</Text>
+                          <Text style={{ color: DS.text, fontSize: 12 }}>
+                            {fmt(quote.week52Low)} ~ {fmt(quote.week52High)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                  {stock?.type === 'etf' && quote?.dividendYield !== undefined && quote.dividendYield > 0 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+                      <Text style={{ color: DS.textSub, fontSize: 12, marginRight: 6 }}>배당률</Text>
+                      <Text style={{ color: DS.text, fontSize: 12, fontWeight: '600' }}>
+                        {quote.dividendYield.toFixed(2)}%
+                      </Text>
+                    </View>
+                  )}
+                  {!isKR && (
+                    <Text style={{ color: DS.textSub, fontSize: 11, marginTop: 6 }}>
+                      🇺🇸 {getUSMarketHoursKST()}
+                    </Text>
+                  )}
                 </>
               ) : (
                 <Text style={{ color: DS.textMuted, fontSize: 18 }}>데이터 없음</Text>
@@ -918,7 +936,7 @@ export default function StockDetailScreen() {
           <View style={{ padding: 16 }}>
             {!financialData ? (
               <View style={[s.infoCard, { marginHorizontal: 0, alignItems: 'center', paddingVertical: 40 }]}>
-                <ActivityIndicator color={'#0066FF'} size="large" />
+                <ActivityIndicator color={'#3478F6'} size="large" />
                 <Text style={{ color: DS.textSub, fontSize: 13, marginTop: 12 }}>종목 정보 불러오는 중...</Text>
               </View>
             ) : (
@@ -929,8 +947,8 @@ export default function StockDetailScreen() {
                     <Text style={{ color: DS.text, fontWeight: 'bold', fontSize: 15, marginBottom: 12 }}>🏢 기업 소개</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                       {financialData.sector && (
-                        <View style={{ backgroundColor: '#0066FF' + '15', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
-                          <Text style={{ color: '#0066FF', fontSize: 12, fontWeight: '700' }}>{financialData.sector}</Text>
+                        <View style={{ backgroundColor: '#3478F6' + '15', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
+                          <Text style={{ color: '#3478F6', fontSize: 12, fontWeight: '700' }}>{financialData.sector}</Text>
                         </View>
                       )}
                       {financialData.industry && (
@@ -976,7 +994,7 @@ export default function StockDetailScreen() {
                           {(() => {
                             const range = (quote.week52High ?? 1) - (quote.week52Low ?? 0);
                             const pos = range > 0 ? ((livePrice - (quote.week52Low ?? 0)) / range) * 100 : 50;
-                            return <View style={{ position: 'absolute', left: `${Math.min(Math.max(pos, 2), 98)}%` as any, top: -3, width: 14, height: 14, borderRadius: 7, backgroundColor: '#0066FF', borderWidth: 2, borderColor: '#fff' }} />;
+                            return <View style={{ position: 'absolute', left: `${Math.min(Math.max(pos, 2), 98)}%` as any, top: -3, width: 14, height: 14, borderRadius: 7, backgroundColor: '#3478F6', borderWidth: 2, borderColor: '#fff' }} />;
                           })()}
                         </View>
                         <Text style={{ color: DS.rise, fontSize: 11, fontWeight: '600', width: 52, textAlign: 'right' }}>{fmtOrDash(quote.week52High)}</Text>
@@ -1077,7 +1095,7 @@ export default function StockDetailScreen() {
                             {(() => {
                               const range = financialData.targetHigh - financialData.targetLow;
                               const pos = range > 0 ? ((livePrice - financialData.targetLow) / range) * 100 : 50;
-                              return <View style={{ position: 'absolute', left: `${Math.min(Math.max(pos, 2), 98)}%` as any, top: -3, width: 14, height: 14, borderRadius: 7, backgroundColor: '#0066FF', borderWidth: 2, borderColor: '#fff' }} />;
+                              return <View style={{ position: 'absolute', left: `${Math.min(Math.max(pos, 2), 98)}%` as any, top: -3, width: 14, height: 14, borderRadius: 7, backgroundColor: '#3478F6', borderWidth: 2, borderColor: '#fff' }} />;
                             })()}
                           </View>
                           <Text style={{ color: DS.rise, fontSize: 11, fontWeight: '600', width: 52, textAlign: 'right' }}>${financialData.targetHigh.toFixed(0)}</Text>
@@ -1171,6 +1189,7 @@ export default function StockDetailScreen() {
                 <TouchableOpacity onPress={() => setShowChartModal(false)}>
                   <Ionicons name="chevron-back" size={24} color={DS.text} />
                 </TouchableOpacity>
+                <StockLogo ticker={ticker} size={24} />
                 <Text style={{
                   flex: 1,
                   color: DS.text,

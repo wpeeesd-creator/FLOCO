@@ -70,7 +70,41 @@ export async function deleteUserProfile(uid: string): Promise<void> {
 
 // ── 커뮤니티 ─────────────────────────────────
 
-export type PostCategory = '전체' | '투자인증' | '분석' | '질문' | '자유';
+export type PostCategory = '질문' | '포트폴리오' | '시장뉴스';
+export type PostCategoryFilter = '전체' | PostCategory;
+
+// Legacy 카테고리 → 신규 3종 매핑 (read 방어 + 마이그레이션 공용)
+const LEGACY_CATEGORY_MAP: Record<string, PostCategory> = {
+  '전체': '질문',
+  '투자인증': '포트폴리오',
+  '분석': '시장뉴스',
+  '질문': '질문',
+  '자유': '질문',
+  '포트폴리오': '포트폴리오',
+  '시장뉴스': '시장뉴스',
+};
+
+export function normalizeCategory(category: string): PostCategory {
+  return LEGACY_CATEGORY_MAP[category] ?? '질문';
+}
+
+// likes 필드 방어 — array/map/undefined 어느 형태든 string[]로 정규화
+export function normalizeLikes(likes: any): string[] {
+  if (Array.isArray(likes)) return likes;
+  if (likes && typeof likes === 'object') {
+    return Object.keys(likes).filter(uid => likes[uid] === true);
+  }
+  return [];
+}
+
+export function getLikeCount(likes: any): number {
+  return normalizeLikes(likes).length;
+}
+
+export function isLikedByMe(likes: any, myUid: string | undefined): boolean {
+  if (!myUid) return false;
+  return normalizeLikes(likes).includes(myUid);
+}
 
 export interface CommunityPost {
   id: string;
@@ -110,14 +144,16 @@ export async function createPost(
   }
 }
 
-export async function getPosts(category?: PostCategory): Promise<CommunityPost[]> {
+export async function getPosts(category?: PostCategoryFilter): Promise<CommunityPost[]> {
   try {
     const col = collection(db, 'posts');
-    const q = category && category !== '전체'
-      ? query(col, where('category', '==', category), orderBy('createdAt', 'desc'), firestoreLimit(50))
-      : query(col, orderBy('createdAt', 'desc'), firestoreLimit(50));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as CommunityPost));
+    const snap = await getDocs(query(col, orderBy('createdAt', 'desc'), firestoreLimit(50)));
+    const normalized = snap.docs.map(d => {
+      const data = d.data();
+      return { id: d.id, ...data, category: normalizeCategory(data.category) } as CommunityPost;
+    });
+    if (!category || category === '전체') return normalized;
+    return normalized.filter(p => p.category === category);
   } catch (error) {
     console.error('getPosts 오류:', error);
     return [];
@@ -127,7 +163,9 @@ export async function getPosts(category?: PostCategory): Promise<CommunityPost[]
 export async function getPost(postId: string): Promise<CommunityPost | null> {
   try {
     const snap = await getDoc(doc(db, 'posts', postId));
-    return snap.exists() ? ({ id: snap.id, ...snap.data() } as CommunityPost) : null;
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return { id: snap.id, ...data, category: normalizeCategory(data.category) } as CommunityPost;
   } catch (error) {
     console.error('getPost 오류:', error);
     return null;

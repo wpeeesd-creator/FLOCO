@@ -13,11 +13,12 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
-import { fetchMultiplePrices, getExchangeRate } from '../utils/priceService';
 import { calculateTotalAsset } from '../utils/assetCalculator';
 import { updateMissionProgress } from '../lib/missionService';
+import { useAppStore } from '../store/appStore';
+import { Medal, Trophy, Globe, School } from 'lucide-react-native';
 
-const MEDALS = ['🥇', '🥈', '🥉'];
+const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];
 
 interface RankEntry {
   uid: string;
@@ -48,8 +49,7 @@ export default function RankingScreen() {
   const [rawUsers, setRawUsers] = useState<Array<{ uid: string; data: any }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<'전체' | '우리반'>('전체');
-  const [livePrices, setLivePrices] = useState<Record<string, any>>({});
-  const [exchangeRate, setExchangeRate] = useState(1380);
+  const { livePrices, exchangeRate, refreshPrices, refreshExchangeRate } = useAppStore();
 
   // ── 랭킹 화면 진입 시 데일리 미션 진행 (실패해도 화면은 정상) ──
   useEffect(() => {
@@ -90,12 +90,9 @@ export default function RankingScreen() {
     return () => unsubscribe();
   }, []);
 
-  // ── 환율 (USD→KRW) ──────────────────────────
-  useEffect(() => {
-    getExchangeRate().then(setExchangeRate).catch(() => {});
-  }, []);
-
-  // ── 시세 폴링: rawUsers 전체의 portfolio ticker, 30초 ──────
+  // ── 시세 / 환율 (store 단일 source) ─────────────
+  // rawUsers 전체 portfolio ticker union을 30초 간격으로 store에 refresh.
+  // rawUsers가 비어있으면 가격 refresh는 skip, 환율만 갱신.
   useEffect(() => {
     const allTickers = new Set<string>();
     rawUsers.forEach(({ data }) => {
@@ -103,24 +100,23 @@ export default function RankingScreen() {
         if (p?.ticker) allTickers.add(p.ticker);
       });
     });
-    if (allTickers.size === 0) return;
-    const stocks = Array.from(allTickers).map(t => ({
-      ticker: t,
-      isKR: t.length === 6 && /^\d+$/.test(t),
-    }));
-    fetchMultiplePrices(stocks).then(setLivePrices).catch(() => {});
+    const tickers = Array.from(allTickers);
+    refreshExchangeRate();
+    if (tickers.length > 0) refreshPrices(tickers);
     const interval = setInterval(() => {
-      fetchMultiplePrices(stocks).then(setLivePrices).catch(() => {});
+      refreshExchangeRate();
+      if (tickers.length > 0) refreshPrices(tickers);
     }, 30000);
     return () => clearInterval(interval);
-  }, [rawUsers.length, rawUsers.map(u => u.uid).join(',')]);
+  }, [rawUsers.length, rawUsers.map(u => u.uid).join(','), refreshPrices, refreshExchangeRate]);
 
   // ── 랭킹 계산 (raw + livePrices + exchangeRate) ─────────
   // 모든 사용자에게 동일한 공식 적용 — 홈/자산현황과 일치하는 실시간 시세·환율 반영
   const ranking = useMemo<RankEntry[]>(() => {
+    // store.livePrices(PriceData) → calculateTotalAsset가 요구하는 number map으로 평탄화
     const livePriceMap: Record<string, number> = {};
     for (const [k, v] of Object.entries(livePrices)) {
-      if (typeof (v as any)?.price === 'number') livePriceMap[k] = (v as any).price;
+      if (typeof v?.price === 'number') livePriceMap[k] = v.price;
     }
 
     const entries: RankEntry[] = rawUsers.map(({ uid, data }) => {
@@ -135,7 +131,7 @@ export default function RankingScreen() {
       });
 
       if (uid === user?.id) {
-        console.log('🏆 ranking totalAsset:', totalAsset);
+        console.log('ranking totalAsset:', totalAsset);
       }
 
       return {
@@ -309,9 +305,6 @@ export default function RankingScreen() {
                 {myGrowth.text}
               </Text>
             </View>
-            <Text style={{ fontSize: 40 }}>
-              {myData.investmentType?.emoji ?? '📊'}
-            </Text>
           </View>
         );
       })()}
@@ -324,9 +317,14 @@ export default function RankingScreen() {
             onPress={() => setSelectedTab(tab)}
             style={[s.tabBtn, selectedTab === tab && s.tabBtnActive]}
           >
-            <Text style={[s.tabBtnText, selectedTab === tab && s.tabBtnTextActive]}>
-              {tab === '전체' ? '🌍 전체' : '🏫 우리반'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {tab === '전체'
+                ? <Globe size={16} color={selectedTab === tab ? '#fff' : theme.text} />
+                : <School size={16} color={selectedTab === tab ? '#fff' : theme.text} />}
+              <Text style={[s.tabBtnText, selectedTab === tab && s.tabBtnTextActive]}>
+                {tab === '전체' ? '전체' : '우리반'}
+              </Text>
+            </View>
           </TouchableOpacity>
         ))}
       </View>
@@ -338,7 +336,7 @@ export default function RankingScreen() {
         contentContainerStyle={{ padding: 16 }}
         ListEmptyComponent={
           <View style={s.center}>
-            <Text style={{ fontSize: 48 }}>🏆</Text>
+            <Trophy size={48} color="#EAB308" strokeWidth={1.8} />
             <Text style={s.emptyTitle}>아직 참가자가 없어요</Text>
             <Text style={s.emptyText}>거래를 시작하면 랭킹에 표시돼요</Text>
           </View>
@@ -351,17 +349,13 @@ export default function RankingScreen() {
           return (
             <View style={[s.row, isMe && s.rowMe]}>
               {/* 순위 */}
-              <Text style={[s.rowRank, isTop3 && { fontSize: 24 }]}>
-                {index === 0 ? '🥇' :
-                 index === 1 ? '🥈' :
-                 index === 2 ? '🥉' :
-                 `${item.rank}`}
-              </Text>
-
-              {/* 투자유형 이모지 */}
-              <Text style={{ fontSize: 28, marginHorizontal: 8 }}>
-                {item.investmentType?.emoji ?? '📊'}
-              </Text>
+              {isTop3 ? (
+                <View style={[s.rowRank, { alignItems: 'center', justifyContent: 'center' }]}>
+                  <Medal size={26} color={MEDAL_COLORS[index]} strokeWidth={2} />
+                </View>
+              ) : (
+                <Text style={s.rowRank}>{item.rank}</Text>
+              )}
 
               {/* 닉네임 */}
               <View style={{ flex: 1 }}>
@@ -376,7 +370,10 @@ export default function RankingScreen() {
                   )}
                 </View>
                 {item.school?.name && (
-                  <Text style={s.rowSub}>🏫 {item.school.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    <School size={11} color={theme.textSecondary} />
+                    <Text style={s.rowSub}>{item.school.name}</Text>
+                  </View>
                 )}
               </View>
 

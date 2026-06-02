@@ -170,9 +170,7 @@ export default function USStockScreen() {
                   activeOpacity={0.7}
                 >
                   {/* Logo */}
-                  <View style={[styles.logoCircle, { backgroundColor: sUp ? '#F0FFF4' : '#FFF5F5' }]}>
-                    <Text style={{ fontSize: 20 }}>{s.logo}</Text>
-                  </View>
+                  <StockLogo ticker={s.ticker} size={44} />
 
                   {/* Name + Ticker */}
                   <View style={{ flex: 1, marginLeft: 12 }}>

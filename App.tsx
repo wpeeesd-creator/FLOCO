@@ -6,7 +6,27 @@
 import 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, LogBox } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, LogBox, Platform } from 'react-native';
+
+// 안드로이드 한글 폰트 padding 글로벌 제거 (시뮬레이터/실기기 일관 렌더링)
+if (Platform.OS === 'android') {
+  // @ts-ignore
+  if (Text.defaultProps == null) Text.defaultProps = {};
+  // @ts-ignore
+  Text.defaultProps.style = [
+    // @ts-ignore
+    Text.defaultProps?.style,
+    { includeFontPadding: false, textAlignVertical: 'center' },
+  ];
+  // @ts-ignore
+  if (TextInput.defaultProps == null) TextInput.defaultProps = {};
+  // @ts-ignore
+  TextInput.defaultProps.style = [
+    // @ts-ignore
+    TextInput.defaultProps?.style,
+    { includeFontPadding: false, textAlignVertical: 'center' },
+  ];
+}
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';

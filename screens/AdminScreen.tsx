@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, TouchableOpacity, ScrollView, Alert, FlatList, TextInput, Platform } from 'react-native';
 import { Text } from '../components/ui/Text';
-import { collection, getDocs, updateDoc, doc, query, orderBy, where } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, query, orderBy, where, writeBatch } from 'firebase/firestore';
+import { normalizeCategory } from '../lib/firestoreService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { db } from '../lib/firebase';
@@ -114,6 +115,43 @@ export default function AdminScreen() {
     );
   };
 
+  const handleMigrateCategories = () => {
+    Alert.alert(
+      '카테고리 마이그레이션',
+      '기존 글의 카테고리를 3종(질문/포트폴리오/시장뉴스)으로 정규화합니다. 진행할까요?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '진행',
+          onPress: async () => {
+            try {
+              const postsRef = collection(db, 'posts');
+              const snapshot = await getDocs(postsRef);
+              const batch = writeBatch(db);
+              let migrated = 0;
+              let valid = 0;
+              snapshot.forEach(docSnap => {
+                const data = docSnap.data();
+                const oldCategory = data.category as string;
+                const newCategory = normalizeCategory(oldCategory);
+                if (oldCategory !== newCategory) {
+                  batch.update(docSnap.ref, { category: newCategory });
+                  migrated++;
+                } else {
+                  valid++;
+                }
+              });
+              if (migrated > 0) await batch.commit();
+              Alert.alert('완료', `변환: ${migrated}개 / 이미 유효: ${valid}개`);
+            } catch (e: any) {
+              Alert.alert('오류', e?.message ?? '마이그레이션 실패');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const filteredTrades = trades.filter(t =>
     t.ticker?.includes(searchText.toUpperCase()) || t.userEmail?.includes(searchText)
   );
@@ -150,9 +188,14 @@ export default function AdminScreen() {
       <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: theme.bgCard, borderBottomWidth: 1, borderBottomColor: theme.border }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text }}>🛡️ 관리자</Text>
-          <TouchableOpacity onPress={handleResetAll} style={{ backgroundColor: theme.red, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
-            <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>전체 초기화</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            <TouchableOpacity onPress={handleMigrateCategories} style={{ backgroundColor: theme.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>카테고리 정규화</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleResetAll} style={{ backgroundColor: theme.red, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>전체 초기화</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <TouchableOpacity
           onPress={() => navigation.navigate('관리자종합')}

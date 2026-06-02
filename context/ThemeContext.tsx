@@ -5,7 +5,7 @@ const lightTheme = {
   bg: '#F2F4F6', bgCard: '#FFFFFF', bgInput: '#F2F4F6',
   bgHeader: '#FFFFFF', bgButton: '#F2F4F6',
   text: '#191F28', textSecondary: '#8B95A1', textTertiary: '#B0B8C1',
-  primary: '#0066FF', primaryLight: '#EBF2FF',
+  primary: '#3478F6', primaryLight: '#EEF4FF',
   red: '#F04452', redLight: '#FFF0F0',
   blue: '#2175F3', blueLight: '#F0F4FF',
   green: '#34C759', border: '#F2F4F6', borderStrong: '#E5E8EB',

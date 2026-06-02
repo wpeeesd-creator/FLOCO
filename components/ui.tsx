@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ── 토스증권 컬러 시스템 ────────────────────────
 export const Colors = {
-  primary: '#0066FF',
+  primary: '#3478F6',
   primaryDark: '#0052CC',
   bg: '#F2F4F6',
   card: '#FFFFFF',

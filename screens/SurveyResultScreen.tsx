@@ -23,6 +23,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
+import StockLogo from '../components/StockLogo';
 import { useTheme } from '../context/ThemeContext';
 import {
   MBTI_MAP, INVEST_TYPES, getInvestorsForType, getStockCompatibility,
@@ -33,7 +34,7 @@ import { useAppStore, STOCKS } from '../store/appStore';
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // ── 도넛차트 ─────────────────────────────────────
-const DONUT_COLORS = ['#FF3B30', '#FF9500', '#34C759', '#0066FF', '#5856D6', '#AF52DE', '#FF2D55'];
+const DONUT_COLORS = ['#FF3B30', '#FF9500', '#34C759', '#3478F6', '#5856D6', '#AF52DE', '#FF2D55'];
 
 function DonutChart({ data, size = 120 }: { data: Array<{ weight: number; ticker: string }>; size?: number }) {
   const radius = (size - 16) / 2;
@@ -377,7 +378,9 @@ export default function SurveyResultScreen() {
               {holdingsCompat.length > 0 ? (
                 holdingsCompat.slice(0, 5).map((h: any) => (
                   <TouchableOpacity key={h.ticker} style={s.compatRow} onPress={() => navigateToStock(h.ticker)} activeOpacity={0.6}>
-                    <Text style={{ fontSize: 20, marginRight: 10 }}>{h.logo}</Text>
+                    <View style={{ marginRight: 10 }}>
+                      <StockLogo ticker={h.ticker} size={40} />
+                    </View>
                     <Text style={s.compatName}>{h.name}</Text>
                     <Text style={[s.compatScore, { color: h.score >= 80 ? typeInfo.color : h.score >= 60 ? '#FF9500' : Colors.textSub }]}>
                       {h.score}% 일치

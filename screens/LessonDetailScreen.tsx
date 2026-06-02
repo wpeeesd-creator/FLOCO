@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore, LESSONS } from '../store/appStore';
 import { Colors, Typography, Button, Badge, BottomSheet, Hearts } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
+import { Check, CheckCircle2, XCircle, PartyPopper, Award, Coins, Flame } from 'lucide-react-native';
 
 export default function LessonDetailScreen() {
   const { theme } = useTheme();
@@ -146,7 +147,7 @@ export default function LessonDetailScreen() {
               <Text style={[Typography.h3, { marginBottom: 8 }]}>핵심 포인트</Text>
               {lesson.keypoints.map((kp, i) => (
                 <View key={i} style={styles.keypointRow}>
-                  <Text style={styles.keypointDot}>✓</Text>
+                  <Check size={14} color={Colors.primary} />
                   <Text style={[Typography.body1, { flex: 1 }]}>{kp}</Text>
                 </View>
               ))}
@@ -200,15 +201,15 @@ export default function LessonDetailScreen() {
                     {String.fromCharCode(65 + i)}
                   </Text>
                   <Text style={[Typography.body1, { flex: 1, color: textColor }]}>{opt}</Text>
-                  {answered && i === lesson.quiz.ans && <Text style={{ fontSize: 18 }}>✅</Text>}
-                  {answered && i === selected && i !== lesson.quiz.ans && <Text style={{ fontSize: 18 }}>❌</Text>}
+                  {answered && i === lesson.quiz.ans && <CheckCircle2 size={20} color="#22C55E" />}
+                  {answered && i === selected && i !== lesson.quiz.ans && <XCircle size={20} color="#EF4444" />}
                 </TouchableOpacity>
               );
             })}
 
             {answered && (
               <Button
-                title={selected === lesson.quiz.ans ? '완료하기 🎉' : '다시 도전'}
+                title={selected === lesson.quiz.ans ? '완료하기' : '다시 도전'}
                 onPress={handleFinish}
                 variant={selected === lesson.quiz.ans ? 'primary' : 'danger'}
                 size="lg"
@@ -220,15 +221,19 @@ export default function LessonDetailScreen() {
       </ScrollView>
 
       {/* 보상 Bottom Sheet */}
-      <BottomSheet visible={showReward} onClose={handleComplete} title="🎉 레슨 완료!">
+      <BottomSheet visible={showReward} onClose={handleComplete} title="레슨 완료!">
         <View style={styles.rewardContent}>
-          <Text style={styles.rewardEmoji}>{lesson.reward.type === 'badge' ? '🏅' : '💰'}</Text>
+          <View style={{ marginBottom: 12 }}>
+            {lesson.reward.type === 'badge'
+              ? <Award size={48} color="#EAB308" />
+              : <Coins size={48} color="#EAB308" />}
+          </View>
           <Text style={[Typography.h2, { textAlign: 'center', marginBottom: 4 }]}>{lesson.reward.label}</Text>
           <Text style={[Typography.body2, { textAlign: 'center', marginBottom: 12 }]}>{lesson.reward.desc}</Text>
           {resultData && (
             <View style={styles.xpRow}>
               <Badge label={`+${resultData.xpGained} XP`} type="success" />
-              {resultData.streakBonus && <Badge label="🔥 스트릭 보너스!" type="warning" />}
+              {resultData.streakBonus && <Badge label="스트릭 보너스!" type="warning" />}
               {resultData.levelUp && <Badge label="⬆️ 레벨업!" type="info" />}
             </View>
           )}

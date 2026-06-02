@@ -20,8 +20,10 @@ import { useAuth } from '../context/AuthContext';
 import { STOCKS } from '../store/appStore';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
+import { Medal, Users } from 'lucide-react-native';
 
-const MEDALS = ['🥇', '🥈', '🥉'];
+const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];
+
 const INITIAL_FUND = 10_000_000;
 
 interface ClassMember {
@@ -67,7 +69,7 @@ export default function ClassRankingScreen({ classId, schoolName, cohort }: Clas
         return {
           uid: d.id,
           name: data?.name ?? '익명',
-          investEmoji: data?.investmentType?.emoji ?? '📊',
+          investEmoji: data?.investmentType?.emoji ?? '',
           totalAsset,
           returnRate,
         };
@@ -147,7 +149,7 @@ export default function ClassRankingScreen({ classId, schoolName, cohort }: Clas
       {/* 랭킹 리스트 */}
       {ranked.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyEmoji}>👥</Text>
+          <Users size={48} color={theme.textSecondary} strokeWidth={1.8} />
           <Text style={styles.emptyText}>
             아직 같은 기수 친구들이 없어요{'\n'}친구들을 초대해보세요!
           </Text>
@@ -172,10 +174,13 @@ export default function ClassRankingScreen({ classId, schoolName, cohort }: Clas
             const isUp = item.returnRate >= 0;
             return (
               <View style={[styles.row, isMe && styles.rowMe]}>
-                <Text style={styles.rank}>
-                  {index < 3 ? MEDALS[index] : `${index + 1}`}
-                </Text>
-                <Text style={styles.rowEmoji}>{item.investEmoji}</Text>
+                {index < 3 ? (
+                  <View style={[styles.rank, { alignItems: 'center', justifyContent: 'center' }]}>
+                    <Medal size={24} color={MEDAL_COLORS[index]} strokeWidth={2} />
+                  </View>
+                ) : (
+                  <Text style={styles.rank}>{index + 1}</Text>
+                )}
                 <View style={styles.rowMeta}>
                   <Text style={styles.rowName}>
                     {item.name}{isMe ? ' (나)' : ''}

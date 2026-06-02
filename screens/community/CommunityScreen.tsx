@@ -18,21 +18,22 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
   getPosts, toggleLike,
+  normalizeLikes, isLikedByMe, getLikeCount,
   type CommunityPost,
 } from '../../lib/firestoreService';
 import { updateMissionProgress } from '../../lib/missionService';
+import { STOCKS } from '../../store/appStore';
 
-const TAGS = ['전체', '구독', '#모의투자', '#주식공부', '#수익인증', '#질문있어요', '#경제뉴스'] as const;
-type Tag = typeof TAGS[number];
-
-const TAG_TO_CATEGORY: Record<string, string> = {
-  '전체': '전체',
-  '#모의투자': '투자인증',
-  '#주식공부': '분석',
-  '#수익인증': '투자인증',
-  '#질문있어요': '질문',
-  '#경제뉴스': '자유',
+const navigateToTicker = (navigation: any, ticker: string) => {
+  if (STOCKS.some(s => s.ticker === ticker)) {
+    navigation.navigate('종목상세', { ticker });
+  } else {
+    Alert.alert('알림', '해당 종목 정보를 찾을 수 없어요.');
+  }
 };
+
+const TAGS = ['전체', '질문', '포트폴리오', '시장뉴스'] as const;
+type Tag = typeof TAGS[number];
 
 const POPULAR_TAGS = [
   { rank: 1, tag: '#모의투자', subscribers: 1243 },
@@ -80,29 +81,15 @@ export default function CommunityScreen({ navigation }: Props) {
 
   const loadPosts = useCallback(async () => {
     try {
-      if (selectedTag === '구독') {
-        // Fetch all posts, then filter client-side by subscribed tags
-        const data = await getPosts('전체' as any);
-        const filtered = data.filter((p) => {
-          const postTags = [
-            `#${p.category}`,
-            ...p.tickers.map((t) => `#${t}`),
-          ];
-          return subscribedTags.some((st) => postTags.includes(st));
-        });
-        setPosts(filtered);
-      } else {
-        const category = TAG_TO_CATEGORY[selectedTag] as any;
-        const data = await getPosts(category);
-        setPosts(data);
-      }
+      const data = await getPosts(selectedTag);
+      setPosts(data);
     } catch {
       setPosts([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedTag, subscribedTags]);
+  }, [selectedTag]);
 
   useEffect(() => {
     setLoading(true);
@@ -118,7 +105,7 @@ export default function CommunityScreen({ navigation }: Props) {
     if (!user?.id) return;
     // 토글 전 상태로 "좋아요 추가" 여부 판별 (취소면 미션 호출 X)
     const targetPost = posts.find((p) => p.id === postId);
-    const wasLiked = targetPost ? (targetPost.likes ?? []).includes(user.id) : false;
+    const wasLiked = targetPost ? isLikedByMe(targetPost.likes, user.id) : false;
     await toggleLike(postId, user.id);
     if (!wasLiked) {
       try {
@@ -158,8 +145,8 @@ export default function CommunityScreen({ navigation }: Props) {
   const remainingPosts = posts.slice(3);
 
   const PostCard = ({ post }: { post: CommunityPost }) => {
-    const postLikes = post.likes ?? [];
-    const liked = user ? postLikes.includes(user.id) : false;
+    const liked = isLikedByMe(post.likes, user?.id);
+    const likeCount = getLikeCount(post.likes);
     return (
       <TouchableOpacity
         style={styles.postCard}
@@ -169,7 +156,16 @@ export default function CommunityScreen({ navigation }: Props) {
         {/* Tags */}
         <View style={styles.cardTagRow}>
           {(post.tickers ?? []).map((t) => (
-            <Text key={t} style={styles.cardTag}>#{t}</Text>
+            <TouchableOpacity
+              key={t}
+              onPress={(e) => {
+                e.stopPropagation();
+                navigateToTicker(navigation, t);
+              }}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+            >
+              <Text style={styles.cardTag}>#{t}</Text>
+            </TouchableOpacity>
           ))}
           <Text style={styles.cardTag}>#{post.category}</Text>
         </View>
@@ -190,7 +186,7 @@ export default function CommunityScreen({ navigation }: Props) {
               size={16}
               color={liked ? theme.red : Colors.textSub}
             />
-            <Text style={styles.actionText}>{postLikes.length}</Text>
+            <Text style={styles.actionText}>{likeCount}</Text>
           </TouchableOpacity>
           <View style={styles.actionBtn}>
             <Ionicons name="chatbubble-outline" size={16} color={Colors.textSub} />

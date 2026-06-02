@@ -10,6 +10,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
+import { CheckCircle2, Lock, BookOpen, Newspaper, Flag, BarChart3, Building2, Brain, Landmark, PieChart, Calculator } from 'lucide-react-native';
+
+const CATEGORY_ICONS: Record<string, any> = {
+  BookOpen, Newspaper, Flag, BarChart3, Building2, Brain, Landmark, PieChart, Calculator,
+};
 import {
   learningContent, CATEGORY_META,
   type CategoryId, type DuoLevel,
@@ -68,12 +73,14 @@ export default function CourseListScreen() {
         <View style={styles.cardRow}>
           <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
             {isCompleted ? (
-              <Text style={styles.iconEmoji}>✅</Text>
+              <CheckCircle2 size={18} color="#22C55E" />
             ) : isLocked ? (
-              <Text style={styles.iconEmoji}>🔒</Text>
-            ) : (
-              <Text style={styles.iconEmoji}>{meta?.emoji ?? '📖'}</Text>
-            )}
+              <Lock size={18} color={Colors.textSub} />
+            ) : (() => {
+              const iconName = category?.iconName;
+              const Icon = iconName ? CATEGORY_ICONS[iconName] : BookOpen;
+              return <Icon size={20} color={borderColor} strokeWidth={1.8} />;
+            })()}
           </View>
           <View style={styles.cardContent}>
             <Text style={[styles.levelTitle, isLocked && styles.lockedText]}>{level.title}</Text>
@@ -143,7 +150,11 @@ export default function CourseListScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerEmoji}>{meta?.emoji ?? '📖'}</Text>
+        {(() => {
+          const iconName = category?.iconName;
+          const Icon = iconName ? CATEGORY_ICONS[iconName] : BookOpen;
+          return <Icon size={22} color={borderColor} strokeWidth={1.8} style={{ marginRight: 6 }} />;
+        })()}
         <Text style={styles.headerTitle}>{meta?.title ?? categoryId}</Text>
       </View>
 

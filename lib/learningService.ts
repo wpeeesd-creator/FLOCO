@@ -16,6 +16,28 @@ export interface LearningData {
   wrongAnswers: string[];     // question IDs
   reviewSchedule: ReviewItem[];
   categoryProgress: Record<string, { completed: number; total: number }>;
+  // 데일리 OX 5문제. lastDate가 오늘이 아니면 미풀이.
+  dailyQuiz?: {
+    lastDate: string;       // YYYY-MM-DD
+    correctCount: number;
+    totalCount: number;
+  };
+}
+
+/** 오늘 데일리 OX를 이미 풀었는지 */
+export function isDailyQuizDoneToday(dailyQuiz?: LearningData['dailyQuiz']): boolean {
+  if (!dailyQuiz) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return dailyQuiz.lastDate === today;
+}
+
+// 완료한 레슨 개수로 사용자 학습 레벨을 단순 추정. 진단 퀴즈는 차기 빌드 예정.
+export function estimateUserLevel(completedLessons: string[]): '입문' | '초급' | '중급' | '고급' {
+  const count = completedLessons.length;
+  if (count < 10) return '입문';
+  if (count < 30) return '초급';
+  if (count < 60) return '중급';
+  return '고급';
 }
 
 const DEFAULT_LEARNING: LearningData = {

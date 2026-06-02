@@ -18,13 +18,22 @@ import {
   CATEGORIES,
   CATEGORY_META,
   learningContent,
+  LEVEL_EMOJI,
   type CategoryId,
+  type Level,
 } from '../data/learningContent';
-import { getLearningData, type LearningData } from '../lib/learningService';
+import { getLearningData, estimateUserLevel, type LearningData } from '../lib/learningService';
+import DailyQuizCard from '../components/DailyQuizCard';
+import { Flame, Heart, CheckCircle2, NotebookPen, BookOpen, Newspaper, Flag, BarChart3, Building2, Brain, Landmark, PieChart, Calculator } from 'lucide-react-native';
+
+const CATEGORY_ICONS: Record<string, any> = {
+  BookOpen, Newspaper, Flag, BarChart3, Building2, Brain, Landmark, PieChart, Calculator,
+};
 
 const CATEGORY_DESCRIPTIONS: Record<CategoryId, string> = {
   vocabulary: '시가, 종가, PER, PBR 등 필수 용어',
   newsLearning: '뉴스가 주가에 미치는 영향 분석',
+  ktrend: 'K-pop, 게임, 좋아하는 브랜드와 주식',
   chartAnalysis: '캔들차트, 이동평균선, RSI 분석',
   companyAnalysis: '재무제표 읽기, 해자 분석',
   psychology: '공포와 탐욕, 손실회피 편향',
@@ -60,14 +69,25 @@ export default function LearningScreen() {
     setRefreshing(false);
   }, [loadData]);
 
+  const userLevel: Level = learningData
+    ? estimateUserLevel(learningData.completedLessons)
+    : '입문';
+
   const getFirstIncomplete = () => {
     if (!learningData) return null;
-    for (const catId of CATEGORIES) {
-      const cat = learningContent[catId];
-      for (const level of cat.levels) {
-        const lessonId = `${catId}_${level.id}`;
-        if (!learningData.completedLessons.includes(lessonId)) {
-          return { categoryId: catId, level, lessonId };
+    const LEVEL_ORDER: Level[] = ['입문', '초급', '중급', '고급'];
+    const startIdx = LEVEL_ORDER.indexOf(userLevel);
+    // 사용자 레벨부터 위로 한 단계씩 탐색 → 못 찾으면 더 높은 레벨로 fallback
+    for (let i = startIdx; i < LEVEL_ORDER.length; i++) {
+      const targetLevel = LEVEL_ORDER[i];
+      for (const catId of CATEGORIES) {
+        const cat = learningContent[catId];
+        if (cat.level !== targetLevel) continue;
+        for (const level of cat.levels) {
+          const lessonId = `${catId}_${level.id}`;
+          if (!learningData.completedLessons.includes(lessonId)) {
+            return { categoryId: catId, level, lessonId };
+          }
         }
       }
     }
@@ -179,13 +199,13 @@ export default function LearningScreen() {
           {/* Status Bar */}
           <View style={styles.statusBar}>
             <View style={styles.statusItem}>
-              <Text style={styles.statusEmoji}>🔥</Text>
+              <Flame size={20} color="#F97316" />
               <Text style={styles.statusValue}>{streak}</Text>
               <Text style={styles.statusLabel}>연속학습</Text>
             </View>
             <View style={styles.statusDivider} />
             <View style={styles.statusItem}>
-              <Text style={styles.statusEmoji}>❤️</Text>
+              <Heart size={20} fill="#EF4444" color="#EF4444" />
               <Text style={styles.statusValue}>{hearts}/3</Text>
               <Text style={styles.statusLabel}>하트</Text>
             </View>
@@ -197,10 +217,18 @@ export default function LearningScreen() {
             </View>
           </View>
 
+          {/* Daily OX */}
+          <DailyQuizCard learningData={learningData} />
+
           {/* Today's Lesson Card */}
           {firstIncomplete && (
             <View style={styles.todayCard}>
-              <Text style={styles.todayLabel}>오늘의 레슨</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={styles.todayLabel}>오늘의 레슨</Text>
+                <Text style={{ color: Colors.textSub, fontSize: 12, fontWeight: '600' }}>
+                  현재 레벨 {LEVEL_EMOJI[userLevel]} {userLevel}
+                </Text>
+              </View>
               <Text style={styles.todayTitle} numberOfLines={2}>
                 {firstIncomplete.level.title}
               </Text>
@@ -248,10 +276,22 @@ export default function LearningScreen() {
                 activeOpacity={0.75}
               >
                 <View style={[styles.categoryIcon, { backgroundColor: color + '33' }]}>
-                  <Text style={styles.categoryEmoji}>{meta.emoji}</Text>
+                  {(() => {
+                    const iconName = learningContent[catId]?.iconName;
+                    const Icon = iconName ? CATEGORY_ICONS[iconName] : null;
+                    return Icon
+                      ? <Icon size={32} color={color} strokeWidth={1.8} />
+                      : <Text style={styles.categoryEmoji}>{meta.emoji}</Text>;
+                  })()}
                 </View>
                 <View style={styles.categoryCenter}>
-                  <Text style={styles.categoryTitle}>{meta.title}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.categoryTitle}>{meta.title}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: color + '20' }}>
+                      <Text style={{ fontSize: 10 }}>{learningContent[catId].levelEmoji}</Text>
+                      <Text style={{ color, fontSize: 10, fontWeight: '700' }}>{learningContent[catId].level}</Text>
+                    </View>
+                  </View>
                   <Text style={styles.categoryDesc} numberOfLines={1}>
                     {CATEGORY_DESCRIPTIONS[catId]}
                   </Text>
@@ -266,7 +306,7 @@ export default function LearningScreen() {
                 </View>
                 <View style={styles.categoryRight}>
                   {allDone ? (
-                    <Text style={styles.categoryDone}>✅</Text>
+                    <CheckCircle2 size={16} color="#22C55E" />
                   ) : (
                     <Text style={[styles.categoryPct, { color }]}>{pct}%</Text>
                   )}
@@ -282,7 +322,7 @@ export default function LearningScreen() {
             activeOpacity={0.75}
           >
             <View style={styles.wrongLeft}>
-              <Text style={styles.wrongEmoji}>📝</Text>
+              <NotebookPen size={18} color={Colors.textSub} />
               <View style={styles.wrongTextBlock}>
                 <View style={styles.wrongTitleRow}>
                   <Text style={styles.wrongTitle}>오답 노트</Text>

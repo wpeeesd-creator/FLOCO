@@ -16,6 +16,9 @@ import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { Medal, Trophy } from 'lucide-react-native';
+
+const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];
 import * as Haptics from 'expo-haptics';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -28,7 +31,7 @@ import { getEvents, joinEvent, type AppEvent } from '../lib/adminService';
 const DUMMY_EVENTS: AppEvent[] = [
   {
     id: 'event_1',
-    title: '🏆 3월 수익률 챌린지',
+    title: '3월 수익률 챌린지',
     description: '이번 달 가장 높은 수익률을 달성한 투자자에게 보상을 드립니다!',
     type: 'profit_rate',
     startDate: Date.now() - 86400000 * 27,
@@ -40,7 +43,7 @@ const DUMMY_EVENTS: AppEvent[] = [
   },
   {
     id: 'event_2',
-    title: '📚 7일 연속 학습 챌린지',
+    title: '7일 연속 학습 챌린지',
     description: '7일 연속으로 학습을 완료하면 보상을 드려요!',
     type: 'learning_streak',
     startDate: Date.now() - 86400000 * 3,
@@ -52,7 +55,7 @@ const DUMMY_EVENTS: AppEvent[] = [
   },
   {
     id: 'event_3',
-    title: '💰 거래왕 챌린지',
+    title: '거래왕 챌린지',
     description: '이번 주 가장 많이 거래한 투자자에게 보상!',
     type: 'trade_count',
     startDate: Date.now() - 86400000 * 4,
@@ -64,7 +67,6 @@ const DUMMY_EVENTS: AppEvent[] = [
   },
 ];
 
-const REWARD_EMOJIS = ['🥇', '🥈', '🥉'];
 
 // ── 유틸 ──────────────────────────────────────────
 function formatDate(ts: number): string {
@@ -131,7 +133,7 @@ function EventCard({ event, userId, onJoin, onPress }: EventCardProps) {
       <View style={styles.rewardsRow}>
         {event.rewards.slice(0, 3).map((r, i) => (
           <View key={r.rank} style={styles.rewardItem}>
-            <Text style={styles.rewardEmoji}>{REWARD_EMOJIS[i] ?? ''}</Text>
+            {i < 3 ? <Medal size={18} color={MEDAL_COLORS[i]} strokeWidth={2} /> : null}
             <Text style={styles.rewardAmount}>{formatAmount(r.amount)}</Text>
             <Text style={styles.rewardRank}>{r.rank}위</Text>
           </View>
@@ -154,7 +156,7 @@ function EventCard({ event, userId, onJoin, onPress }: EventCardProps) {
             disabled={isJoined}
           >
             <Text style={[styles.joinBtnText, { color: theme.bgCard }, isJoined && styles.joinBtnTextJoined]}>
-              {isJoined ? '참여중 ✅' : '참여하기'}
+              {isJoined ? '참여중' : '참여하기'}
             </Text>
           </TouchableOpacity>
         )}
@@ -224,7 +226,7 @@ export default function EventScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>이벤트 & 챌린지 🏆</Text>
+        <Text style={styles.headerTitle}>이벤트 & 챌린지</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -235,7 +237,7 @@ export default function EventScreen() {
         </View>
       ) : events.length === 0 ? (
         <View style={styles.loadingContainer}>
-          <Text style={{ fontSize: 48, marginBottom: 12 }}>🏆</Text>
+          <Trophy size={48} color={Colors.textSub} strokeWidth={1.8} style={{ marginBottom: 12 }} />
           <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.text }}>아직 진행 중인 이벤트가 없어요</Text>
           <Text style={{ fontSize: 14, color: Colors.textSub, marginTop: 6 }}>곧 새로운 이벤트가 열릴 예정이에요!</Text>
         </View>
@@ -256,7 +258,10 @@ export default function EventScreen() {
           {/* 진행중 */}
           {activeEvents.length > 0 && (
             <>
-              <Text style={styles.sectionHeader}>🔴 진행중</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF4444' }} />
+                <Text style={styles.sectionHeader}>진행중</Text>
+              </View>
               {activeEvents.map(event => (
                 <EventCard
                   key={event.id}
@@ -272,7 +277,7 @@ export default function EventScreen() {
           {/* 예정된 이벤트 */}
           {upcomingEvents.length > 0 && (
             <>
-              <Text style={styles.sectionHeader}>📅 예정된 이벤트</Text>
+              <Text style={styles.sectionHeader}>예정된 이벤트</Text>
               {upcomingEvents.map(event => (
                 <EventCard
                   key={event.id}
@@ -288,7 +293,7 @@ export default function EventScreen() {
           {/* 종료된 이벤트 */}
           {endedEvents.length > 0 && (
             <>
-              <Text style={styles.sectionHeader}>✅ 종료된 이벤트</Text>
+              <Text style={styles.sectionHeader}>종료된 이벤트</Text>
               {endedEvents.map(event => (
                 <EventCard
                   key={event.id}

@@ -24,7 +24,7 @@
         "NSPhotoLibraryUsageDescription": "프로필 사진 선택",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "4"
+      "buildNumber": "11"
     },
     "android": {
       "adaptiveIcon": {
@@ -33,7 +33,7 @@
       },
       "softwareKeyboardLayoutMode": "pan",
       "package": "com.floco.app",
-      "versionCode": 1,
+      "versionCode": 11,
       "permissions": [
         "android.permission.NOTIFICATIONS",
         "android.permission.INTERNET",

@@ -19,6 +19,11 @@ import { Text } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  Wallet, BookOpen, TrendingUp, Award, Users,
+  Flame, Star, CheckCircle2,
+  IdCard, Sparkles, Settings,
+} from 'lucide-react-native';
 import { doc, getDoc, updateDoc, onSnapshot, increment } from 'firebase/firestore';
 import * as Haptics from 'expo-haptics';
 import * as SecureStore from 'expo-secure-store';
@@ -27,7 +32,7 @@ import { useAppStore, STOCKS } from '../store/appStore';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../components/ui';
-import { BADGE_DEFINITIONS } from './BadgeScreen';
+import { BADGE_DEFINITIONS, BADGE_ICONS } from './BadgeScreen';
 import { fetchMultiplePrices, getExchangeRate } from '../utils/priceService';
 import { registerPushToken, removePushToken } from '../utils/pushToken';
 
@@ -254,7 +259,7 @@ export default function ProfileScreen() {
   // ── Account reset ────────────────────────────────────────────────────
   const resetAccount = () => {
     Alert.alert(
-      '⚠️ 계좌 초기화',
+      '계좌 초기화',
       '정말 초기화할까요?\n\n초기화 시:\n• 잔액 → 100만원으로 리셋\n• 보유 종목 전체 삭제\n• 거래내역 전체 삭제\n• 학습 기록은 유지됩니다\n\n이 작업은 되돌릴 수 없어요!',
       [
         { text: '취소', style: 'cancel' },
@@ -391,11 +396,13 @@ export default function ProfileScreen() {
         {/* ── 프로필 카드 ─────────────────────────────── */}
         <View style={styles.card}>
           {/* Avatar */}
-          <View style={styles.avatarWrap}>
+          <View style={[styles.avatarWrap, !profileImage && { backgroundColor: theme.primary }]}>
             {profileImage ? (
               <Image source={{ uri: profileImage }} style={{ width: 80, height: 80, borderRadius: 40 }} />
             ) : (
-              <Text style={styles.avatarEmoji}>{investmentType?.emoji ?? '👤'}</Text>
+              <Text style={{ color: '#fff', fontSize: 32, fontWeight: '700' }}>
+                {(nickname ?? currentUser?.name ?? '?').charAt(0)}
+              </Text>
             )}
           </View>
 
@@ -438,7 +445,10 @@ export default function ProfileScreen() {
             </View>
           ) : (
             <TouchableOpacity style={styles.verifyBtn} onPress={() => navigation.navigate('실명인증')} activeOpacity={0.7}>
-              <Text style={styles.verifyBtnText}>🪪 실명 인증하기</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <IdCard size={16} color={theme.text} />
+                <Text style={styles.verifyBtnText}>실명 인증하기</Text>
+              </View>
             </TouchableOpacity>
           )}
 
@@ -450,7 +460,7 @@ export default function ProfileScreen() {
               activeOpacity={0.7}
             >
               <Text style={styles.typeBadgeText}>
-                {investmentType.emoji}{'  '}{investmentType.title}{'  '}
+                {investmentType.title}{'  '}
                 <Text style={{ color: theme.textSecondary, fontWeight: '400' }}>
                   {investmentType.mbti ?? investmentType.mbtiLike}
                 </Text>
@@ -464,14 +474,20 @@ export default function ProfileScreen() {
               onPress={() => navigation.navigate('투자유형설문')}
               activeOpacity={0.8}
             >
-              <Text style={styles.surveyBtnText}>🔮  내 투자 유형 분석하기</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={16} color={theme.text} />
+                <Text style={styles.surveyBtnText}>내 투자 유형 분석하기</Text>
+              </View>
             </TouchableOpacity>
           )}
         </View>
 
         {/* ── 자산 현황 카드 ───────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.cardHeader}>💰 자산 현황</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Wallet size={16} color={theme.text} />
+            <Text style={styles.cardHeader}>자산 현황</Text>
+          </View>
           <View style={styles.statGrid}>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>총 자산</Text>
@@ -509,20 +525,23 @@ export default function ProfileScreen() {
 
         {/* ── 학습 현황 카드 ───────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.cardHeader}>📚 학습 현황</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <BookOpen size={16} color={theme.text} />
+            <Text style={styles.cardHeader}>학습 현황</Text>
+          </View>
           <View style={styles.learnRow}>
             <View style={styles.learnItem}>
-              <Text style={styles.learnEmoji}>🔥</Text>
+              <Flame size={24} color="#F97316" strokeWidth={2} />
               <Text style={styles.learnValue}>{learningData.streak}일</Text>
               <Text style={styles.learnLabel}>연속학습</Text>
             </View>
             <View style={[styles.learnItem, styles.learnBorderLeft]}>
-              <Text style={styles.learnEmoji}>⭐</Text>
+              <Star size={24} color="#EAB308" fill="#EAB308" strokeWidth={2} />
               <Text style={styles.learnValue}>{learningData.totalPoints.toLocaleString('ko-KR')}</Text>
               <Text style={styles.learnLabel}>총 포인트</Text>
             </View>
             <View style={[styles.learnItem, styles.learnBorderLeft]}>
-              <Text style={styles.learnEmoji}>✅</Text>
+              <CheckCircle2 size={24} color="#22C55E" strokeWidth={2} />
               <Text style={styles.learnValue}>{learningData.completedLessons.length}개</Text>
               <Text style={styles.learnLabel}>완료</Text>
             </View>
@@ -538,7 +557,10 @@ export default function ProfileScreen() {
 
         {/* ── 거래 현황 카드 ───────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.cardHeader}>📈 거래 현황</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TrendingUp size={16} color={theme.text} />
+            <Text style={styles.cardHeader}>거래 현황</Text>
+          </View>
           <View style={styles.learnRow}>
             <View style={styles.learnItem}>
               <Text style={styles.learnValue}>{safeTrades.length}회</Text>
@@ -565,16 +587,22 @@ export default function ProfileScreen() {
         {/* ── 배지 요약 카드 ──────────────────────────────── */}
         <View style={styles.card}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <Text style={styles.cardHeader}>🏅 나의 배지</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Award size={16} color={theme.text} />
+              <Text style={styles.cardHeader}>나의 배지</Text>
+            </View>
             <TouchableOpacity onPress={() => navigation.navigate('배지')} activeOpacity={0.7}>
               <Text style={{ fontSize: 13, color: theme.primary, fontWeight: '600' }}>전체 보기 →</Text>
             </TouchableOpacity>
           </View>
           {earnedBadges.length > 0 ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-              {earnedBadges.slice(0, 5).map((b) => (
-                <Text key={b.id} style={{ fontSize: 28 }}>{b.emoji}</Text>
-              ))}
+              {earnedBadges.slice(0, 5).map((b) => {
+                const Icon = BADGE_ICONS[b.iconName];
+                return Icon ? (
+                  <Icon key={b.id} size={28} color={b.color} strokeWidth={2} />
+                ) : null;
+              })}
               {earnedBadges.length > 5 && (
                 <View style={{ justifyContent: 'center', paddingLeft: 4 }}>
                   <Text style={{ fontSize: 13, color: theme.textSecondary, fontWeight: '600' }}>
@@ -590,7 +618,10 @@ export default function ProfileScreen() {
 
         {/* ── 친구 초대 카드 ──────────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.cardHeader}>👥 친구 초대</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Users size={16} color={theme.text} />
+            <Text style={styles.cardHeader}>친구 초대</Text>
+          </View>
 
           {/* 내 초대 코드 */}
           <View style={styles.inviteCodeBox}>
@@ -742,7 +773,10 @@ export default function ProfileScreen() {
             onPress={() => navigation.navigate('관리자대시보드')}
             activeOpacity={0.85}
           >
-            <Text style={styles.adminBtnText}>⚙️  관리자 대시보드</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Settings size={16} color={theme.text} />
+              <Text style={styles.adminBtnText}>관리자 대시보드</Text>
+            </View>
           </TouchableOpacity>
         )}
 

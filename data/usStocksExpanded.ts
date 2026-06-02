@@ -607,7 +607,6 @@ export const US_STOCKS_EXPANDED: Stock[] = [
   //  나스닥 확장 — 시총·인지도 기준 500종 (기존 카탈로그 미포함)
   // ═══════════════════════════════════════════════
   // ── 인터넷·SaaS·클라우드 ──
-  { ticker: 'ZM',    name: '줌비디오',           market: '미국', price: 0, change: 0, logo: '🎥', krw: false, sector: '기술' },
   { ticker: 'DOCU',  name: '도큐사인',           market: '미국', price: 0, change: 0, logo: '📝', krw: false, sector: '기술' },
   { ticker: 'DBX',   name: '드롭박스',           market: '미국', price: 0, change: 0, logo: '📦', krw: false, sector: '기술' },
   { ticker: 'BOX',   name: '박스',               market: '미국', price: 0, change: 0, logo: '📦', krw: false, sector: '기술' },
@@ -629,8 +628,6 @@ export const US_STOCKS_EXPANDED: Stock[] = [
   { ticker: 'IAC',   name: 'IAC',                market: '미국', price: 0, change: 0, logo: '💼', krw: false, sector: '기술' },
   { ticker: 'ANGI',  name: '앤지홈서비스',       market: '미국', price: 0, change: 0, logo: '🔧', krw: false, sector: '기술' },
   { ticker: 'GRPN',  name: '그루폰',             market: '미국', price: 0, change: 0, logo: '🎟️', krw: false, sector: '기술' },
-  { ticker: 'PINS',  name: '핀터레스트',         market: '미국', price: 0, change: 0, logo: '📌', krw: false, sector: '기술' },
-  { ticker: 'SNAP',  name: '스냅',               market: '미국', price: 0, change: 0, logo: '👻', krw: false, sector: '기술' },
   { ticker: 'AGYS',  name: '아질리시스',         market: '미국', price: 0, change: 0, logo: '💻', krw: false, sector: '기술' },
   { ticker: 'ALKT',  name: '알카미',             market: '미국', price: 0, change: 0, logo: '🏦', krw: false, sector: '기술' },
   { ticker: 'APLD',  name: '어플라이드디지털',   market: '미국', price: 0, change: 0, logo: '🤖', krw: false, sector: '기술' },
@@ -656,8 +653,6 @@ export const US_STOCKS_EXPANDED: Stock[] = [
   { ticker: 'CASS',  name: '카스인포메이션시스템', market: '미국', price: 0, change: 0, logo: '💼', krw: false, sector: '기술' },
 
   // ── 핀테크·결제·암호화폐 관련주 ──
-  { ticker: 'HOOD',  name: '로빈후드',           market: '미국', price: 0, change: 0, logo: '🏹', krw: false, sector: '금융' },
-  { ticker: 'COIN',  name: '코인베이스',         market: '미국', price: 0, change: 0, logo: '🪙', krw: false, sector: '금융' },
   { ticker: 'PAYO',  name: '페이오니아',         market: '미국', price: 0, change: 0, logo: '💵', krw: false, sector: '금융' },
   { ticker: 'STNE',  name: '스톤코',             market: '미국', price: 0, change: 0, logo: '💳', krw: false, sector: '금융' },
   { ticker: 'PAGS',  name: '파그세구로',         market: '미국', price: 0, change: 0, logo: '💳', krw: false, sector: '금융' },
@@ -694,8 +689,6 @@ export const US_STOCKS_EXPANDED: Stock[] = [
   { ticker: 'APAM',  name: '아티잔파트너스',     market: '미국', price: 0, change: 0, logo: '🏦', krw: false, sector: '금융' },
 
   // ── 자동차·EV·모빌리티 ──
-  { ticker: 'RIVN',  name: '리비안',             market: '미국', price: 0, change: 0, logo: '🚙', krw: false, sector: '자동차' },
-  { ticker: 'LCID',  name: '루시드모터스',       market: '미국', price: 0, change: 0, logo: '🚗', krw: false, sector: '자동차' },
   { ticker: 'NKLA',  name: '니콜라',             market: '미국', price: 0, change: 0, logo: '🚛', krw: false, sector: '자동차' },
   { ticker: 'MULN',  name: '뮬런오토모티브',     market: '미국', price: 0, change: 0, logo: '🚐', krw: false, sector: '자동차' },
   { ticker: 'WKHS',  name: '워크호스그룹',       market: '미국', price: 0, change: 0, logo: '🚚', krw: false, sector: '자동차' },
@@ -740,8 +733,6 @@ export const US_STOCKS_EXPANDED: Stock[] = [
   { ticker: 'AMC',   name: 'AMC엔터테인먼트',    market: '미국', price: 0, change: 0, logo: '🎬', krw: false, sector: '미디어' },
   { ticker: 'CNK',   name: '시네마크',           market: '미국', price: 0, change: 0, logo: '🎬', krw: false, sector: '미디어' },
   { ticker: 'WMG',   name: '워너뮤직그룹',       market: '미국', price: 0, change: 0, logo: '🎵', krw: false, sector: '미디어' },
-  { ticker: 'SPOT',  name: '스포티파이',         market: '미국', price: 0, change: 0, logo: '🎵', krw: false, sector: '미디어' },
-  { ticker: 'RBLX',  name: '로블록스',           market: '미국', price: 0, change: 0, logo: '🎮', krw: false, sector: '엔터' },
   { ticker: 'PLTK',  name: '플레이티카',         market: '미국', price: 0, change: 0, logo: '🎮', krw: false, sector: '엔터' },
   { ticker: 'GME',   name: '게임스톱',           market: '미국', price: 0, change: 0, logo: '🎮', krw: false, sector: '유통' },
 
@@ -779,7 +770,6 @@ export const US_STOCKS_EXPANDED: Stock[] = [
   { ticker: 'RGTI',  name: '리게티컴퓨팅',       market: '미국', price: 0, change: 0, logo: '⚛️', krw: false, sector: '반도체' },
   { ticker: 'IONQ',  name: '아이온큐',           market: '미국', price: 0, change: 0, logo: '⚛️', krw: false, sector: '반도체' },
   { ticker: 'QUBT',  name: '퀀텀컴퓨팅',         market: '미국', price: 0, change: 0, logo: '⚛️', krw: false, sector: '반도체' },
-  { ticker: 'AVGO',  name: '브로드컴',           market: '미국', price: 0, change: 0, logo: '🔌', krw: false, sector: '반도체' },
   { ticker: 'COHU',  name: '코후',               market: '미국', price: 0, change: 0, logo: '🔬', krw: false, sector: '반도체' },
   { ticker: 'IPGP',  name: 'IPG포토닉스',        market: '미국', price: 0, change: 0, logo: '💡', krw: false, sector: '반도체' },
   { ticker: 'PLAB',  name: '포트로닉스',         market: '미국', price: 0, change: 0, logo: '🔌', krw: false, sector: '반도체' },
@@ -858,9 +848,7 @@ export const US_STOCKS_EXPANDED: Stock[] = [
   { ticker: 'CROX',  name: '크록스',             market: '미국', price: 0, change: 0, logo: '👟', krw: false, sector: '소비재' },
   { ticker: 'DECK',  name: '데커스아웃도어',     market: '미국', price: 0, change: 0, logo: '👟', krw: false, sector: '소비재' },
   { ticker: 'YETI',  name: '예티홀딩스',         market: '미국', price: 0, change: 0, logo: '🥶', krw: false, sector: '소비재' },
-  { ticker: 'ABNB',  name: '에어비앤비',         market: '미국', price: 0, change: 0, logo: '🏠', krw: false, sector: '여행' },
   { ticker: 'GRAB',  name: '그랩홀딩스',         market: '미국', price: 0, change: 0, logo: '🛵', krw: false, sector: '기술' },
-  { ticker: 'DASH',  name: '도어대시',           market: '미국', price: 0, change: 0, logo: '🍔', krw: false, sector: '기술' },
   { ticker: 'TRIP',  name: '트립어드바이저',     market: '미국', price: 0, change: 0, logo: '🌐', krw: false, sector: '여행' },
   { ticker: 'EXPE',  name: '익스피디아',         market: '미국', price: 0, change: 0, logo: '✈️', krw: false, sector: '여행' },
   { ticker: 'WH',    name: '윈덤호텔',           market: '미국', price: 0, change: 0, logo: '🏨', krw: false, sector: '여행' },
@@ -940,7 +928,6 @@ export const US_STOCKS_EXPANDED: Stock[] = [
   { ticker: 'NOVA',  name: '서노바에너지',       market: '미국', price: 0, change: 0, logo: '☀️', krw: false, sector: '에너지' },
   { ticker: 'ENPH',  name: '엔페이즈에너지',     market: '미국', price: 0, change: 0, logo: '☀️', krw: false, sector: '에너지' },
   { ticker: 'MAXN',  name: '맥세온솔라',         market: '미국', price: 0, change: 0, logo: '☀️', krw: false, sector: '에너지' },
-  { ticker: 'TSLA',  name: '테슬라',             market: '미국', price: 0, change: 0, logo: '⚡', krw: false, sector: '자동차' },
 
   // ── 산업재·물류·운송 ──
   { ticker: 'CHRW',  name: 'C.H.로빈슨',         market: '미국', price: 0, change: 0, logo: '🚚', krw: false, sector: '물류' },
@@ -1002,8 +989,6 @@ export const US_STOCKS_EXPANDED: Stock[] = [
   { ticker: 'MAIN',  name: '메인스트리트캐피털', market: '미국', price: 0, change: 0, logo: '🏦', krw: false, sector: '금융' },
 
   // ── 통신 ──
-  { ticker: 'VZ',    name: '버라이즌',           market: '미국', price: 0, change: 0, logo: '📞', krw: false, sector: '통신' },
-  { ticker: 'T',     name: 'AT&T',               market: '미국', price: 0, change: 0, logo: '📞', krw: false, sector: '통신' },
   { ticker: 'LUMN',  name: '루멘테크놀로지',     market: '미국', price: 0, change: 0, logo: '📞', krw: false, sector: '통신' },
   { ticker: 'TDS',   name: '텔레폰&데이터시스템', market: '미국', price: 0, change: 0, logo: '📞', krw: false, sector: '통신' },
   { ticker: 'USM',   name: '유에스셀룰러',       market: '미국', price: 0, change: 0, logo: '📞', krw: false, sector: '통신' },
@@ -1059,7 +1044,6 @@ export const US_STOCKS_EXPANDED: Stock[] = [
   // ── 추가 헬스/생활 ──
   { ticker: 'HCA',   name: 'HCA헬스케어',        market: '미국', price: 0, change: 0, logo: '🏥', krw: false, sector: '헬스케어' },
   { ticker: 'UHS',   name: '유니버설헬스서비스', market: '미국', price: 0, change: 0, logo: '🏥', krw: false, sector: '헬스케어' },
-  { ticker: 'UNH',   name: '유나이티드헬스',     market: '미국', price: 0, change: 0, logo: '🏥', krw: false, sector: '헬스케어' },
   { ticker: 'COR',   name: '센코라',             market: '미국', price: 0, change: 0, logo: '💊', krw: false, sector: '헬스케어' },
   { ticker: 'WST',   name: '웨스트파마슈티컬',   market: '미국', price: 0, change: 0, logo: '💊', krw: false, sector: '헬스케어' },
   { ticker: 'BDX',   name: '벡톤디킨슨',         market: '미국', price: 0, change: 0, logo: '💉', krw: false, sector: '헬스케어' },
@@ -1072,20 +1056,8 @@ export const US_STOCKS_EXPANDED: Stock[] = [
   { ticker: 'TTD',   name: '트레이드데스크',     market: '미국', price: 0, change: 0, logo: '📊', krw: false, sector: '기술' },
   { ticker: 'APP',   name: '애플로빈',           market: '미국', price: 0, change: 0, logo: '📱', krw: false, sector: '기술' },
   { ticker: 'TWLO',  name: '트윌리오',           market: '미국', price: 0, change: 0, logo: '📞', krw: false, sector: '기술' },
-  { ticker: 'NET',   name: '클라우드플레어',     market: '미국', price: 0, change: 0, logo: '☁️', krw: false, sector: '기술' },
-  { ticker: 'SNOW',  name: '스노우플레이크',     market: '미국', price: 0, change: 0, logo: '❄️', krw: false, sector: '기술' },
-  { ticker: 'PLTR',  name: '팔란티어',           market: '미국', price: 0, change: 0, logo: '🔮', krw: false, sector: '기술' },
-  { ticker: 'NOW',   name: '서비스나우',         market: '미국', price: 0, change: 0, logo: '☁️', krw: false, sector: '기술' },
-  { ticker: 'CRM',   name: '세일즈포스',         market: '미국', price: 0, change: 0, logo: '☁️', krw: false, sector: '기술' },
-  { ticker: 'ORCL',  name: '오라클',             market: '미국', price: 0, change: 0, logo: '🗄️', krw: false, sector: '기술' },
-  { ticker: 'IBM',   name: 'IBM',                market: '미국', price: 0, change: 0, logo: '💻', krw: false, sector: '기술' },
   { ticker: 'SAP',   name: 'SAP',                market: '미국', price: 0, change: 0, logo: '💻', krw: false, sector: '기술' },
-  { ticker: 'SHOP',  name: '쇼피파이',           market: '미국', price: 0, change: 0, logo: '🛒', krw: false, sector: '기술' },
   { ticker: 'SE',    name: '씨',                 market: '미국', price: 0, change: 0, logo: '🌊', krw: false, sector: '기술' },
-  { ticker: 'PYPL',  name: '페이팔',             market: '미국', price: 0, change: 0, logo: '💳', krw: false, sector: '금융' },
-  { ticker: 'SQ',    name: '블록 (스퀘어)',      market: '미국', price: 0, change: 0, logo: '⬛', krw: false, sector: '금융' },
-  { ticker: 'V',     name: '비자',               market: '미국', price: 0, change: 0, logo: '💳', krw: false, sector: '금융' },
-  { ticker: 'MA',    name: '마스터카드',         market: '미국', price: 0, change: 0, logo: '💳', krw: false, sector: '금융' },
 
   // ── 추가 산업재 ──
   { ticker: 'CARR',  name: '캐리어글로벌',       market: '미국', price: 0, change: 0, logo: '❄️', krw: false, sector: '산업재' },

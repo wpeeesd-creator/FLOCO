@@ -184,7 +184,7 @@ export default function AdminUserTradesScreen() {
     asset: { fontSize: 22, fontWeight: '800', color: theme.text },
     statsLine: { fontSize: 14, color: theme.text, fontWeight: '500' },
     statBuy: { color: '#FF3B30', fontWeight: '700' },
-    statSell: { color: '#0066FF', fontWeight: '700' },
+    statSell: { color: '#3478F6', fontWeight: '700' },
     statTotal: { color: theme.textSecondary },
     timeLine: { fontSize: 13, color: theme.textSecondary },
     chevron: { paddingLeft: 8 },

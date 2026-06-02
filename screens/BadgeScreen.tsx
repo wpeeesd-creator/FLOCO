@@ -17,11 +17,21 @@ import { useAppStore } from '../store/appStore';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
+import {
+  Sprout, Activity, TrendingUp, DollarSign, PieChart,
+  BookOpen, GraduationCap, Flame, Zap, Gem,
+} from 'lucide-react-native';
+
+export const BADGE_ICONS: Record<string, any> = {
+  Sprout, Activity, TrendingUp, DollarSign, PieChart,
+  BookOpen, GraduationCap, Flame, Zap, Gem,
+};
 
 // ── 배지 정의 ──────────────────────────────────────────────────────────────
-interface BadgeDef {
+export interface BadgeDef {
   id: string;
-  emoji: string;
+  iconName: string;
+  color: string;
   title: string;
   description: string;
   check: (data: BadgeCheckData) => boolean;
@@ -39,70 +49,80 @@ interface BadgeCheckData {
 export const BADGE_DEFINITIONS: BadgeDef[] = [
   {
     id: 'first_trade',
-    emoji: '🌱',
+    iconName: 'Sprout',
+    color: '#22C55E',
     title: '첫 투자',
     description: '첫 거래를 완료하세요',
     check: ({ tradesLength }) => tradesLength >= 1,
   },
   {
     id: 'active_investor',
-    emoji: '📊',
+    iconName: 'Activity',
+    color: '#3478F6',
     title: '활발한 투자자',
     description: '거래 10회 달성',
     check: ({ tradesLength }) => tradesLength >= 10,
   },
   {
     id: 'profit_achieved',
-    emoji: '💚',
+    iconName: 'TrendingUp',
+    color: '#22C55E',
     title: '수익 달성',
     description: '총 자산 1,000,000원 이상',
     check: ({ totalValue }) => totalValue > 1_000_000,
   },
   {
     id: 'return_10',
-    emoji: '🤑',
+    iconName: 'DollarSign',
+    color: '#EAB308',
     title: '수익률 10%',
     description: '수익률 10% 이상 달성',
     check: ({ returnRate }) => returnRate >= 10,
   },
   {
     id: 'diversified',
-    emoji: '🌈',
+    iconName: 'PieChart',
+    color: '#A855F7',
     title: '분산 투자자',
     description: '5개 이상 종목 보유',
     check: ({ holdingsLength }) => holdingsLength >= 5,
   },
   {
     id: 'learn_start',
-    emoji: '📚',
+    iconName: 'BookOpen',
+    color: '#3478F6',
     title: '학습 시작',
     description: '레슨 1개 완료',
     check: ({ completedLessonsLength }) => completedLessonsLength >= 1,
   },
   {
     id: 'hard_learner',
-    emoji: '🎓',
+    iconName: 'GraduationCap',
+    color: '#6366F1',
     title: '열공 투자자',
     description: '레슨 5개 완료',
     check: ({ completedLessonsLength }) => completedLessonsLength >= 5,
   },
   {
     id: 'streak_3',
-    emoji: '🔥',
+    iconName: 'Flame',
+    color: '#F97316',
     title: '3일 연속 학습',
     description: '3일 연속으로 학습하세요',
     check: ({ streak }) => streak >= 3,
   },
   {
     id: 'streak_7',
-    emoji: '⚡',
+    iconName: 'Zap',
+    color: '#EAB308',
     title: '7일 연속 학습',
     description: '7일 연속으로 학습하세요',
     check: ({ streak }) => streak >= 7,
   },
   {
     id: 'streak_30',
-    emoji: '💎',
+    iconName: 'Gem',
+    color: '#06B6D4',
     title: '30일 연속 학습',
     description: '30일 연속으로 학습하세요',
     check: ({ streak }) => streak >= 30,
@@ -172,9 +192,14 @@ export default function BadgeScreen() {
 // ── 배지 카드 ─────────────────────────────────────────────────────────────
 function BadgeCard({ badge, earned }: { badge: BadgeDef; earned: boolean }) {
   const { theme } = useTheme();
+  const Icon = BADGE_ICONS[badge.iconName];
   return (
     <View style={[styles.badgeCard, { shadowColor: theme.text }, !earned && styles.badgeCardLocked]}>
-      <Text style={styles.badgeEmoji}>{badge.emoji}</Text>
+      <View style={styles.badgeEmoji}>
+        {Icon ? (
+          <Icon size={32} color={earned ? badge.color : theme.textSecondary} strokeWidth={2} />
+        ) : null}
+      </View>
       <Text style={styles.badgeTitle} numberOfLines={1}>{badge.title}</Text>
       <Text style={styles.badgeDesc} numberOfLines={2}>{badge.description}</Text>
     </View>

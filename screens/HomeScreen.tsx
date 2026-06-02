@@ -23,9 +23,15 @@ import StockLogo from '../components/StockLogo';
 import NewsCard from '../components/NewsCard';
 import { useAllNews } from '../hooks/useNews';
 import { loadTodayMissions, ALL_COMPLETE_BONUS, type DailyMission } from '../lib/missionService';
-import { fetchMultiplePrices, calculateProfit, getExchangeRate } from '../utils/priceService';
+import { fetchMultiplePrices, calculateProfit } from '../utils/priceService';
 import { calculateTotalAsset } from '../utils/assetCalculator';
 import { useTheme } from '../context/ThemeContext';
+import { Wallet, Gift, Receipt, Sparkles, BookOpen, Trophy, TrendingUp, Newspaper, Heart, Lightbulb, Globe, GraduationCap, AlertTriangle } from 'lucide-react-native';
+
+const INTRO_ICONS: Record<string, any> = {
+  Lightbulb, Wallet, TrendingUp, Receipt, Globe,
+  Trophy, GraduationCap, AlertTriangle,
+};
 
 type TopTab = '보유' | '관심';
 type StockTab = '전체' | '국내' | '미국';
@@ -36,7 +42,10 @@ export default function HomeScreen() {
   const { theme, isDark } = useTheme();
   const { user } = useAuth();
   const navigation = useNavigation<any>();
-  const { holdings, cash, getTotalValue, getReturnRate } = useAppStore();
+  const {
+    holdings, cash, getTotalValue, getReturnRate,
+    livePrices, exchangeRate, refreshPrices, refreshExchangeRate,
+  } = useAppStore();
   const { news, loading: newsLoading } = useAllNews(5);
 
   const [topTab, setTopTab] = useState<TopTab>('보유');
@@ -114,29 +123,19 @@ export default function HomeScreen() {
     }).catch(() => {});
   }, [user?.id]);
 
-  // ── 환율 ──────────────────────────────────────────
-  const [exchangeRate, setExchangeRate] = useState(1380);
-
-  useEffect(() => {
-    getExchangeRate().then(rate => setExchangeRate(rate));
-  }, []);
-
-  // ── 보유 종목 실시간 가격 ──────────────────────────
-  const [portfolioPrices, setPortfolioPrices] = useState<Record<string, any>>({});
-
+  // ── 보유 종목 실시간 가격 / 환율 (store 단일 source) ──────
+  // mount + holdings 변경 시 1회, 30초 간격 폴링. unmount 시 cleanup.
   useEffect(() => {
     const safeH = holdings ?? [];
-    if (safeH.length === 0) return;
-    const tickers = safeH.map(h => ({
-      ticker: h.ticker,
-      isKR: h.ticker.length === 6 && /^\d+$/.test(h.ticker),
-    }));
-    fetchMultiplePrices(tickers).then(setPortfolioPrices).catch(() => {});
+    const tickers = safeH.map(h => h.ticker);
+    refreshExchangeRate();
+    if (tickers.length > 0) refreshPrices(tickers);
     const interval = setInterval(() => {
-      fetchMultiplePrices(tickers).then(setPortfolioPrices).catch(() => {});
+      refreshExchangeRate();
+      if (tickers.length > 0) refreshPrices(tickers);
     }, 30000);
     return () => clearInterval(interval);
-  }, [holdings?.length]);
+  }, [holdings?.length, refreshPrices, refreshExchangeRate]);
 
   // ── 관심 종목 실시간 가격 ──────────────────────────
   useEffect(() => {
@@ -155,9 +154,10 @@ export default function HomeScreen() {
   // ── Derived values ────────────────────────────────
   const balance = cash !== undefined ? cash : (firestoreBalance ?? 10_000_000);
   const safeHoldingsRaw = holdings ?? [];
+  // store.livePrices(PriceData) → calculateTotalAsset가 요구하는 number map으로 평탄화
   const livePriceMap: Record<string, number> = {};
-  for (const [k, v] of Object.entries(portfolioPrices)) {
-    if (typeof (v as any)?.price === 'number') livePriceMap[k] = (v as any).price;
+  for (const [k, v] of Object.entries(livePrices)) {
+    if (typeof v?.price === 'number') livePriceMap[k] = v.price;
   }
   const { totalAsset: realTotalAsset, portfolioValue } = calculateTotalAsset({
     balance,
@@ -171,25 +171,13 @@ export default function HomeScreen() {
   const totalValue = realTotalAsset;
   const isUp = profit >= 0;
 
-  // ── Firestore totalAsset 실시간 업데이트 ──────────
-  // holdings가 비어있으면 totalAsset = balance로 정리 (zustand persist 좀비 현상 방지)
-  useEffect(() => {
-    if (!user?.id) return;
-    const targetTotal = safeHoldingsRaw.length === 0 ? balance : realTotalAsset;
-    if (Math.abs(targetTotal - (firestoreTotalAsset ?? 0)) > 100) {
-      updateDoc(doc(db, 'users', user.id), {
-        totalAsset: Math.round(targetTotal),
-      }).catch(console.error);
-    }
-  }, [user?.id, realTotalAsset, firestoreTotalAsset, safeHoldingsRaw.length, balance]);
-
   // ── Holdings computation ──────────────────────────
   const safeHoldings = holdings ?? [];
   const holdingsData = safeHoldings.map(h => {
     const stock = STOCKS.find(s => s.ticker === h.ticker);
     if (!stock) return null;
     const isKR = (h as any).krw ?? stock?.krw ?? true;
-    const pd = portfolioPrices[h.ticker];
+    const pd = livePrices[h.ticker];
     const livePrice = pd?.price ?? stock?.price ?? 0;
     const livePriceKRW = isKR ? livePrice : Math.round(livePrice * exchangeRate);
     const evalAmt = livePriceKRW * (h.qty ?? 0);
@@ -231,13 +219,9 @@ export default function HomeScreen() {
     try {
       const safeH = holdings ?? [];
       if (safeH.length > 0) {
-        const tickers = safeH.map(h => ({
-          ticker: h.ticker,
-          isKR: h.ticker.length === 6 && /^\d+$/.test(h.ticker),
-        }));
-        const prices = await fetchMultiplePrices(tickers);
-        setPortfolioPrices(prices);
+        await refreshPrices(safeH.map(h => h.ticker));
       }
+      await refreshExchangeRate();
       if (wishlist.length > 0) {
         const tickers = wishlist.map((s: any) => ({
           ticker: s.ticker,
@@ -248,7 +232,7 @@ export default function HomeScreen() {
       }
     } catch {}
     setRefreshing(false);
-  }, [holdings, wishlist]);
+  }, [holdings, wishlist, refreshPrices, refreshExchangeRate]);
 
   // ── Shared banners ────────────────────────────────
   const renderNoticeBanner = () => (
@@ -268,7 +252,7 @@ export default function HomeScreen() {
       activeOpacity={0.85}
     >
       <View style={styles.learnBannerLeft}>
-        <Text style={styles.learnBannerEmoji}>📚</Text>
+        <BookOpen size={32} color="#fff" strokeWidth={2} />
         <View style={styles.learnBannerTexts}>
           <Text style={styles.learnBannerTitle}>오늘의 학습</Text>
           <Text style={styles.learnBannerSub}>주식 공부하고 FLO 포인트 받기!</Text>
@@ -284,7 +268,7 @@ export default function HomeScreen() {
       onPress={() => navigation.navigate('이벤트')}
       activeOpacity={0.85}
     >
-      <Text style={styles.eventBannerEmoji}>🏆</Text>
+      <Trophy size={32} color="#fff" strokeWidth={2} />
       <View style={{ flex: 1 }}>
         <Text style={styles.eventBannerTitle}>이벤트 & 챌린지</Text>
         <Text style={styles.eventBannerSub}>참여하고 보상 받아보세요!</Text>
@@ -1095,7 +1079,7 @@ export default function HomeScreen() {
                 {investmentType && (
                   <View style={styles.investTypeBadge}>
                     <Text style={styles.investTypeBadgeText}>
-                      {investmentType.emoji} {investmentType.name}
+                      {investmentType.name}
                     </Text>
                   </View>
                 )}
@@ -1129,7 +1113,7 @@ export default function HomeScreen() {
                   onPress={() => navigation.navigate('자산상세')}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.actionBtnEmoji}>📊</Text>
+                  <Wallet size={20} color={theme.text} strokeWidth={2} />
                   <Text style={styles.actionBtnText}>총자산</Text>
                 </TouchableOpacity>
                 <View style={styles.actionBtnDivider} />
@@ -1138,7 +1122,7 @@ export default function HomeScreen() {
                   onPress={() => navigation.navigate('보상내역')}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.actionBtnEmoji}>🎁</Text>
+                  <Gift size={20} color={theme.text} strokeWidth={2} />
                   <Text style={styles.actionBtnText}>보상내역</Text>
                 </TouchableOpacity>
                 <View style={styles.actionBtnDivider} />
@@ -1147,7 +1131,7 @@ export default function HomeScreen() {
                   onPress={() => navigation.navigate('거래내역')}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.actionBtnEmoji}>🔄</Text>
+                  <Receipt size={20} color={theme.text} strokeWidth={2} />
                   <Text style={styles.actionBtnText}>거래내역</Text>
                 </TouchableOpacity>
               </View>
@@ -1172,9 +1156,10 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            <Text style={styles.rewardHint}>
-              💡 학습을 완료하면 가상 자산이 늘어나요!
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Sparkles size={14} color={theme.textSecondary} strokeWidth={2} />
+              <Text style={styles.rewardHint}>학습을 완료하면 가상 자산이 늘어나요!</Text>
+            </View>
 
             {/* ── 전체/국내/미국 보유 종목 탭 ── */}
             <View style={styles.stockTabRow}>
@@ -1261,7 +1246,7 @@ export default function HomeScreen() {
             {/* ── 보유 종목 리스트 ── */}
             {sortedHoldings.length === 0 ? (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyEmoji}>📈</Text>
+                <TrendingUp size={48} color={theme.textSecondary} strokeWidth={1.5} />
                 <Text style={styles.emptyTitle}>
                   보유 종목이 없어요{'\n'}첫 투자를 시작해보세요!
                 </Text>
@@ -1285,7 +1270,7 @@ export default function HomeScreen() {
                         i < sortedHoldings.length - 1 && styles.holdingBorder,
                       ]}
                       onPress={() => {
-                        const pd = portfolioPrices[h.ticker];
+                        const pd = livePrices[h.ticker];
                         // HomeStack 내부 push — 뒤로가기 시 홈으로 자연 복귀
                         navigation.navigate('종목상세', {
                           ticker: h.ticker,
@@ -1383,7 +1368,7 @@ export default function HomeScreen() {
               </View>
             ) : news.length === 0 ? (
               <View style={{ alignItems: 'center', paddingVertical: 32 }}>
-                <Text style={{ fontSize: 36 }}>📰</Text>
+                <Newspaper size={36} color={theme.textSecondary} strokeWidth={1.5} />
                 <Text style={{ fontSize: 14, color: theme.textSecondary, marginTop: 8 }}>뉴스를 불러올 수 없어요</Text>
               </View>
             ) : (
@@ -1405,7 +1390,7 @@ export default function HomeScreen() {
             </View>
             {watchlistStocks.length === 0 ? (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyEmoji}>🤍</Text>
+                <Heart size={48} color={theme.textSecondary} strokeWidth={1.5} />
                 <Text style={styles.emptyTitle}>
                   관심 종목이 없어요{'\n'}투자 탭에서 하트를 눌러 추가해보세요!
                 </Text>
@@ -1508,23 +1493,28 @@ export default function HomeScreen() {
               </View>
               <ScrollView showsVerticalScrollIndicator={false}>
                 {[
-                  { emoji: '💡', title: 'FLOCO란?', content: '실제 돈을 사용하지 않고 가상의 자산으로 주식 투자를 경험할 수 있는 모의투자 앱이에요.' },
-                  { emoji: '💰', title: '초기 자산', content: '처음 가입하면 1,000,000원의 가상 자산이 지급돼요. 학습을 완료하면 추가 보상을 받을 수 있어요.' },
-                  { emoji: '📈', title: '실시간 주가', content: 'Yahoo Finance API를 통해 실제 주식 시장의 실시간 가격으로 거래할 수 있어요.' },
-                  { emoji: '💸', title: '수수료 안내', content: '매수 시 0.1%, 매도 시 0.1%의 수수료가 부과돼요. 실제 증권사와 유사한 환경이에요.' },
-                  { emoji: '🇺🇸', title: '미국 주식 소수점', content: '미국 주식은 소수점 단위로 매수할 수 있어요. 예: Apple 0.5주 매수 가능' },
-                  { emoji: '🏆', title: '랭킹', content: '수익률 기준으로 다른 사용자와 경쟁해요. 실시간으로 랭킹이 갱신돼요.' },
-                  { emoji: '🎓', title: '학습 보상', content: '학습 탭에서 레슨을 완료하면 가상 자산 보상을 받아요.' },
-                  { emoji: '⚠️', title: '주의사항', content: 'FLOCO는 교육 목적의 모의투자 앱이에요. 실제 투자 결과와 다를 수 있으며, 실제 투자 권유가 아니에요.' },
-                ].map((item, i) => (
-                  <View key={i} style={{ flexDirection: 'row', marginBottom: 20, alignItems: 'flex-start' }}>
-                    <Text style={{ fontSize: 28, marginRight: 12, marginTop: 2 }}>{item.emoji}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontWeight: 'bold', fontSize: 15, color: theme.text, marginBottom: 4 }}>{item.title}</Text>
-                      <Text style={{ color: theme.textSecondary, fontSize: 14, lineHeight: 20 }}>{item.content}</Text>
+                  { iconName: 'Lightbulb', color: '#EAB308', title: 'FLOCO란?', content: '실제 돈을 사용하지 않고 가상의 자산으로 주식 투자를 경험할 수 있는 모의투자 앱이에요.' },
+                  { iconName: 'Wallet', color: '#22C55E', title: '초기 자산', content: '처음 가입하면 1,000,000원의 가상 자산이 지급돼요. 학습을 완료하면 추가 보상을 받을 수 있어요.' },
+                  { iconName: 'TrendingUp', color: '#EF4444', title: '실시간 주가', content: 'Yahoo Finance API를 통해 실제 주식 시장의 실시간 가격으로 거래할 수 있어요.' },
+                  { iconName: 'Receipt', color: '#6366F1', title: '수수료 안내', content: '매수 시 0.1%, 매도 시 0.1%의 수수료가 부과돼요. 실제 증권사와 유사한 환경이에요.' },
+                  { iconName: 'Globe', color: '#3478F6', title: '미국 주식 소수점', content: '미국 주식은 소수점 단위로 매수할 수 있어요. 예: Apple 0.5주 매수 가능' },
+                  { iconName: 'Trophy', color: '#EAB308', title: '랭킹', content: '수익률 기준으로 다른 사용자와 경쟁해요. 실시간으로 랭킹이 갱신돼요.' },
+                  { iconName: 'GraduationCap', color: '#A855F7', title: '학습 보상', content: '학습 탭에서 레슨을 완료하면 가상 자산 보상을 받아요.' },
+                  { iconName: 'AlertTriangle', color: '#F59E0B', title: '주의사항', content: 'FLOCO는 교육 목적의 모의투자 앱이에요. 실제 투자 결과와 다를 수 있으며, 실제 투자 권유가 아니에요.' },
+                ].map((item, i) => {
+                  const Icon = INTRO_ICONS[item.iconName];
+                  return (
+                    <View key={i} style={{ flexDirection: 'row', marginBottom: 20, alignItems: 'flex-start' }}>
+                      <View style={{ width: 36, marginRight: 8, marginTop: 2, alignItems: 'center' }}>
+                        {Icon ? <Icon size={28} color={item.color} strokeWidth={2} /> : null}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontWeight: 'bold', fontSize: 15, color: theme.text, marginBottom: 4 }}>{item.title}</Text>
+                        <Text style={{ color: theme.textSecondary, fontSize: 14, lineHeight: 20 }}>{item.content}</Text>
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
                 <TouchableOpacity
                   onPress={() => setShowGuide(false)}
                   style={{

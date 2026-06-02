@@ -51,7 +51,7 @@ const tutorialSteps: TutorialStep[] = [
     description: '학습 탭에서 강의를 완료하면\n가상 자산이 늘어나요!',
     action: '학습 탭으로 가기',
     tabName: '학습Tab',
-    color: '#0066FF',
+    color: '#3478F6',
     tip: '💡 퀴즈를 다 맞히면\n최대 10만원까지 받을 수 있어요!',
   },
   {

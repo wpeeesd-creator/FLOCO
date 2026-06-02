@@ -23,6 +23,7 @@ import {
   BottomSheet, Button, SectionHeader, EmptyState, Toast,
 } from '../components/ui';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
+import StockLogo from '../components/StockLogo';
 import { useTheme } from '../context/ThemeContext';
 
 // ── 미니 차트 ──────────────────────────────────
@@ -47,9 +48,7 @@ function StockRow({ stock, onPress, holding }: any) {
 
   return (
     <TouchableOpacity style={styles.stockRow} onPress={onPress} activeOpacity={0.7}>
-      <View style={[styles.stockLogo, { backgroundColor: stock.krw ? '#EAF6FF' : '#FFF3D6' }]}>
-        <Text style={{ fontSize: 18 }}>{stock.logo}</Text>
-      </View>
+      <StockLogo ticker={stock.ticker} size={40} />
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text style={[Typography.body1, { fontWeight: '700', fontFamily: 'Courier' }]}>{stock.ticker}</Text>
@@ -130,9 +129,7 @@ export function StockDetailScreen({ route }: any) {
           <Text style={{ fontSize: 22, color: Colors.text }}>‹</Text>
         </TouchableOpacity>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={[styles.stockLogo, { backgroundColor: stock.krw ? '#EAF6FF' : '#FFF3D6' }]}>
-            <Text style={{ fontSize: 18 }}>{stock.logo}</Text>
-          </View>
+          <StockLogo ticker={stock.ticker} size={40} />
           <View>
             <Text style={[Typography.h3]}>{stock.name}</Text>
             <Text style={[Typography.caption, { fontFamily: 'Courier' }]}>{stock.ticker}</Text>
@@ -378,9 +375,7 @@ export default function TradeScreen() {
                 return (
                   <Card key={h.ticker} onPress={() => navigation.navigate('종목상세', { ticker: h.ticker })}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <View style={[styles.stockLogo, { backgroundColor: s.krw ? '#EAF6FF' : '#FFF3D6' }]}>
-                        <Text style={{ fontSize: 18 }}>{s.logo}</Text>
-                      </View>
+                      <StockLogo ticker={s.ticker} size={40} />
                       <View style={{ flex: 1 }}>
                         <Text style={[Typography.body1, { fontWeight: '700' }]}>{s.name}</Text>
                         <Text style={Typography.caption}>{h.qty}주 · 평균 {s.krw ? `₩${h.avgPrice.toLocaleString()}` : `$${h.avgPrice.toFixed(2)}`}</Text>

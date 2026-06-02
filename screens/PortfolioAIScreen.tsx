@@ -26,7 +26,7 @@ import { classifyError } from '../lib/errorHandler';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { fetchMultiplePrices } from '../utils/priceService';
 
-const SECTOR_COLORS = ['#0066FF', '#34C759', '#FF9500', '#FF2D55', '#5856D6', '#FF3B30', '#AF52DE', '#007AFF'];
+const SECTOR_COLORS = ['#3478F6', '#34C759', '#FF9500', '#FF2D55', '#5856D6', '#FF3B30', '#AF52DE', '#007AFF'];
 
 interface SectorEntry {
   sector: string;

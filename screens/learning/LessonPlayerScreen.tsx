@@ -27,8 +27,22 @@ import {
   type DuoLesson,
   type CategoryId,
 } from '../../data/learningContent';
+import { STOCKS } from '../../store/appStore';
+import { Rocket, PartyPopper, Heart } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// 카테고리별 학습 완료 후 추천 종목 (학습 → 매수 연결)
+const CATEGORY_RECOMMEND_TICKER: Partial<Record<CategoryId, string>> = {
+  vocabulary: '005930',
+  newsLearning: '005930',
+  chartAnalysis: '005930',
+  companyAnalysis: '035420',
+  psychology: 'SPY',
+  macro: 'AAPL',
+  portfolio: 'SPY',
+  ktrend: '005930',
+};
 
 type RouteParams = {
   categoryId: string;
@@ -187,9 +201,20 @@ export default function LessonPlayerScreen() {
       const currentLevelIdx = cat.levels.findIndex((l) => l.id === levelId);
       const nextLevel = cat.levels[currentLevelIdx + 1];
 
+      const recommendTicker = CATEGORY_RECOMMEND_TICKER[categoryId as CategoryId];
+      const recommendStock = recommendTicker ? STOCKS.find(s => s.ticker === recommendTicker) : null;
+      const buyButton = recommendStock
+        ? [{
+            text: `${recommendStock.name} 보러가기`,
+            onPress: () => {
+              (navigation as any).navigate('종목상세', { ticker: recommendStock.ticker });
+            },
+          }]
+        : [];
+
       if (nextLevel) {
         Alert.alert(
-          '🎉 레슨 완료!',
+          '레슨 완료!',
           `정답률 ${Math.round(rate * 100)}%\n+${reward.toLocaleString()}원 지급!\n\n다음 레슨으로 이동할까요?`,
           [
             {
@@ -203,14 +228,18 @@ export default function LessonPlayerScreen() {
                 });
               },
             },
+            ...buyButton,
             { text: '나중에', onPress: () => navigation.goBack() },
           ],
         );
       } else {
         Alert.alert(
-          '🏆 카테고리 완료!',
+          '카테고리 완료!',
           `모든 레슨을 완료했어요!\n정답률 ${Math.round(rate * 100)}%\n+${reward.toLocaleString()}원 지급!`,
-          [{ text: '확인', onPress: () => navigation.goBack() }],
+          [
+            ...buyButton,
+            { text: '확인', onPress: () => navigation.goBack() },
+          ],
         );
       }
     } else {
@@ -344,7 +373,9 @@ export default function LessonPlayerScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.completionContainer}>
-          <Text style={styles.completionEmoji}>🎉</Text>
+          <View style={{ marginBottom: 16 }}>
+            <PartyPopper size={64} color={theme.primary} />
+          </View>
           <Text style={styles.completionTitle}>레슨 완료!</Text>
           <View style={styles.completionPointsBox}>
             <Text style={styles.completionPointsLabel}>획득 포인트</Text>
@@ -388,9 +419,9 @@ export default function LessonPlayerScreen() {
       {/* Hearts */}
       <View style={[styles.heartsRow, { backgroundColor: theme.bgCard }]}>
         {[0, 1, 2].map((i) => (
-          <Text key={i} style={styles.heartIcon}>
-            {i < hearts ? '❤️' : '🖤'}
-          </Text>
+          <View key={i} style={{ marginHorizontal: 4 }}>
+            <Heart size={22} fill={i < hearts ? '#EF4444' : 'transparent'} color={i < hearts ? '#EF4444' : Colors.textSub} />
+          </View>
         ))}
       </View>
 
@@ -492,7 +523,7 @@ function FeedbackBar({ isCorrect, feedbackOpacity, explanation, onNext }: Feedba
           { color: isCorrect ? '#58CC02' : '#FF4B4B' },
         ]}
       >
-        {isCorrect ? '🎉 정답이에요!' : '💔 틀렸어요!'}
+        {isCorrect ? '정답이에요!' : '틀렸어요!'}
       </Text>
       {explanation ? (
         <Text style={styles.feedbackExplanation}>{explanation}</Text>

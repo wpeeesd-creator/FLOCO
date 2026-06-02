@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { STOCKS } from '../store/appStore';
 import type { Stock } from '../store/appStore';
 import { Colors, Typography, EmptyState } from '../components/ui';
+import StockLogo from '../components/StockLogo';
 import { useTheme } from '../context/ThemeContext';
 
 // ── 주니몽 말풍선 ──────────────────────────────
@@ -50,9 +51,7 @@ function StockRow({ stock, onPress }: { stock: Stock; onPress: () => void }) {
   const isUp = stock.change >= 0;
   return (
     <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.rowLogo}>
-        <Text style={styles.logoText}>{stock.logo}</Text>
-      </View>
+      <StockLogo ticker={stock.ticker} size={44} />
       <View style={styles.rowInfo}>
         <Text style={styles.rowTicker}>{stock.ticker}</Text>
         <Text style={styles.rowName}>{stock.name}</Text>

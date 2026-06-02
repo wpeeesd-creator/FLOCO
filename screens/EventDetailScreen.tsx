@@ -22,6 +22,9 @@ import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
 import { joinEvent, type AppEvent } from '../lib/adminService';
+import { Medal, Trophy, Award } from 'lucide-react-native';
+
+const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];
 
 // ── 타입 ──────────────────────────────────────────
 interface LeaderboardEntry {
@@ -58,8 +61,6 @@ function getTypeName(type: AppEvent['type']): string {
   return '학습스트릭';
 }
 
-const REWARD_EMOJIS = ['🥇', '🥈', '🥉'];
-const RANK_MEDALS = ['🥇', '🥈', '🥉'];
 
 // ── 메인 화면 ─────────────────────────────────────
 export default function EventDetailScreen() {
@@ -102,7 +103,7 @@ export default function EventDetailScreen() {
           return {
             uid,
             name: data.name ?? data.nickname ?? '익명',
-            emoji: data.investmentType?.emoji ?? '📊',
+            emoji: data.investmentType?.emoji ?? '',
             score,
           };
         })
@@ -437,10 +438,15 @@ export default function EventDetailScreen() {
 
         {/* 보상 카드 */}
         <View style={styles.rewardCard}>
-          <Text style={styles.sectionTitle}>🏅 보상</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <Award size={16} color={Colors.text} />
+            <Text style={styles.sectionTitle}>보상</Text>
+          </View>
           {event.rewards.map((r, i) => (
             <View key={r.rank} style={styles.rewardRow}>
-              <Text style={styles.rewardEmoji}>{REWARD_EMOJIS[i] ?? `${r.rank}위`}</Text>
+              {i < 3
+                ? <Medal size={18} color={MEDAL_COLORS[i]} strokeWidth={2} />
+                : <Text style={styles.rewardEmoji}>{r.rank}위</Text>}
               <Text style={styles.rewardRankText}>{r.rank}위</Text>
               <Text style={styles.rewardAmount}>{formatAmount(r.amount)}</Text>
             </View>
@@ -448,7 +454,10 @@ export default function EventDetailScreen() {
         </View>
 
         {/* 순위표 */}
-        <Text style={styles.leaderboardHeader}>🏅 순위표</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Trophy size={16} color={Colors.text} />
+          <Text style={styles.leaderboardHeader}>순위표</Text>
+        </View>
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -462,15 +471,18 @@ export default function EventDetailScreen() {
           leaderboard.map((entry, index) => {
             const rank = index + 1;
             const isMine = entry.uid === user?.id;
-            const rankDisplay = rank <= 3 ? RANK_MEDALS[rank - 1] : String(rank);
-
             return (
               <View
                 key={entry.uid}
                 style={[styles.leaderboardRow, isMine && styles.leaderboardRowMine]}
               >
-                <Text style={styles.leaderboardRank}>{rankDisplay}</Text>
-                <Text style={styles.leaderboardEmoji}>{entry.emoji}</Text>
+                {rank <= 3 ? (
+                  <View style={[styles.leaderboardRank, { alignItems: 'center', justifyContent: 'center' }]}>
+                    <Medal size={20} color={MEDAL_COLORS[rank - 1]} strokeWidth={2} />
+                  </View>
+                ) : (
+                  <Text style={styles.leaderboardRank}>{rank}</Text>
+                )}
                 <Text style={styles.leaderboardName} numberOfLines={1}>
                   {entry.name}
                   {isMine ? ' (나)' : ''}

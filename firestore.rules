@@ -1,0 +1,110 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===== Helper Functions =====
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.uid == '8AFondf3MUT42Jhs4ayIRzHCFRj2';
+    }
+
+    // ===== Users =====
+    match /users/{uid} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+
+      // 하위 컬렉션 (learning/data, notifications 등)
+      match /{subcollection}/{docId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isOwner(uid) || isAdmin();
+      }
+    }
+
+    // ===== Posts =====
+    match /posts/{postId} {
+      allow read: if isAuthenticated();
+
+      // 생성: uid 위조 방지
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.uid;
+
+      // 업데이트: 본인 글 수정 / 좋아요만 변경 / 댓글 카운트만 변경
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.uid
+        || isLikeOnlyUpdate()
+        || isCommentCountOnlyUpdate()
+      );
+
+      // 삭제: 본인 또는 관리자
+      allow delete: if request.auth.uid == resource.data.uid || isAdmin();
+
+      function isLikeOnlyUpdate() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['likes']);
+      }
+
+      function isCommentCountOnlyUpdate() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['commentCount']);
+      }
+
+      // 댓글 하위 컬렉션
+      match /comments/{commentId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated()
+          && request.auth.uid == request.resource.data.uid;
+        allow update: if isAuthenticated()
+          && request.auth.uid == resource.data.uid;
+        allow delete: if request.auth.uid == resource.data.uid || isAdmin();
+      }
+    }
+
+    // ===== Reports (커뮤니티 신고) =====
+    match /reports/{reportId} {
+      // 인증된 사용자가 신고 작성 (reporterId 위조 방지)
+      allow create: if isAuthenticated()
+        && request.auth.uid == request.resource.data.reporterId;
+      // 관리자만 조회/처리
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ===== Stats (앱 전역 통계, 관리자 전용) =====
+    match /stats/{statId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ===== Transactions (관리자 거래로그 조회용) =====
+    match /transactions/{txId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ===== Events (플로월드) =====
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow delete: if isAdmin();
+      // 관리자는 모든 필드 수정. 일반 사용자는 participants 필드만 수정 가능.
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants'])
+      );
+    }
+
+    // ===== Default deny =====
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -9,6 +9,11 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
+import { TrendingUp, TrendingDown, GraduationCap, Bell } from 'lucide-react-native';
+
+// 저장된 알림 텍스트의 이모지만 표시에서 제거 (Firestore 데이터는 그대로 보존)
+const EMOJI_REGEX = /[\u{1F300}-\u{1F9FF}]|[\u{1FA00}-\u{1FAFF}]|[\u{2600}-\u{27BF}]|[\u{1F1E6}-\u{1F1FF}]/gu;
+const stripEmoji = (text: string) => (text ?? '').replace(EMOJI_REGEX, '').trim();
 
 export default function NotificationScreen() {
   const { theme, isDark } = useTheme();
@@ -101,7 +106,7 @@ export default function NotificationScreen() {
 
       {notifications.length === 0 ? (
         <View style={s.emptyWrap}>
-          <Text style={{ fontSize: 48 }}>🔔</Text>
+          <Bell size={48} color={theme.textSecondary} strokeWidth={1.5} />
           <Text style={{ color: theme.textSecondary, marginTop: 12 }}>
             알림이 없어요
           </Text>
@@ -133,17 +138,21 @@ export default function NotificationScreen() {
                     ? (isBuy ? Colors.greenBg : Colors.redBg)
                     : Colors.goldBg,
                 }]}>
-                  <Text style={{ fontSize: 22 }}>
-                    {item.type === 'trade'
-                      ? (isBuy ? '📈' : '📉')
-                      : item.type === 'reward' ? '🎓' : '🔔'}
-                  </Text>
+                  {item.type === 'trade' ? (
+                    isBuy
+                      ? <TrendingUp size={22} color={theme.red} strokeWidth={2} />
+                      : <TrendingDown size={22} color={theme.blue} strokeWidth={2} />
+                  ) : item.type === 'reward' ? (
+                    <GraduationCap size={22} color="#EAB308" strokeWidth={2} />
+                  ) : (
+                    <Bell size={22} color={theme.textSecondary} strokeWidth={2} />
+                  )}
                 </View>
 
                 {/* 내용 */}
                 <View style={{ flex: 1 }}>
-                  <Text style={s.rowTitle}>{item.title}</Text>
-                  <Text style={s.rowBody}>{item.body}</Text>
+                  <Text style={s.rowTitle}>{stripEmoji(item.title)}</Text>
+                  <Text style={s.rowBody}>{stripEmoji(item.body)}</Text>
 
                   {/* 거래 상세 */}
                   {item.type === 'trade' && item.quantity != null && (
