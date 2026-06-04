@@ -4,7 +4,7 @@ import {
   signOut, onAuthStateChanged, GoogleAuthProvider, signInWithCredential,
 } from 'firebase/auth';
 import * as SecureStore from 'expo-secure-store';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { app, db } from '../lib/firebase';
 import { setSessionUser } from '../lib/userSession';
 import { useAppStore } from '../store/appStore';
@@ -41,6 +41,8 @@ async function fetchOrCreateUser(uid: string, email: string, name: string): Prom
 
   if (snap.exists()) {
     const data = snap.data();
+    // DAU/WAU 집계용 마지막 접속 시각 — 실패해도 로그인은 정상 진행
+    updateDoc(ref, { lastLoginAt: serverTimestamp() }).catch(() => {});
     return {
       id: uid,
       email: data.email ?? email,
@@ -92,6 +94,7 @@ async function fetchOrCreateUser(uid: string, email: string, name: string): Prom
     postCount: 0,
     totalLikes: 0,
     createdAt: new Date().toISOString(),
+    lastLoginAt: serverTimestamp(),
   });
   return newUser;
 }

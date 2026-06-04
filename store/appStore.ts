@@ -7,7 +7,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, onSnapshot, getDoc, updateDoc, arrayUnion, increment } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, updateDoc, arrayUnion, increment, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { updateMissionProgress } from '../lib/missionService';
 import { logStockPurchase, logStockSold, logLessonCompleted, logLevelUp } from '../lib/analytics';
@@ -597,6 +597,28 @@ interface AppState {
 
 // ── 스토어 구현 ──────────────────────────
 
+// users/{uid}/assetHistory/{YYYY-MM-DD} 일별 자산 스냅샷 (자산 추이 분석용).
+// 같은 날 여러 번 호출되면 merge로 마지막 값을 덮어씀 → 일별 마감 스냅샷.
+async function writeAssetSnapshot(uid: string, totalAsset: number): Promise<void> {
+  if (!uid) return;
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  try {
+    await setDoc(
+      doc(db, 'users', uid, 'assetHistory', today),
+      {
+        totalAsset: Math.round(totalAsset),
+        recordedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  } catch (e) {
+    console.warn('[appStore] writeAssetSnapshot failed:', e);
+  }
+}
+
+// 세션 중 같은 날 중복 스냅샷 방지 키 (자산 변동 없는 날도 접속 시 1회는 기록)
+let lastSnapshotKey = '';
+
 // users/{uid}.totalAsset 단일 write 진입점. threshold=0이면 무조건 write,
 // >0이면 변화량이 그 이상일 때만 write (불필요한 Firestore 쓰기 감소).
 async function writeTotalAssetIfChanged(uid: string, threshold: number = 100): Promise<void> {
@@ -613,12 +635,22 @@ async function writeTotalAssetIfChanged(uid: string, threshold: number = 100): P
       livePrices: priceMap,
       exchangeRate: state.exchangeRate,
     });
+
+    // 일별 자산 스냅샷 — 오늘 첫 호출이면 변동 여부와 무관하게 1회 기록
+    const todayKey = `${uid}:${new Date().toISOString().slice(0, 10)}`;
+    if (lastSnapshotKey !== todayKey) {
+      lastSnapshotKey = todayKey;
+      writeAssetSnapshot(uid, newTotal);
+    }
+
     const snap = await getDoc(doc(db, 'users', uid));
     const oldTotal = snap.exists() ? (snap.data()?.totalAsset ?? 0) : 0;
     if (Math.abs(newTotal - oldTotal) < threshold) return;
     await updateDoc(doc(db, 'users', uid), {
       totalAsset: Math.round(newTotal),
     });
+    // 자산이 실제로 변한 경우 스냅샷도 최신 값으로 갱신
+    writeAssetSnapshot(uid, newTotal);
   } catch (e) {
     console.warn('[appStore] writeTotalAssetIfChanged failed:', e);
   }

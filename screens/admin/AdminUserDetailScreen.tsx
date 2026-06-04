@@ -9,12 +9,23 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { Text } from '../../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import {
+  type School,
+  type SchoolType,
+  SCHOOL_TYPE_LABELS,
+  getSchoolDisplayType,
+  buildClassId,
+  formatSchoolLabel,
+} from '../../lib/school';
 import { db } from '../../lib/firebase';
 import { useTheme } from '../../context/ThemeContext';
 import StockLogo from '../../components/StockLogo';
@@ -66,6 +77,61 @@ export default function AdminUserDetailScreen() {
   const [userDoc, setUserDoc] = useState<any | null>(null);
   const [loaded, setLoaded] = useState(false);
   const { livePrices, exchangeRate, refreshPrices, refreshExchangeRate } = useAppStore();
+
+  // ── 학교 정보 수정 폼 상태 ──
+  const [editingSchool, setEditingSchool] = useState(false);
+  const [formType, setFormType] = useState<SchoolType>('alternative');
+  const [formName, setFormName] = useState('');
+  const [formCohort, setFormCohort] = useState('');
+  const [formGrade, setFormGrade] = useState<number | null>(null);
+  const [formClassNum, setFormClassNum] = useState<number | null>(null);
+  const [savingSchool, setSavingSchool] = useState(false);
+
+  const openSchoolEditor = () => {
+    const school = userDoc?.school;
+    setFormType(school ? getSchoolDisplayType(school) : 'alternative');
+    setFormName(school?.name ?? '');
+    setFormCohort(school?.cohort ?? '');
+    setFormGrade(typeof school?.grade === 'number' ? school.grade : null);
+    setFormClassNum(typeof school?.classNum === 'number' ? school.classNum : null);
+    setEditingSchool(true);
+  };
+
+  const handleAdminSchoolUpdate = async () => {
+    if (!uid) return;
+    const trimmedName = formName.trim();
+    if (!trimmedName) {
+      Alert.alert('알림', '학교명을 입력해주세요');
+      return;
+    }
+    const newSchool: School = { name: trimmedName, type: formType, classId: '' };
+    if (formType === 'alternative') {
+      if (!formCohort) {
+        Alert.alert('알림', '기수를 선택해주세요');
+        return;
+      }
+      newSchool.cohort = formCohort;
+      newSchool.classId = buildClassId(trimmedName, formType, { cohort: formCohort });
+    } else {
+      if (!formGrade || !formClassNum) {
+        Alert.alert('알림', '학년과 반을 입력해주세요');
+        return;
+      }
+      newSchool.grade = formGrade;
+      newSchool.classNum = formClassNum;
+      newSchool.classId = buildClassId(trimmedName, formType, { grade: formGrade, classNum: formClassNum });
+    }
+    setSavingSchool(true);
+    try {
+      await updateDoc(doc(db, 'users', uid), { school: newSchool });
+      setEditingSchool(false);
+      Alert.alert('완료', '학교 정보가 수정됐어요.');
+    } catch {
+      Alert.alert('오류', '학교 정보 수정에 실패했어요.');
+    } finally {
+      setSavingSchool(false);
+    }
+  };
 
   useEffect(() => {
     if (!uid) {
@@ -214,6 +280,66 @@ export default function AdminUserDetailScreen() {
     reasonHeader: { fontSize: 12, fontWeight: '700', color: theme.textSecondary },
     reasonText: { fontSize: 16, color: theme.text, lineHeight: 22 },
     reasonEmpty: { fontSize: 16, color: theme.textTertiary, fontStyle: 'italic' },
+    // 학교 정보 행 + 수정 모달
+    schoolRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+    },
+    schoolLabel: { fontSize: 13, color: theme.textSecondary, fontWeight: '600', flexShrink: 1 },
+    schoolEditBtn: {
+      backgroundColor: theme.primaryLight,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 8,
+    },
+    schoolEditBtnText: { fontSize: 12, fontWeight: '700', color: theme.primary },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      padding: 24,
+    },
+    modalBox: {
+      backgroundColor: theme.bgCard,
+      borderRadius: 16,
+      padding: 20,
+      gap: 12,
+    },
+    modalTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
+    formLabel: { fontSize: 12, fontWeight: '700', color: theme.textSecondary },
+    chipRow: { flexDirection: 'row', gap: 8 },
+    chip: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 10,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      alignItems: 'center',
+      backgroundColor: theme.bgCard,
+    },
+    chipActive: { borderColor: theme.primary, backgroundColor: theme.primaryLight },
+    chipText: { fontSize: 13, color: theme.textSecondary, fontWeight: '600' },
+    chipTextActive: { color: theme.primary, fontWeight: '700' },
+    formInput: {
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 10,
+      padding: 12,
+      fontSize: 14,
+      color: theme.text,
+    },
+    modalBtnRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+    modalBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     emptyTitle: { fontSize: 15, color: theme.textSecondary, marginTop: 8 },
     emptyState: {
@@ -235,6 +361,15 @@ export default function AdminUserDetailScreen() {
           {'  '}
           <Text style={styles.sumSellText}>매도 {summary.sellCount}</Text>
         </Text>
+      </View>
+      {/* 학교 정보 + 관리자 수정 */}
+      <View style={styles.schoolRow}>
+        <Text style={styles.schoolLabel} numberOfLines={1}>
+          🏫 {formatSchoolLabel(userDoc?.school)}
+        </Text>
+        <TouchableOpacity onPress={openSchoolEditor} style={styles.schoolEditBtn} activeOpacity={0.8}>
+          <Text style={styles.schoolEditBtnText}>학교 수정</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -306,6 +441,113 @@ export default function AdminUserDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* 학교 정보 수정 모달 (관리자) */}
+      <Modal
+        visible={editingSchool}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingSchool(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>🏫 학교 정보 수정</Text>
+
+            <Text style={styles.formLabel}>학교 유형</Text>
+            <View style={styles.chipRow}>
+              {(Object.keys(SCHOOL_TYPE_LABELS) as SchoolType[]).map(t => (
+                <TouchableOpacity
+                  key={t}
+                  onPress={() => setFormType(t)}
+                  style={[styles.chip, formType === t && styles.chipActive]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.chipText, formType === t && styles.chipTextActive]}>
+                    {SCHOOL_TYPE_LABELS[t]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.formLabel}>학교명</Text>
+            <TextInput
+              value={formName}
+              onChangeText={setFormName}
+              placeholder="학교명"
+              placeholderTextColor={theme.textTertiary}
+              style={styles.formInput}
+            />
+
+            {formType === 'alternative' ? (
+              <>
+                <Text style={styles.formLabel}>기수</Text>
+                <View style={styles.chipRow}>
+                  {['1기', '2기', '3기'].map(c => (
+                    <TouchableOpacity
+                      key={c}
+                      onPress={() => setFormCohort(c)}
+                      style={[styles.chip, formCohort === c && styles.chipActive]}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.chipText, formCohort === c && styles.chipTextActive]}>{c}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.formLabel}>학년</Text>
+                <View style={styles.chipRow}>
+                  {[1, 2, 3].map(g => (
+                    <TouchableOpacity
+                      key={g}
+                      onPress={() => setFormGrade(g)}
+                      style={[styles.chip, formGrade === g && styles.chipActive]}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.chipText, formGrade === g && styles.chipTextActive]}>{g}학년</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.formLabel}>반</Text>
+                <TextInput
+                  value={formClassNum != null ? String(formClassNum) : ''}
+                  onChangeText={(t) => {
+                    const n = parseInt(t, 10);
+                    setFormClassNum(Number.isFinite(n) && n > 0 ? n : null);
+                  }}
+                  placeholder="예) 3"
+                  placeholderTextColor={theme.textTertiary}
+                  keyboardType="numeric"
+                  maxLength={2}
+                  style={styles.formInput}
+                />
+              </>
+            )}
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                onPress={() => setEditingSchool(false)}
+                style={[styles.modalBtn, { backgroundColor: theme.bgInput }]}
+                disabled={savingSchool}
+              >
+                <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleAdminSchoolUpdate}
+                style={[styles.modalBtn, { backgroundColor: theme.primary }]}
+                disabled={savingSchool}
+              >
+                {savingSchool ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={{ color: '#fff', fontWeight: '700' }}>저장</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-back" size={24} color={theme.text} />

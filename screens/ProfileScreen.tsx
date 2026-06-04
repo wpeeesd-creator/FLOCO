@@ -34,6 +34,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../components/ui';
 import { BADGE_DEFINITIONS, BADGE_ICONS } from './BadgeScreen';
 import { fetchMultiplePrices, getExchangeRate } from '../utils/priceService';
+import { type School, formatSchoolLabel } from '../lib/school';
 import { registerPushToken, removePushToken } from '../utils/pushToken';
 
 // 빌드 11에서 true로 변경 (Blaze 가입 + Cloud Functions 배포 후 재활성화)
@@ -75,7 +76,7 @@ export default function ProfileScreen() {
     invitedFriends: [] as string[],
     inviteReward: 0,
   });
-  const [schoolInfo, setSchoolInfo] = useState<{ name: string; cohort?: string; grade?: string; classNum?: string } | null>(null);
+  const [schoolInfo, setSchoolInfo] = useState<Partial<School> | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [realNameVerified, setRealNameVerified] = useState(false);
   const [portfolioPrices, setPortfolioPrices] = useState<Record<string, any>>({});
@@ -687,9 +688,7 @@ export default function ProfileScreen() {
           >
             <Ionicons name="school-outline" size={20} color={theme.text} style={styles.menuIcon} />
             <Text style={styles.menuLabel}>
-              {schoolInfo
-                ? `${schoolInfo.name} ${schoolInfo.cohort ?? schoolInfo.grade ?? ''}`
-                : '학교/기수 설정'}
+              {schoolInfo ? formatSchoolLabel(schoolInfo) : '학교/기수 설정'}
             </Text>
             <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
           </TouchableOpacity>

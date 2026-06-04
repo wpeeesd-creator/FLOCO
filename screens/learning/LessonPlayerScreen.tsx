@@ -17,7 +17,7 @@ import { Colors } from '../../components/ui';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAppStore } from '../../store/appStore';
-import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { completeLesson, loseHeart, saveWrongAnswer } from '../../lib/learningService';
 import { updateMissionProgress } from '../../lib/missionService';
@@ -173,6 +173,9 @@ export default function LessonPlayerScreen() {
         // Save to learning/data rewardHistory
         const learningRef = doc(db, 'users', user.id, 'learning', 'data');
         await updateDoc(learningRef, {
+          // 학습 시계열 분석용 — completedLessons(string[])는 호환성 위해 그대로 두고,
+          // 레슨별 완료 시각을 map으로 병렬 누적
+          [`lessonCompletedAt.${lessonKey}`]: serverTimestamp(),
           rewardHistory: arrayUnion({
             lessonId: lessonKey,
             lessonTitle: levelTitle,

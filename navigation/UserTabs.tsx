@@ -37,6 +37,14 @@ import AdminReportScreen from '../screens/admin/AdminReportScreen';
 import AdminLearningStatsScreen from '../screens/admin/AdminLearningStatsScreen';
 import AdminPopularStocksScreen from '../screens/admin/AdminPopularStocksScreen';
 import AdminEventScreen from '../screens/admin/AdminEventScreen';
+import AdminSchoolStatsScreen from '../screens/admin/AdminSchoolStatsScreen';
+import AdminFunnelScreen from '../screens/admin/AdminFunnelScreen';
+import AdminLearningImpactScreen from '../screens/admin/AdminLearningImpactScreen';
+import AdminTopStocksScreen from '../screens/admin/AdminTopStocksScreen';
+import AdminGrowthScreen from '../screens/admin/AdminGrowthScreen';
+import AdminExportScreen from '../screens/admin/AdminExportScreen';
+import AdminRiskMonitorScreen from '../screens/admin/AdminRiskMonitorScreen';
+import AdminReasonQualityScreen from '../screens/admin/AdminReasonQualityScreen';
 import SurveyScreen from '../screens/SurveyScreen';
 import SurveyResultScreen from '../screens/SurveyResultScreen';
 import SchoolSetupScreen from '../screens/SchoolSetupScreen';
@@ -151,6 +159,14 @@ function ProfileNavigator() {
       <ProfileStack.Screen name="학습통계" component={AdminLearningStatsScreen} />
       <ProfileStack.Screen name="인기종목" component={AdminPopularStocksScreen} />
       <ProfileStack.Screen name="이벤트관리" component={AdminEventScreen} />
+      <ProfileStack.Screen name="학교별현황" component={AdminSchoolStatsScreen} />
+      <ProfileStack.Screen name="가입퍼널" component={AdminFunnelScreen} />
+      <ProfileStack.Screen name="학습효과분석" component={AdminLearningImpactScreen} />
+      <ProfileStack.Screen name="거래종목TOP" component={AdminTopStocksScreen} />
+      <ProfileStack.Screen name="성장추이" component={AdminGrowthScreen} />
+      <ProfileStack.Screen name="데이터내보내기" component={AdminExportScreen} />
+      <ProfileStack.Screen name="위험모니터링" component={AdminRiskMonitorScreen} />
+      <ProfileStack.Screen name="이유품질" component={AdminReasonQualityScreen} />
       <ProfileStack.Screen name="투자유형설문" component={SurveyScreen} />
       <ProfileStack.Screen name="투자유형결과" component={SurveyResultScreen} />
       <ProfileStack.Screen name="학교반설정" component={SchoolSetupScreen} />

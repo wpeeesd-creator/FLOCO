@@ -15,7 +15,7 @@ import { useAppStore, STOCKS } from '../store/appStore';
 import { Colors, Typography, Button, Card, Toast } from '../components/ui';
 import { validateTradeQty } from '../lib/errorHandler';
 import { useTheme } from '../context/ThemeContext';
-import { validateReason, getReasonStatus } from '../utils/reasonValidator';
+import { validateReason, getReasonStatus, REASON_TEMPLATES } from '../utils/reasonValidator';
 
 export default function TradingScreen() {
   const navigation = useNavigation<any>();
@@ -188,6 +188,19 @@ export default function TradingScreen() {
           <Text style={styles.cardLabel}>
             거래 이유 <Text style={styles.requiredMark}>*</Text>
           </Text>
+          {/* 추천 이유 템플릿 — 탭하면 자동 채움, 이어서 수정 가능 */}
+          <View style={styles.templateRow}>
+            {REASON_TEMPLATES[tradeType].map((t) => (
+              <TouchableOpacity
+                key={t}
+                onPress={() => setReasonStr(t)}
+                style={styles.templateChip}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.templateChipText}>{t}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           <TextInput
             style={styles.reasonInput}
             value={reasonStr}
@@ -397,6 +410,25 @@ const styles = StyleSheet.create({
 
   // Reason
   requiredMark: { color: Colors.red },
+  templateRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  templateChip: {
+    backgroundColor: Colors.bg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  templateChipText: {
+    fontSize: 12,
+    color: Colors.textSub,
+    fontWeight: '500',
+  },
   reasonInput: {
     minHeight: 88,
     borderWidth: 1,

@@ -42,7 +42,7 @@ import {
 } from '../utils/priceService';
 import { saveNotif } from '../utils/notificationService';
 import { updateMissionProgress } from '../lib/missionService';
-import { validateReason, getReasonStatus } from '../utils/reasonValidator';
+import { validateReason, getReasonStatus, REASON_TEMPLATES } from '../utils/reasonValidator';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -1755,6 +1755,26 @@ function TradeSheet({
                 <Text style={{ color: DS.textSub, fontSize: 13, marginBottom: 8, paddingHorizontal: 4 }}>
                   거래 이유 <Text style={{ color: DS.fall }}>*</Text>
                 </Text>
+                {/* 추천 이유 템플릿 — 탭하면 자동 채움, 이어서 수정 가능 */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                  {REASON_TEMPLATES[tradeType === 'buy' ? 'buy' : 'sell'].map((t) => (
+                    <TouchableOpacity
+                      key={t}
+                      onPress={() => setReason(t)}
+                      activeOpacity={0.7}
+                      style={{
+                        backgroundColor: DS.cardAlt,
+                        borderWidth: 1,
+                        borderColor: DS.border,
+                        borderRadius: 14,
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, color: DS.textSub, fontWeight: '500' }}>{t}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
                 <TextInput
                   value={reason}
                   onChangeText={setReason}

@@ -1,5 +1,6 @@
 /**
  * 관리자 종합 대시보드 — 사용자/거래/학습/자산/커뮤니티 핵심 지표 한 화면
+ * 토스 톤 라이트 디자인 — 사업계획서 PPT 캡처용
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -9,19 +10,25 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Dimensions,
 } from 'react-native';
 import { Text } from '../../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
+import Svg, { Rect, Line } from 'react-native-svg';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Users,
+  Wallet,
+  BookOpen,
+  Briefcase,
+  MessageCircle,
+  TrendingUp,
+  ClipboardList,
+} from 'lucide-react-native';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useTheme } from '../../context/ThemeContext';
-
-const SCREEN_W = Dimensions.get('window').width;
-const CHART_W = SCREEN_W - 32;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
@@ -63,6 +70,19 @@ function median(nums: number[]): number {
 export default function AdminDashboardScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation();
+
+  // ── 디자인 토큰 (PPT 캡처용 고정 라이트 톤) ──
+  const DS = {
+    bg: '#F9FAFB',
+    cardBg: '#FFFFFF',
+    text: '#1F2937',
+    textSub: '#6B7280',
+    textMuted: '#9CA3AF',
+    primary: theme.primary ?? '#0066FF',
+    border: '#F3F4F6',
+    positive: '#22C55E',
+    negative: '#EF4444',
+  };
 
   const [users, setUsers] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
@@ -135,8 +155,10 @@ export default function AdminDashboardScreen() {
   // ── Section 2: 거래 지표 ──
   const tradeMetrics = useMemo(() => {
     const today = startOfToday();
+    const week = startOfWeek();
     let todayCount = 0;
     let todayAmount = 0;
+    let weekAmount = 0;
     let buyCount = 0;
     let sellCount = 0;
     const tickerCounts: Record<string, number> = {};
@@ -152,6 +174,7 @@ export default function AdminDashboardScreen() {
           todayCount++;
           todayAmount += amount;
         }
+        if (ts >= week) weekAmount += amount;
         if (t.type === 'buy') buyCount++;
         else if (t.type === 'sell') sellCount++;
         if (t.ticker) tickerCounts[t.ticker] = (tickerCounts[t.ticker] ?? 0) + 1;
@@ -176,7 +199,7 @@ export default function AdminDashboardScreen() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10);
 
-    return { todayCount, todayAmount, buyCount, sellCount, top10Tickers, top10Reasons };
+    return { todayCount, todayAmount, weekAmount, buyCount, sellCount, top10Tickers, top10Reasons };
   }, [users]);
 
   // ── Section 3: 학습 지표 ──
@@ -280,396 +303,515 @@ export default function AdminDashboardScreen() {
 
   const loading = !usersLoaded || !postsLoaded;
 
-  // ── 차트 공통 설정 ──
-  const chartConfig = {
-    backgroundColor: theme.bgCard,
-    backgroundGradientFrom: theme.bgCard,
-    backgroundGradientTo: theme.bgCard,
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(0, 102, 255, ${opacity})`,
-    labelColor: () => theme.textSecondary,
-    propsForBackgroundLines: { stroke: theme.border },
-  };
+  // 헤더 우측 날짜 범위 (최근 30일)
+  const dateRange = useMemo(() => {
+    const end = new Date();
+    const start = new Date(Date.now() - 29 * DAY_MS);
+    return `${start.getFullYear()}.${start.getMonth() + 1}.${start.getDate()} - ${end.getMonth() + 1}.${end.getDate()}`;
+  }, []);
 
-  const PIE_COLORS = ['#F04452', '#2175F3'];
+  const activeRate = userMetrics.total > 0
+    ? Math.round((userMetrics.dau / userMetrics.total) * 1000) / 10
+    : 0;
 
   const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: theme.bg },
+    safe: { flex: 1, backgroundColor: DS.bg },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 14,
-      backgroundColor: theme.bgCard,
+      backgroundColor: DS.cardBg,
       borderBottomWidth: 1,
-      borderBottomColor: theme.border,
+      borderBottomColor: DS.border,
     },
-    backBtn: { width: 40, alignItems: 'flex-start' },
-    headerTitle: { fontSize: 17, fontWeight: '700', color: theme.text },
-    scrollContent: { padding: 16, gap: 16, paddingBottom: 40 },
-    section: {
-      backgroundColor: theme.bgCard,
+    backBtn: { width: 36, alignItems: 'flex-start' },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: DS.text, flex: 1 },
+    headerDate: { fontSize: 12, color: DS.textMuted, fontWeight: '500' },
+    scrollContent: { padding: 16, paddingBottom: 100 }, // 탭바 가림 방지
+    // BigKPICard
+    bigCard: {
+      backgroundColor: DS.cardBg,
+      padding: 20,
       borderRadius: 16,
+      marginBottom: 12,
+    },
+    bigLabel: { fontSize: 13, color: DS.textSub, fontWeight: '500', marginBottom: 8 },
+    bigNumber: { fontSize: 36, fontWeight: '700', color: DS.text, lineHeight: 42 },
+    bigChangeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 4 },
+    bigChangeText: { fontSize: 12, color: DS.positive, fontWeight: '600' },
+    // SmallKPI grid
+    kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+    smallCard: {
+      backgroundColor: DS.cardBg,
       padding: 16,
-      gap: 12,
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 4,
-      elevation: 2,
-    },
-    sectionTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
-    metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    metricCard: {
-      flexBasis: '48%',
-      flexGrow: 1,
-      backgroundColor: theme.bgInput,
       borderRadius: 12,
-      padding: 12,
+      flex: 1,
+      minWidth: '47%',
     },
-    metricBig: {
-      flexBasis: '100%',
-      backgroundColor: theme.primaryLight,
-      borderRadius: 12,
-      padding: 14,
+    smallLabel: { fontSize: 12, color: DS.textSub, fontWeight: '500', marginBottom: 4 },
+    smallNumber: { fontSize: 22, fontWeight: '700', color: DS.text },
+    // ChartCard
+    chartCard: {
+      backgroundColor: DS.cardBg,
+      padding: 20,
+      borderRadius: 16,
+      marginBottom: 12,
     },
-    metricLabel: { fontSize: 11, color: theme.textSecondary, fontWeight: '600' },
-    metricValue: { fontSize: 22, fontWeight: '800', color: theme.text, marginTop: 4 },
-    metricValueBig: { fontSize: 32, fontWeight: '800', color: theme.primary, marginTop: 4 },
-    barRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
-    barLabel: { fontSize: 12, color: theme.text, width: 60 },
-    barTrack: { flex: 1, height: 8, backgroundColor: theme.border, borderRadius: 4, overflow: 'hidden' },
-    barFill: { height: '100%', backgroundColor: theme.primary, borderRadius: 4 },
-    barValue: { fontSize: 11, color: theme.textSecondary, width: 40, textAlign: 'right' },
+    chartHeaderRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+    chartTitle: { fontSize: 15, fontWeight: '700', color: DS.text },
+    chartSubtitle: { fontSize: 12, color: DS.textMuted, fontWeight: '500' },
+    chartLabelRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 6,
+    },
+    chartLabelText: { fontSize: 10, color: DS.textMuted },
+    // SectionHeader
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 24,
+      marginBottom: 12,
+      paddingHorizontal: 4,
+    },
+    sectionTitle: { fontSize: 15, fontWeight: '700', color: DS.text },
+    // 가로 막대 (TOP 리스트)
+    barRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
+    barLabel: { fontSize: 12, color: DS.text, width: 60, fontWeight: '500' },
+    barTrack: { flex: 1, height: 8, backgroundColor: DS.border, borderRadius: 4, overflow: 'hidden' },
+    barFill: { height: '100%', backgroundColor: DS.primary, borderRadius: 4 },
+    barValue: { fontSize: 11, color: DS.textSub, width: 36, textAlign: 'right', fontWeight: '600' },
+    // 매수/매도 비율 (스택 바)
+    ratioBar: {
+      flexDirection: 'row',
+      height: 12,
+      borderRadius: 6,
+      overflow: 'hidden',
+      backgroundColor: DS.border,
+      marginTop: 10,
+    },
+    ratioLegend: { flexDirection: 'row', gap: 16, marginTop: 8 },
+    ratioLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    ratioDot: { width: 8, height: 8, borderRadius: 4 },
+    ratioText: { fontSize: 12, color: DS.textSub, fontWeight: '600' },
+    // 리스트 행
     listRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingVertical: 8,
+      paddingVertical: 9,
       borderBottomWidth: 1,
-      borderBottomColor: theme.border,
+      borderBottomColor: DS.border,
     },
-    listText: { fontSize: 13, color: theme.text, flex: 1 },
-    listMeta: { fontSize: 12, color: theme.textSecondary, fontWeight: '600' },
-    pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    listText: { fontSize: 13, color: DS.text, flex: 1 },
+    listMeta: { fontSize: 12, color: DS.textSub, fontWeight: '600' },
+    // 키워드 필
+    pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
     pill: {
-      backgroundColor: theme.primaryLight,
+      backgroundColor: DS.bg,
       paddingHorizontal: 10,
       paddingVertical: 5,
       borderRadius: 12,
     },
-    pillText: { fontSize: 12, color: theme.primary, fontWeight: '700' },
+    pillText: { fontSize: 12, color: DS.textSub, fontWeight: '600' },
+    // 하단 진입 카드
+    navCard: {
+      backgroundColor: DS.cardBg,
+      padding: 20,
+      borderRadius: 16,
+      marginTop: 24,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    navCardTitle: { fontSize: 15, fontWeight: '700', color: DS.text },
+    navCardSub: { fontSize: 12, color: DS.textSub, fontWeight: '500', marginTop: 3 },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   });
+
+  // ── 컴포넌트: BigKPICard ──
+  const BigKPICard = ({ label, value, change }: { label: string; value: string; change?: string }) => (
+    <View style={styles.bigCard}>
+      <Text style={styles.bigLabel}>{label}</Text>
+      <Text style={styles.bigNumber}>{value}</Text>
+      {change ? (
+        <View style={styles.bigChangeRow}>
+          <TrendingUp size={14} color={DS.positive} />
+          <Text style={styles.bigChangeText}>{change}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+
+  // ── 컴포넌트: SmallKPI ──
+  const SmallKPI = ({ label, value }: { label: string; value: string }) => (
+    <View style={styles.smallCard}>
+      <Text style={styles.smallLabel}>{label}</Text>
+      <Text style={styles.smallNumber}>{value}</Text>
+    </View>
+  );
+
+  // ── 컴포넌트: SectionHeader ──
+  const SectionHeader = ({ icon: Icon, title }: { icon: any; title: string }) => (
+    <View style={styles.sectionHeader}>
+      <Icon size={18} color={DS.text} strokeWidth={2} />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+
+  // ── 컴포넌트: BarChart (SVG 막대 차트) ──
+  const BarChart = ({ values, labels, color }: { values: number[]; labels: string[]; color?: string }) => {
+    const maxValue = Math.max(...values, 1);
+    const W = 320;
+    const H = 140;
+    const CHART_TOP = 16;
+    const CHART_BOTTOM = 124;
+    const CHART_H = CHART_BOTTOM - CHART_TOP;
+    const gap = 2;
+    const barWidth = W / values.length - gap;
+    const visibleLabels = labels.filter(l => l !== '');
+
+    return (
+      <View style={{ marginTop: 14 }}>
+        <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
+          {/* 가로 기준선 3개 */}
+          {[0, 1, 2].map(i => (
+            <Line
+              key={i}
+              x1={0}
+              x2={W}
+              y1={CHART_TOP + i * (CHART_H / 2)}
+              y2={CHART_TOP + i * (CHART_H / 2)}
+              stroke={DS.border}
+              strokeWidth={1}
+            />
+          ))}
+          {/* 막대 */}
+          {values.map((v, i) => {
+            const barHeight = Math.max((v / maxValue) * CHART_H, v > 0 ? 3 : 0);
+            const x = i * (barWidth + gap);
+            const y = CHART_BOTTOM - barHeight;
+            return (
+              <Rect
+                key={i}
+                x={x}
+                y={y}
+                width={barWidth}
+                height={barHeight}
+                fill={color ?? DS.primary}
+                rx={2}
+              />
+            );
+          })}
+        </Svg>
+        {/* X축 라벨 */}
+        {visibleLabels.length > 0 && (
+          <View style={styles.chartLabelRow}>
+            {visibleLabels.map((l, i) => (
+              <Text key={`${l}-${i}`} style={styles.chartLabelText}>{l}</Text>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={{ marginTop: 12, color: theme.textSecondary }}>대시보드 불러오는 중...</Text>
+          <ActivityIndicator size="large" color={DS.primary} />
+          <Text style={{ marginTop: 12, color: DS.textSub }}>대시보드 불러오는 중...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // ── 차트 데이터 가공 ──
+  // ── 파생 표시값 ──
   const maxBucket = Math.max(...assetMetrics.buckets, 1);
   const maxCategory = Math.max(...learningMetrics.categoryStats.map(c => c.count), 1);
   const maxTicker = tradeMetrics.top10Tickers[0]?.[1] ?? 1;
-
   const buyTotal = tradeMetrics.buyCount + tradeMetrics.sellCount;
-  const pieData = buyTotal > 0 ? [
-    {
-      name: '매수',
-      population: tradeMetrics.buyCount,
-      color: PIE_COLORS[0],
-      legendFontColor: theme.text,
-      legendFontSize: 12,
-    },
-    {
-      name: '매도',
-      population: tradeMetrics.sellCount,
-      color: PIE_COLORS[1],
-      legendFontColor: theme.text,
-      legendFontSize: 12,
-    },
-  ] : [];
+  const buyPct = buyTotal > 0 ? Math.round((tradeMetrics.buyCount / buyTotal) * 100) : 0;
+  const BUCKET_LABELS = ['50만 미만', '50~100만', '100~200만', '200~500만', '500만 이상'];
 
   return (
     <SafeAreaView style={styles.safe}>
+      {/* 헤더 */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="chevron-back" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>📊 종합 대시보드</Text>
-        <View style={{ width: 40 }} />
+        {navigation.canGoBack() ? (
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <ChevronLeft size={24} color={DS.text} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backBtn} />
+        )}
+        <Text style={styles.headerTitle}>대시보드</Text>
+        <Text style={styles.headerDate}>{dateRange}</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* ── Section 1: 사용자 ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>👥 사용자</Text>
-          <View style={styles.metricGrid}>
-            <View style={styles.metricBig}>
-              <Text style={styles.metricLabel}>총 가입자</Text>
-              <Text style={styles.metricValueBig}>{userMetrics.total.toLocaleString()}명</Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>오늘 가입</Text>
-              <Text style={styles.metricValue}>{userMetrics.todaySignups}</Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>이번 주 가입</Text>
-              <Text style={styles.metricValue}>{userMetrics.weekSignups}</Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>DAU (오늘)</Text>
-              <Text style={styles.metricValue}>{userMetrics.dau}</Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>WAU (이번 주)</Text>
-              <Text style={styles.metricValue}>{userMetrics.wau}</Text>
-            </View>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* ── 사용자 ── */}
+        <SectionHeader icon={Users} title="사용자" />
+
+        <BigKPICard
+          label="전체 가입자"
+          value={`${userMetrics.total.toLocaleString()}명`}
+          change={userMetrics.weekSignups > 0 ? `+${userMetrics.weekSignups} 이번 주` : undefined}
+        />
+
+        <View style={styles.kpiGrid}>
+          <SmallKPI label="오늘 가입" value={`${userMetrics.todaySignups}`} />
+          <SmallKPI label="DAU" value={`${userMetrics.dau}`} />
+          <SmallKPI label="WAU" value={`${userMetrics.wau}`} />
+          <SmallKPI label="활성 비율" value={`${activeRate}%`} />
+        </View>
+
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeaderRow}>
+            <Text style={styles.chartTitle}>최근 30일 신규 가입</Text>
+            <Text style={styles.chartSubtitle}>일별</Text>
           </View>
-          <Text style={[styles.metricLabel, { marginTop: 8 }]}>최근 30일 신규 가입 추이</Text>
-          <LineChart
-            data={{
-              labels: userMetrics.signupTrend.labels,
-              datasets: [{ data: userMetrics.signupTrend.counts }],
-            }}
-            width={CHART_W - 32}
-            height={160}
-            chartConfig={chartConfig}
-            bezier
-            withDots={false}
-            withInnerLines={false}
-            style={{ borderRadius: 8, marginLeft: -16 }}
+          <BarChart
+            values={userMetrics.signupTrend.counts}
+            labels={userMetrics.signupTrend.labels}
           />
         </View>
 
-        {/* ── Section 2: 거래 ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>💰 거래</Text>
-          <View style={styles.metricGrid}>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>오늘 거래 횟수</Text>
-              <Text style={styles.metricValue}>{tradeMetrics.todayCount}건</Text>
+        {/* ── 거래 ── */}
+        <SectionHeader icon={Wallet} title="거래 현황" />
+
+        <BigKPICard
+          label="총 누적 거래"
+          value={`${totalTrades.toLocaleString()}회`}
+          change={tradeMetrics.todayCount > 0 ? `+${tradeMetrics.todayCount} 오늘` : undefined}
+        />
+
+        <View style={styles.kpiGrid}>
+          <SmallKPI
+            label="오늘 거래대금"
+            value={`${Math.round(tradeMetrics.todayAmount / 10_000).toLocaleString()}만원`}
+          />
+          <SmallKPI
+            label="이번 주 거래대금"
+            value={`${Math.round(tradeMetrics.weekAmount / 10_000).toLocaleString()}만원`}
+          />
+        </View>
+
+        {buyTotal > 0 && (
+          <View style={styles.chartCard}>
+            <View style={styles.chartHeaderRow}>
+              <Text style={styles.chartTitle}>매수 / 매도 비율</Text>
+              <Text style={styles.chartSubtitle}>누적</Text>
             </View>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>오늘 거래대금</Text>
-              <Text style={styles.metricValue}>
-                ₩{Math.round(tradeMetrics.todayAmount / 10_000).toLocaleString()}만
-              </Text>
+            <View style={styles.ratioBar}>
+              <View style={{ flex: tradeMetrics.buyCount, backgroundColor: DS.primary }} />
+              <View style={{ flex: Math.max(tradeMetrics.sellCount, 0.001), backgroundColor: DS.negative }} />
+            </View>
+            <View style={styles.ratioLegend}>
+              <View style={styles.ratioLegendItem}>
+                <View style={[styles.ratioDot, { backgroundColor: DS.primary }]} />
+                <Text style={styles.ratioText}>매수 {tradeMetrics.buyCount.toLocaleString()} ({buyPct}%)</Text>
+              </View>
+              <View style={styles.ratioLegendItem}>
+                <View style={[styles.ratioDot, { backgroundColor: DS.negative }]} />
+                <Text style={styles.ratioText}>매도 {tradeMetrics.sellCount.toLocaleString()} ({100 - buyPct}%)</Text>
+              </View>
             </View>
           </View>
+        )}
 
-          {pieData.length > 0 && (
-            <>
-              <Text style={[styles.metricLabel, { marginTop: 8 }]}>매수/매도 비율</Text>
-              <PieChart
-                data={pieData}
-                width={CHART_W - 32}
-                height={160}
-                chartConfig={chartConfig}
-                accessor="population"
-                backgroundColor="transparent"
-                paddingLeft="16"
-              />
-            </>
-          )}
-
-          {tradeMetrics.top10Tickers.length > 0 && (
-            <>
-              <Text style={[styles.metricLabel, { marginTop: 8 }]}>거래 빈도 TOP 10 종목</Text>
+        {tradeMetrics.top10Tickers.length > 0 && (
+          <View style={styles.chartCard}>
+            <View style={styles.chartHeaderRow}>
+              <Text style={styles.chartTitle}>거래 빈도 TOP 10</Text>
+              <Text style={styles.chartSubtitle}>종목</Text>
+            </View>
+            <View style={{ marginTop: 10 }}>
               {tradeMetrics.top10Tickers.map(([ticker, count]) => (
                 <View key={ticker} style={styles.barRow}>
-                  <Text style={styles.barLabel}>{ticker}</Text>
+                  <Text style={styles.barLabel} numberOfLines={1}>{ticker}</Text>
                   <View style={styles.barTrack}>
                     <View style={[styles.barFill, { width: `${(count / maxTicker) * 100}%` }]} />
                   </View>
                   <Text style={styles.barValue}>{count}</Text>
                 </View>
               ))}
-            </>
-          )}
-
-          {tradeMetrics.top10Reasons.length > 0 && (
-            <>
-              <Text style={[styles.metricLabel, { marginTop: 8 }]}>매매 이유 키워드 TOP 10</Text>
-              <View style={styles.pillRow}>
-                {tradeMetrics.top10Reasons.map(([word, n]) => (
-                  <View key={word} style={styles.pill}>
-                    <Text style={styles.pillText}>{word} · {n}</Text>
-                  </View>
-                ))}
-              </View>
-            </>
-          )}
-        </View>
-
-        {/* ── Section 3: 학습 ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📚 학습</Text>
-          <View style={styles.metricGrid}>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>유저당 평균 완료 레슨</Text>
-              <Text style={styles.metricValue}>{learningMetrics.avgPerUser}</Text>
             </View>
           </View>
+        )}
 
-          <Text style={[styles.metricLabel, { marginTop: 8 }]}>카테고리별 학습량</Text>
-          {learningMetrics.categoryStats.map(c => (
-            <View key={c.label} style={styles.barRow}>
-              <Text style={styles.barLabel}>{c.label}</Text>
-              <View style={styles.barTrack}>
-                <View style={[styles.barFill, {
-                  width: `${(c.count / maxCategory) * 100}%`,
-                  backgroundColor: theme.green,
-                }]} />
-              </View>
-              <Text style={styles.barValue}>{c.count}</Text>
+        {tradeMetrics.top10Reasons.length > 0 && (
+          <View style={styles.chartCard}>
+            <View style={styles.chartHeaderRow}>
+              <Text style={styles.chartTitle}>매매 이유 키워드</Text>
+              <Text style={styles.chartSubtitle}>TOP 10</Text>
             </View>
-          ))}
+            <View style={styles.pillRow}>
+              {tradeMetrics.top10Reasons.map(([word, n]) => (
+                <View key={word} style={styles.pill}>
+                  <Text style={styles.pillText}>{word} · {n}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
-          {learningMetrics.top5Lessons.length > 0 && (
-            <>
-              <Text style={[styles.metricLabel, { marginTop: 8 }]}>가장 많이 풀린 레슨 TOP 5</Text>
+        {/* ── 학습 ── */}
+        <SectionHeader icon={BookOpen} title="학습" />
+
+        <View style={styles.kpiGrid}>
+          <SmallKPI label="유저당 평균 완료 레슨" value={`${learningMetrics.avgPerUser}개`} />
+        </View>
+
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeaderRow}>
+            <Text style={styles.chartTitle}>최근 14일 학습량</Text>
+            <Text style={styles.chartSubtitle}>일별</Text>
+          </View>
+          <BarChart
+            values={learningMetrics.dailyTrend.counts}
+            labels={learningMetrics.dailyTrend.labels}
+            color={DS.positive}
+          />
+        </View>
+
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeaderRow}>
+            <Text style={styles.chartTitle}>카테고리별 학습량</Text>
+          </View>
+          <View style={{ marginTop: 10 }}>
+            {learningMetrics.categoryStats.map(c => (
+              <View key={c.label} style={styles.barRow}>
+                <Text style={styles.barLabel}>{c.label}</Text>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, {
+                    width: `${(c.count / maxCategory) * 100}%`,
+                    backgroundColor: DS.positive,
+                  }]} />
+                </View>
+                <Text style={styles.barValue}>{c.count}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {learningMetrics.top5Lessons.length > 0 && (
+          <View style={styles.chartCard}>
+            <View style={styles.chartHeaderRow}>
+              <Text style={styles.chartTitle}>가장 많이 풀린 레슨</Text>
+              <Text style={styles.chartSubtitle}>TOP 5</Text>
+            </View>
+            <View style={{ marginTop: 4 }}>
               {learningMetrics.top5Lessons.map(([id, n], i) => (
                 <View key={id} style={styles.listRow}>
                   <Text style={styles.listText}>{i + 1}. 레슨 #{id}</Text>
                   <Text style={styles.listMeta}>{n}회</Text>
                 </View>
               ))}
-            </>
-          )}
-
-          <Text style={[styles.metricLabel, { marginTop: 8 }]}>최근 14일 일별 학습량</Text>
-          <LineChart
-            data={{
-              labels: learningMetrics.dailyTrend.labels,
-              datasets: [{
-                data: learningMetrics.dailyTrend.counts,
-                color: () => theme.green,
-              }],
-            }}
-            width={CHART_W - 32}
-            height={160}
-            chartConfig={{
-              ...chartConfig,
-              color: (opacity = 1) => `rgba(52, 199, 89, ${opacity})`,
-            }}
-            bezier
-            withDots={false}
-            withInnerLines={false}
-            style={{ borderRadius: 8, marginLeft: -16 }}
-          />
-        </View>
-
-        {/* ── Section 4: 자산 ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>💼 자산</Text>
-          <View style={styles.metricGrid}>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>평균 총 자산</Text>
-              <Text style={styles.metricValue}>
-                ₩{Math.round(assetMetrics.avg).toLocaleString()}
-              </Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>중앙값</Text>
-              <Text style={styles.metricValue}>
-                ₩{Math.round(assetMetrics.med).toLocaleString()}
-              </Text>
             </View>
           </View>
+        )}
 
-          <Text style={[styles.metricLabel, { marginTop: 8 }]}>자산 구간별 사용자 수</Text>
-          <BarChart
-            data={{
-              labels: ['<50만', '50~100', '100~200', '200~500', '500↑'],
-              datasets: [{ data: assetMetrics.buckets }],
-            }}
-            width={CHART_W - 32}
-            height={180}
-            yAxisLabel=""
-            yAxisSuffix="명"
-            chartConfig={{
-              ...chartConfig,
-              barPercentage: 0.7,
-            }}
-            fromZero
-            withInnerLines={false}
-            style={{ borderRadius: 8, marginLeft: -16 }}
-          />
+        {/* ── 자산 ── */}
+        <SectionHeader icon={Briefcase} title="자산" />
+
+        <View style={styles.kpiGrid}>
+          <SmallKPI label="평균 총 자산" value={`${Math.round(assetMetrics.avg / 10_000).toLocaleString()}만원`} />
+          <SmallKPI label="중앙값" value={`${Math.round(assetMetrics.med / 10_000).toLocaleString()}만원`} />
         </View>
 
-        {/* ── Section 5: 커뮤니티 ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>💬 커뮤니티</Text>
-          <View style={styles.metricGrid}>
-            <View style={styles.metricBig}>
-              <Text style={styles.metricLabel}>총 게시글</Text>
-              <Text style={styles.metricValueBig}>{communityMetrics.total.toLocaleString()}</Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>오늘 게시글</Text>
-              <Text style={styles.metricValue}>{communityMetrics.todayPosts}</Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>이번 주</Text>
-              <Text style={styles.metricValue}>{communityMetrics.weekPosts}</Text>
-            </View>
+        <View style={styles.chartCard}>
+          <View style={styles.chartHeaderRow}>
+            <Text style={styles.chartTitle}>자산 구간별 사용자</Text>
+            <Text style={styles.chartSubtitle}>명</Text>
           </View>
+          <View style={{ marginTop: 10 }}>
+            {assetMetrics.buckets.map((count, i) => (
+              <View key={BUCKET_LABELS[i]} style={styles.barRow}>
+                <Text style={[styles.barLabel, { width: 76 }]}>{BUCKET_LABELS[i]}</Text>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, { width: `${(count / maxBucket) * 100}%` }]} />
+                </View>
+                <Text style={styles.barValue}>{count}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
 
-          {communityMetrics.popular.length > 0 && (
-            <>
-              <Text style={[styles.metricLabel, { marginTop: 8 }]}>인기 글 TOP 5 (좋아요)</Text>
+        {/* ── 커뮤니티 ── */}
+        <SectionHeader icon={MessageCircle} title="커뮤니티" />
+
+        <BigKPICard
+          label="총 게시글"
+          value={`${communityMetrics.total.toLocaleString()}개`}
+          change={communityMetrics.weekPosts > 0 ? `+${communityMetrics.weekPosts} 이번 주` : undefined}
+        />
+
+        <View style={styles.kpiGrid}>
+          <SmallKPI label="오늘 게시글" value={`${communityMetrics.todayPosts}`} />
+          <SmallKPI label="이번 주" value={`${communityMetrics.weekPosts}`} />
+        </View>
+
+        {communityMetrics.popular.length > 0 && (
+          <View style={styles.chartCard}>
+            <View style={styles.chartHeaderRow}>
+              <Text style={styles.chartTitle}>인기 글</Text>
+              <Text style={styles.chartSubtitle}>좋아요순 TOP 5</Text>
+            </View>
+            <View style={{ marginTop: 4 }}>
               {communityMetrics.popular.map((p, i) => (
                 <View key={p.id} style={styles.listRow}>
                   <Text style={styles.listText} numberOfLines={1}>
                     {i + 1}. {p.content?.slice(0, 30) ?? '(내용 없음)'}
                   </Text>
-                  <Text style={styles.listMeta}>♥ {p.likes?.length ?? 0}</Text>
+                  <Text style={styles.listMeta}>{p.likes?.length ?? 0}</Text>
                 </View>
               ))}
-            </>
-          )}
+            </View>
+          </View>
+        )}
 
-          {communityMetrics.topAuthors.length > 0 && (
-            <>
-              <Text style={[styles.metricLabel, { marginTop: 8 }]}>활성 작성자 TOP 10</Text>
+        {communityMetrics.topAuthors.length > 0 && (
+          <View style={styles.chartCard}>
+            <View style={styles.chartHeaderRow}>
+              <Text style={styles.chartTitle}>활성 작성자</Text>
+              <Text style={styles.chartSubtitle}>TOP 10</Text>
+            </View>
+            <View style={{ marginTop: 4 }}>
               {communityMetrics.topAuthors.map((a, i) => (
                 <View key={a.uid} style={styles.listRow}>
                   <Text style={styles.listText}>{i + 1}. {a.nickname}</Text>
                   <Text style={styles.listMeta}>{a.count}건</Text>
                 </View>
               ))}
-            </>
-          )}
-        </View>
+            </View>
+          </View>
+        )}
 
-        {/* ── Section 6: 사용자별 거래내역 진입 ── */}
+        {/* ── 사용자별 거래내역 진입 ── */}
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => {
             const parent = navigation.getParent<any>();
             if (parent) parent.navigate('거래내역Tab');
           }}
-          style={[styles.section, { flexDirection: 'row', alignItems: 'center' }]}
+          style={styles.navCard}
         >
-          <View style={{ flex: 1, gap: 6 }}>
-            <Text style={styles.sectionTitle}>📋 전체 사용자 거래내역</Text>
-            <Text style={{ fontSize: 13, color: theme.textSecondary, fontWeight: '600' }}>
+          <ClipboardList size={20} color={DS.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.navCardTitle}>전체 사용자 거래내역</Text>
+            <Text style={styles.navCardSub}>
               {userMetrics.total.toLocaleString()}명 · 총 {totalTrades.toLocaleString()}건 · reason 분석
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={22} color={theme.primary} />
+          <ChevronRight size={20} color={DS.textMuted} />
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
