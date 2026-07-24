@@ -27,7 +27,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -42,7 +42,7 @@ import {
 } from '../utils/priceService';
 import { saveNotif } from '../utils/notificationService';
 import { updateMissionProgress } from '../lib/missionService';
-import { validateReason, getReasonStatus, REASON_TEMPLATES } from '../utils/reasonValidator';
+import { validateTradeReason, getReasonStatus, REASON_TEMPLATES } from '../utils/reasonValidator';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -296,6 +296,39 @@ export default function StockDetailScreen() {
     });
     return () => unsubscribe();
   }, [user?.id]);
+
+  // 종목 상세 진입/이탈 시간 로깅 (stockVisits)
+  useEffect(() => {
+    if (!user?.id) return;
+    const startMs = Date.now();
+    let visitRef: any = null;
+    let left = false;
+
+    const saveDuration = (ref: any) => {
+      const durationSeconds = Math.round((Date.now() - startMs) / 1000);
+      updateDoc(ref, { durationSeconds }).catch((e) =>
+        console.warn('stockVisit 이탈 기록 실패:', e));
+    };
+
+    // 진입: entryTime 기록
+    addDoc(collection(db, 'stockVisits'), {
+      uid: user.id,
+      ticker,
+      entryTime: serverTimestamp(),
+    })
+      .then((ref) => {
+        // addDoc 완료 전에 이미 이탈했으면 바로 durationSeconds 저장
+        if (left) saveDuration(ref);
+        else visitRef = ref;
+      })
+      .catch((e) => console.warn('stockVisit 진입 기록 실패:', e));
+
+    // 이탈: durationSeconds 계산 후 저장
+    return () => {
+      left = true;
+      if (visitRef) saveDuration(visitRef);
+    };
+  }, [user?.id, ticker]);
 
   useEffect(() => {
     const back = BackHandler.addEventListener(
@@ -1501,7 +1534,11 @@ function TradeSheet({
   const ownedStock = userData?.portfolio?.find(p => p.ticker === stock.ticker);
   const balance = userData?.balance ?? cash;
   const maxSellQty = ownedStock?.quantity ?? 0;
-  const maxBuyQty = tradePriceKRW > 0 ? Math.floor(balance / (tradePriceKRW * 1.001)) : 0;
+  const maxBuyQty = tradePriceKRW > 0
+    ? (isKR
+        ? Math.floor(balance / (tradePriceKRW * 1.001))
+        : Math.floor((balance / (tradePriceKRW * 1.001)) * 10000) / 10000)
+    : 0;
   const maxQty = tradeType === 'buy' ? maxBuyQty : maxSellQty;
   const totalCost = Math.round(tradePriceKRW * quantity * 1.001);
   const totalReceive = Math.round(tradePriceKRW * quantity * 0.999);
@@ -1521,19 +1558,38 @@ function TradeSheet({
   };
 
   const handleQuantityChange = (text: string) => {
-    setQuantityText(text);
-    const num = parseInt(text.replace(/[^0-9]/g, ''), 10) || 0;
-    if (tradeType === 'sell' && num > maxSellQty) {
-      setQuantity(maxSellQty);
-      setQuantityText(maxSellQty.toString());
-      return;
+    // 해외주식: 소수점 허용, 한국주식: 정수만
+    if (isKR) {
+      setQuantityText(text);
+      const num = parseInt(text.replace(/[^0-9]/g, ''), 10) || 0;
+      if (tradeType === 'sell' && num > maxSellQty) {
+        setQuantity(maxSellQty);
+        setQuantityText(maxSellQty.toString());
+        return;
+      }
+      if (tradeType === 'buy' && num > maxBuyQty) {
+        setQuantity(maxBuyQty);
+        setQuantityText(maxBuyQty.toString());
+        return;
+      }
+      setQuantity(Math.max(0, num));
+    } else {
+      // 소수점 입력 허용: 숫자와 소수점만 통과, 소수점 4자리까지
+      const cleaned = text.replace(/[^0-9.]/g, '').replace(/^(\d*\.?\d{0,4}).*$/, '$1');
+      setQuantityText(cleaned);
+      const num = parseFloat(cleaned) || 0;
+      if (tradeType === 'sell' && num > maxSellQty) {
+        setQuantity(maxSellQty);
+        setQuantityText(maxSellQty.toFixed(4));
+        return;
+      }
+      if (tradeType === 'buy' && num > maxBuyQty) {
+        setQuantity(maxBuyQty);
+        setQuantityText(maxBuyQty.toFixed(4));
+        return;
+      }
+      setQuantity(Math.max(0, num));
     }
-    if (tradeType === 'buy' && num > maxBuyQty) {
-      setQuantity(maxBuyQty);
-      setQuantityText(maxBuyQty.toString());
-      return;
-    }
-    setQuantity(Math.max(0, num));
   };
 
   const handleIncrease = () => {
@@ -1558,6 +1614,7 @@ function TradeSheet({
   };
 
   const handleTrade = async () => {
+    if (isLoading) return;
     if (!userId || quantity <= 0) {
       if (quantity <= 0) Alert.alert('알림', '수량을 입력해주세요');
       return;
@@ -1583,16 +1640,16 @@ function TradeSheet({
       }
     }
 
-    // 거래 이유 필수 (의미 있는 입력 검증)
-    const reasonResult = validateReason(reason);
-    if (!reasonResult.valid) {
-      Alert.alert('이유 입력 확인', reasonResult.message);
-      return;
-    }
-    const trimmedReason = reason.trim();
-
     try {
       setIsLoading(true);
+
+      // 거래 이유 필수 — 로컬 + 세이프가드 AI 검증 (네트워크 왕복 발생)
+      const reasonResult = await validateTradeReason(reason, userId, stock.ticker);
+      if (!reasonResult.valid) {
+        Alert.alert('이유 입력 확인', reasonResult.error);
+        return;
+      }
+      const trimmedReason = reason.trim();
 
       const result = tradeType === 'buy'
         ? await buyStock(stock.ticker, quantity, tradePrice, trimmedReason)

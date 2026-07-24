@@ -439,8 +439,8 @@ export default function InvestScreen() {
                     console.log(`투자탭 가격 (${item.ticker}):`, pd?.price);
                     navigation.navigate('종목상세', {
                       ticker: item.ticker,
-                      price: pd?.price,
-                      change: pd?.change,
+                      price: pd?.price ?? item.price ?? 0,
+                      change: pd?.change ?? item.change ?? 0,
                       changeAmount: pd?.changeAmount,
                       high: pd?.high,
                       low: pd?.low,

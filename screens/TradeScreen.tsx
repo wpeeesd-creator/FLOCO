@@ -75,7 +75,7 @@ export function StockDetailScreen({ route }: any) {
   const { ticker } = route.params;
   const navigation = useNavigation();
   const stock = STOCKS.find(s => s.ticker === ticker);
-  const { holdings, cash, buyStock, sellStock } = useAppStore();
+  const { holdings, cash, buyStock, sellStock, exchangeRate } = useAppStore();
   const safeHoldings = holdings ?? [];
   const holding = safeHoldings.find(h => h.ticker === ticker);
 
@@ -105,8 +105,8 @@ export function StockDetailScreen({ route }: any) {
     // Optimistic UI: 먼저 Sheet를 닫고 결과를 Toast로 피드백
     setShowSheet(false);
     const result = await (tab === 'buy'
-      ? buyStock(ticker, qty, stock.price)
-      : sellStock(ticker, qty, stock.price));
+      ? buyStock(ticker, qty, stock.krw ? stock.price : Math.round(stock.price * exchangeRate))
+      : sellStock(ticker, qty, stock.krw ? stock.price : Math.round(stock.price * exchangeRate)));
     if (result.success) {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(

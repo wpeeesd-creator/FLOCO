@@ -31,6 +31,7 @@ export interface Stock {
   krw: boolean;
   sector?: string;
   type?: 'stock' | 'etf' | 'crypto' | 'index';
+  isDividend?: boolean;  // 배당주 플래그 (정적)
 }
 
 export interface Holding {
@@ -112,7 +113,7 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: 'NOW',   name: '서비스나우',       market: '미국', price: 798.30, change: +1.1,  logo: '⚙️', krw: false, sector: '기술' },
   { ticker: 'INTU',  name: '인튜이트',        market: '미국', price: 612.80, change: +0.8,  logo: '📊', krw: false, sector: '기술' },
   { ticker: 'ORCL',  name: '오라클',          market: '미국', price: 142.30, change: +0.9,  logo: '🔶', krw: false, sector: '기술' },
-  { ticker: 'IBM',   name: 'IBM',            market: '미국', price: 198.40, change: +0.3,  logo: '🔵', krw: false, sector: '기술' },
+  { ticker: 'IBM',   name: 'IBM',            market: '미국', price: 198.40, change: +0.3,  logo: '🔵', krw: false, sector: '기술' , isDividend: true },
   { ticker: 'UBER',  name: '우버',            market: '미국', price: 78.40,  change: +0.7,  logo: '🚗', krw: false, sector: '기술' },
   { ticker: 'SNAP',  name: '스냅',            market: '미국', price: 12.40,  change: -2.1,  logo: '👻', krw: false, sector: '기술' },
   { ticker: 'PINS',  name: '핀터레스트',       market: '미국', price: 34.80,  change: +1.5,  logo: '📌', krw: false, sector: '기술' },
@@ -133,11 +134,11 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: 'TSM',   name: 'TSMC',           market: '미국', price: 178.90, change: +2.4,  logo: '🇹🇼', krw: false, sector: '반도체' },
   { ticker: 'ASML',  name: 'ASML',           market: '미국', price: 892.40, change: -0.6,  logo: '🔬', krw: false, sector: '반도체' },
   // ── 미국 금융 ──
-  { ticker: 'JPM',   name: 'JP모건',          market: '미국', price: 198.70, change: +0.8,  logo: '🏦', krw: false, sector: '금융' },
+  { ticker: 'JPM',   name: 'JP모건',          market: '미국', price: 198.70, change: +0.8,  logo: '🏦', krw: false, sector: '금융' , isDividend: true },
   { ticker: 'GS',    name: '골드만삭스',       market: '미국', price: 478.20, change: -0.2,  logo: '💼', krw: false, sector: '금융' },
   { ticker: 'V',     name: '비자',            market: '미국', price: 278.40, change: +0.3,  logo: '💳', krw: false, sector: '금융' },
   { ticker: 'MA',    name: '마스터카드',       market: '미국', price: 478.90, change: +0.5,  logo: '💳', krw: false, sector: '금융' },
-  { ticker: 'BAC',   name: '뱅크오브아메리카', market: '미국', price: 38.40,  change: +0.4,  logo: '🏛️', krw: false, sector: '금융' },
+  { ticker: 'BAC',   name: '뱅크오브아메리카', market: '미국', price: 38.40,  change: +0.4,  logo: '🏛️', krw: false, sector: '금융' , isDividend: true },
   { ticker: 'WFC',   name: '웰스파고',        market: '미국', price: 58.90,  change: +0.6,  logo: '🏛️', krw: false, sector: '금융' },
   { ticker: 'MS',    name: '모건스탠리',       market: '미국', price: 98.40,  change: +0.3,  logo: '💼', krw: false, sector: '금융' },
   { ticker: 'PYPL',  name: '페이팔',          market: '미국', price: 78.40,  change: -1.2,  logo: '🅿️', krw: false, sector: '금융' },
@@ -145,21 +146,21 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: 'COIN',  name: '코인베이스',       market: '미국', price: 198.30, change: +4.2,  logo: '🪙', krw: false, sector: '금융' },
   { ticker: 'BRKB',  name: '버크셔해서웨이',   market: '미국', price: 452.30, change: +0.3,  logo: '🦉', krw: false, sector: '금융' },
   // ── 미국 헬스케어 ──
-  { ticker: 'JNJ',   name: '존슨앤드존슨',    market: '미국', price: 152.30, change: +0.4,  logo: '🏥', krw: false, sector: '헬스케어' },
-  { ticker: 'PFE',   name: '화이자',          market: '미국', price: 28.40,  change: -0.7,  logo: '💊', krw: false, sector: '헬스케어' },
+  { ticker: 'JNJ',   name: '존슨앤드존슨',    market: '미국', price: 152.30, change: +0.4,  logo: '🏥', krw: false, sector: '헬스케어' , isDividend: true },
+  { ticker: 'PFE',   name: '화이자',          market: '미국', price: 28.40,  change: -0.7,  logo: '💊', krw: false, sector: '헬스케어' , isDividend: true },
   { ticker: 'LLY',   name: '일라이릴리',      market: '미국', price: 782.40, change: +1.8,  logo: '💉', krw: false, sector: '헬스케어' },
-  { ticker: 'ABBV',  name: '애브비',          market: '미국', price: 178.40, change: +0.9,  logo: '🧬', krw: false, sector: '헬스케어' },
+  { ticker: 'ABBV',  name: '애브비',          market: '미국', price: 178.40, change: +0.9,  logo: '🧬', krw: false, sector: '헬스케어' , isDividend: true },
   { ticker: 'MRK',   name: '머크',            market: '미국', price: 128.60, change: +0.5,  logo: '💊', krw: false, sector: '헬스케어' },
   { ticker: 'UNH',   name: '유나이티드헬스',   market: '미국', price: 512.80, change: +0.7,  logo: '🩺', krw: false, sector: '헬스케어' },
   // ── 미국 소비재 ──
   { ticker: 'TSLA',  name: '테슬라',          market: '미국', price: 242.30, change: -1.4,  logo: '⚡', krw: false, sector: '자동차' },
   { ticker: 'NKE',   name: '나이키',          market: '미국', price: 98.60,  change: -0.4,  logo: '👟', krw: false, sector: '소비재' },
   { ticker: 'SBUX',  name: '스타벅스',        market: '미국', price: 89.30,  change: +0.6,  logo: '☕', krw: false, sector: '소비재' },
-  { ticker: 'MCD',   name: '맥도날드',        market: '미국', price: 298.40, change: +0.3,  logo: '🍔', krw: false, sector: '소비재' },
+  { ticker: 'MCD',   name: '맥도날드',        market: '미국', price: 298.40, change: +0.3,  logo: '🍔', krw: false, sector: '소비재' , isDividend: true },
   { ticker: 'DIS',   name: '디즈니',          market: '미국', price: 112.40, change: +0.5,  logo: '🏰', krw: false, sector: '미디어' },
   // ── 미국 에너지 ──
-  { ticker: 'XOM',   name: '엑슨모빌',        market: '미국', price: 112.80, change: +1.1,  logo: '🛢️', krw: false, sector: '에너지' },
-  { ticker: 'CVX',   name: '셰브론',          market: '미국', price: 158.40, change: +0.8,  logo: '⛽', krw: false, sector: '에너지' },
+  { ticker: 'XOM',   name: '엑슨모빌',        market: '미국', price: 112.80, change: +1.1,  logo: '🛢️', krw: false, sector: '에너지' , isDividend: true },
+  { ticker: 'CVX',   name: '셰브론',          market: '미국', price: 158.40, change: +0.8,  logo: '⛽', krw: false, sector: '에너지' , isDividend: true },
   // ── 미국 AI·성장주 ──
   { ticker: 'PLTR',  name: '팔란티어',        market: '미국', price: 24.60,  change: +2.8,  logo: '🔭', krw: false, sector: 'AI' },
   { ticker: 'RIVN',  name: '리비안',          market: '미국', price: 12.40,  change: -2.3,  logo: '🚙', krw: false, sector: '전기차' },
@@ -173,8 +174,8 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: 'ARKK',  name: 'ARK 이노베이션',  market: '미국', price: 48.30,  change: +2.34, logo: '🚀', krw: false, sector: 'ETF' },
 
   // ── 한국 반도체 ──
-  { ticker: '005930', name: '삼성전자',        market: '한국', price: 75400,  change: +1.2,  logo: '📱', krw: true, sector: '반도체' },
-  { ticker: '000660', name: 'SK하이닉스',      market: '한국', price: 198500, change: -0.8,  logo: '🔬', krw: true, sector: '반도체' },
+  { ticker: '005930', name: '삼성전자',        market: '한국', price: 75400,  change: +1.2,  logo: '📱', krw: true, sector: '반도체' , isDividend: true },
+  { ticker: '000660', name: 'SK하이닉스',      market: '한국', price: 198500, change: -0.8,  logo: '🔬', krw: true, sector: '반도체' , isDividend: true },
   { ticker: '009150', name: '삼성전기',        market: '한국', price: 145000, change: +2.1,  logo: '⚡', krw: true, sector: '반도체' },
   // ── 한국 IT ──
   { ticker: '035420', name: 'NAVER',          market: '한국', price: 215000, change: -0.3,  logo: '🟩', krw: true, sector: 'IT' },
@@ -189,7 +190,7 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: '000100', name: '유한양행',        market: '한국', price: 98500,  change: +1.2,  logo: '💊', krw: true, sector: '바이오' },
   { ticker: '128940', name: '한미약품',        market: '한국', price: 312000, change: +2.4,  logo: '💉', krw: true, sector: '바이오' },
   // ── 한국 자동차 ──
-  { ticker: '005380', name: '현대차',          market: '한국', price: 245000, change: +0.5,  logo: '🚗', krw: true, sector: '자동차' },
+  { ticker: '005380', name: '현대차',          market: '한국', price: 245000, change: +0.5,  logo: '🚗', krw: true, sector: '자동차' , isDividend: true },
   { ticker: '000270', name: '기아',            market: '한국', price: 118500, change: +0.7,  logo: '🚙', krw: true, sector: '자동차' },
   { ticker: '012330', name: '현대모비스',       market: '한국', price: 245000, change: +0.3,  logo: '🔧', krw: true, sector: '자동차' },
   { ticker: '161390', name: '한국타이어',       market: '한국', price: 52300,  change: +0.4,  logo: '⭕', krw: true, sector: '자동차' },
@@ -198,9 +199,9 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: '006400', name: '삼성SDI',         market: '한국', price: 289000, change: -0.6,  logo: '⚡', krw: true, sector: '2차전지' },
   { ticker: '051910', name: 'LG화학',          market: '한국', price: 312000, change: +1.5,  logo: '🧪', krw: true, sector: '2차전지' },
   // ── 한국 금융 ──
-  { ticker: '105560', name: 'KB금융',          market: '한국', price: 72300,  change: +0.5,  logo: '🏦', krw: true, sector: '금융' },
-  { ticker: '055550', name: '신한지주',        market: '한국', price: 47850,  change: +1.3,  logo: '🏛️', krw: true, sector: '금융' },
-  { ticker: '086790', name: '하나금융지주',     market: '한국', price: 58200,  change: +0.8,  logo: '🏛️', krw: true, sector: '금융' },
+  { ticker: '105560', name: 'KB금융',          market: '한국', price: 72300,  change: +0.5,  logo: '🏦', krw: true, sector: '금융' , isDividend: true },
+  { ticker: '055550', name: '신한지주',        market: '한국', price: 47850,  change: +1.3,  logo: '🏛️', krw: true, sector: '금융' , isDividend: true },
+  { ticker: '086790', name: '하나금융지주',     market: '한국', price: 58200,  change: +0.8,  logo: '🏛️', krw: true, sector: '금융' , isDividend: true },
   { ticker: '032830', name: '삼성생명',        market: '한국', price: 98500,  change: +1.5,  logo: '🛡️', krw: true, sector: '금융' },
   { ticker: '000810', name: '삼성화재',        market: '한국', price: 298000, change: +0.7,  logo: '🛡️', krw: true, sector: '금융' },
   { ticker: '024110', name: '기업은행',        market: '한국', price: 14850,  change: +0.3,  logo: '🏦', krw: true, sector: '금융' },
@@ -214,7 +215,7 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: '096770', name: 'SK이노베이션',    market: '한국', price: 132000, change: -1.3,  logo: '⛽', krw: true, sector: '에너지' },
   { ticker: '010950', name: 'S-Oil',          market: '한국', price: 78400,  change: +0.6,  logo: '🛢️', krw: true, sector: '에너지' },
   { ticker: '034020', name: '두산에너빌리티',   market: '한국', price: 19450,  change: +0.4,  logo: '⚙️', krw: true, sector: '에너지' },
-  { ticker: '015760', name: '한국전력',        market: '한국', price: 21350,  change: -0.5,  logo: '💡', krw: true, sector: '에너지' },
+  { ticker: '015760', name: '한국전력',        market: '한국', price: 21350,  change: -0.5,  logo: '💡', krw: true, sector: '에너지' , isDividend: true },
   { ticker: '036460', name: '한국가스공사',     market: '한국', price: 32150,  change: +0.2,  logo: '🔥', krw: true, sector: '에너지' },
   // ── 한국 방산 ──
   { ticker: '012450', name: '한화에어로스페이스', market: '한국', price: 289000, change: +3.1, logo: '✈️', krw: true, sector: '방산' },
@@ -247,12 +248,13 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: '225570', name: '넥슨게임즈',       market: '한국', price: 21500,  change: +1.3,  logo: '🎮', krw: true, sector: '게임' },
   // ── 미국 추가 종목 ──
   { ticker: 'COST',  name: '코스트코',         market: '미국', price: 912.30, change: +0.6,  logo: '🏪', krw: false, sector: '소비재' },
-  { ticker: 'WMT',   name: '월마트',           market: '미국', price: 68.40,  change: +0.3,  logo: '🏬', krw: false, sector: '소비재' },
+  { ticker: 'WMT',   name: '월마트',           market: '미국', price: 68.40,  change: +0.3,  logo: '🏬', krw: false, sector: '소비재' , isDividend: true },
   { ticker: 'NET',   name: '클라우드플레어',    market: '미국', price: 98.40,  change: +1.8,  logo: '☁️', krw: false, sector: '클라우드' },
   { ticker: 'DDOG',  name: '데이터독',         market: '미국', price: 128.60, change: +2.1,  logo: '🐕', krw: false, sector: '클라우드' },
   { ticker: 'ZM',    name: '줌',              market: '미국', price: 68.40,  change: -0.8,  logo: '📹', krw: false, sector: '기술' },
-  { ticker: 'T',     name: 'AT&T',            market: '미국', price: 18.40,  change: +0.2,  logo: '📞', krw: false, sector: '통신' },
-  { ticker: 'VZ',    name: '버라이즌',         market: '미국', price: 42.30,  change: -0.3,  logo: '📶', krw: false, sector: '통신' },
+  { ticker: 'T',     name: 'AT&T',            market: '미국', price: 18.40,  change: +0.2,  logo: '📞', krw: false, sector: '통신' , isDividend: true },
+  { ticker: 'VZ',    name: '버라이즌',         market: '미국', price: 42.30,  change: -0.3,  logo: '📶', krw: false, sector: '통신' , isDividend: true },
+  { ticker: 'SNDK',  name: '샌디스크',         market: '미국', price: 1646.54, change: -4.1,  logo: '💾', krw: false, sector: '반도체' },
   // ── 확장 미국 종목 (섹터별 대량 추가) ──
   ...US_STOCKS_EXPANDED,
 
@@ -323,14 +325,14 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: '096530', name: '씨젠',              market: '한국', price: 28400,  change: -0.2,  logo: '🧬', krw: true, sector: '바이오' },
   { ticker: '326030', name: 'SK바이오팜',        market: '한국', price: 91400,  change: +0.9,  logo: '🧬', krw: true, sector: '바이오' },
   // 금융
-  { ticker: '316140', name: '우리금융지주',      market: '한국', price: 14850,  change: +0.3,  logo: '🏦', krw: true, sector: '금융' },
+  { ticker: '316140', name: '우리금융지주',      market: '한국', price: 14850,  change: +0.3,  logo: '🏦', krw: true, sector: '금융' , isDividend: true },
   { ticker: '006800', name: '미래에셋증권',      market: '한국', price: 8320,   change: +0.4,  logo: '💼', krw: true, sector: '금융' },
   { ticker: '016360', name: '삼성증권',          market: '한국', price: 44800,  change: +0.5,  logo: '💼', krw: true, sector: '금융' },
   { ticker: '005940', name: 'NH투자증권',       market: '한국', price: 12650,  change: +0.2,  logo: '💼', krw: true, sector: '금융' },
   { ticker: '071050', name: '한국금융지주',      market: '한국', price: 71200,  change: +0.3,  logo: '💼', krw: true, sector: '금융' },
   { ticker: '039490', name: '키움증권',          market: '한국', price: 135000, change: +0.6,  logo: '💼', krw: true, sector: '금융' },
   { ticker: '138040', name: '메리츠금융지주',    market: '한국', price: 87600,  change: +0.7,  logo: '🏦', krw: true, sector: '금융' },
-  { ticker: '138930', name: 'BNK금융지주',      market: '한국', price: 9850,   change: +0.3,  logo: '🏦', krw: true, sector: '금융' },
+  { ticker: '138930', name: 'BNK금융지주',      market: '한국', price: 9850,   change: +0.3,  logo: '🏦', krw: true, sector: '금융' , isDividend: true },
   { ticker: '139130', name: 'DGB금융지주',      market: '한국', price: 8120,   change: +0.3,  logo: '🏦', krw: true, sector: '금융' },
   { ticker: '175330', name: 'JB금융지주',       market: '한국', price: 14200,  change: +0.1,  logo: '🏦', krw: true, sector: '금융' },
   { ticker: '088350', name: '한화생명',          market: '한국', price: 3780,   change: +0.3,  logo: '🛡️', krw: true, sector: '금융' },
@@ -393,9 +395,9 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: 'VOO',  name: '뱅가드 S&P 500',          market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
   { ticker: 'VTI',  name: '뱅가드 전체시장',         market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
   { ticker: 'DIA',  name: '다우존스 ETF',           market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
-  { ticker: 'SCHD', name: '슈왑 배당 ETF',          market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
-  { ticker: 'VYM',  name: '뱅가드 고배당 ETF',       market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
-  { ticker: 'JEPI', name: 'JP모건 프리미엄 인컴',    market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
+  { ticker: 'SCHD', name: '슈왑 배당 ETF',          market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' , isDividend: true },
+  { ticker: 'VYM',  name: '뱅가드 고배당 ETF',       market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' , isDividend: true },
+  { ticker: 'JEPI', name: 'JP모건 프리미엄 인컴',    market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' , isDividend: true },
   { ticker: 'SOXX', name: '반도체 ETF',             market: '미국', price: 0, change: 0, logo: '', krw: false, sector: 'ETF', type: 'etf' },
 
   // ── 한국 ETF ──
@@ -408,7 +410,7 @@ const _RAW_STOCKS: Stock[] = [
   { ticker: '102110', name: 'TIGER 200',             market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
   { ticker: '251340', name: 'KODEX 코스닥150',       market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
   { ticker: '411060', name: 'ACE 미국빅테크TOP7',    market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
-  { ticker: '458730', name: 'TIGER 미국배당다우존스', market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' },
+  { ticker: '458730', name: 'TIGER 미국배당다우존스', market: '한국', price: 0, change: 0, logo: '', krw: true, sector: 'ETF', type: 'etf' , isDividend: true },
 
   // ── 암호화폐 ──
   { ticker: 'BTC',   name: '비트코인',     market: '암호화폐', price: 0, change: 0, logo: '', krw: true, sector: '암호화폐', type: 'crypto' },
@@ -840,6 +842,7 @@ export const useAppStore = create<AppState>()(
               total: Math.round(total),
               fee: Math.round(fee),
               reason: safeReason,
+              reasonCharCount: safeReason.length,
               createdAt: new Date().toISOString(),
             }),
           });
@@ -931,6 +934,7 @@ export const useAppStore = create<AppState>()(
               profit: profitAmt,
               fee: Math.round(fee),
               reason: safeReason,
+              reasonCharCount: safeReason.length,
               createdAt: new Date().toISOString(),
             }),
           });

@@ -76,7 +76,7 @@ export default function AdminScreen() {
       const uList = uSnap.docs.map(d => ({
         uid: d.id,
         email: d.data().email ?? '',
-        name: d.data().displayName ?? d.data().nickname ?? d.data().name ?? d.data().email ?? '',
+        name: d.data().username ?? d.data().name ?? d.data().nickname ?? d.data().email ?? '',
         balance: d.data().balance ?? 10000000,
         totalAsset: d.data().totalAsset ?? 10000000,
       }));

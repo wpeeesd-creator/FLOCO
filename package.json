@@ -35,6 +35,7 @@
     "expo-status-bar": "~3.0.9",
     "expo-web-browser": "~15.0.10",
     "firebase": "~12.11.0",
+    "firebase-admin": "^14.2.0",
     "lucide-react-native": "^1.17.0",
     "pretendard": "^1.3.9",
     "react": "19.1.0",

@@ -17,23 +17,16 @@ import {
 import { Text } from '../components/ui/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useTheme, type Theme } from '../context/ThemeContext';
 import { validateEmail, validatePassword, validateName } from '../lib/errorHandler';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 type Mode = 'login' | 'register';
 
-const PALETTE = {
-  bg: '#FFFFFF',
-  text: '#111111',
-  textSub: '#757575',
-  border: '#111111',
-  borderSubtle: '#E5E5E5',
-  error: '#FE0000',
-  onPrimary: '#FFFFFF',
-};
-
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -121,7 +114,7 @@ export default function AuthScreen() {
             <TextInput
               style={styles.input}
               placeholder="닉네임"
-              placeholderTextColor={PALETTE.textSub}
+              placeholderTextColor={theme.textSecondary}
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
@@ -132,7 +125,7 @@ export default function AuthScreen() {
           <TextInput
             style={styles.input}
             placeholder="이메일"
-            placeholderTextColor={PALETTE.textSub}
+            placeholderTextColor={theme.textSecondary}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -143,7 +136,7 @@ export default function AuthScreen() {
           <TextInput
             style={styles.input}
             placeholder="비밀번호"
-            placeholderTextColor={PALETTE.textSub}
+            placeholderTextColor={theme.textSecondary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -155,7 +148,7 @@ export default function AuthScreen() {
             <TextInput
               style={styles.input}
               placeholder="비밀번호 확인"
-              placeholderTextColor={PALETTE.textSub}
+              placeholderTextColor={theme.textSecondary}
               value={passwordConfirm}
               onChangeText={setPasswordConfirm}
               secureTextEntry
@@ -203,13 +196,13 @@ export default function AuthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: PALETTE.bg },
+const makeStyles = (theme: Theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.bgCard },
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },
   headline: {
     fontSize: 36,
     fontWeight: '800',
-    color: PALETTE.text,
+    color: theme.text,
     letterSpacing: -0.7,
     lineHeight: 44,
     marginBottom: 48,
@@ -219,22 +212,22 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 0,
     borderBottomWidth: 1,
-    borderBottomColor: PALETTE.borderSubtle,
+    borderBottomColor: theme.border,
     paddingHorizontal: 0,
     paddingVertical: 0,
     fontSize: 16,
     fontWeight: '400',
-    color: PALETTE.text,
-    backgroundColor: PALETTE.bg,
+    color: theme.text,
+    backgroundColor: theme.bgCard,
   },
   errorText: {
     fontSize: 13,
     fontWeight: '400',
-    color: PALETTE.error,
+    color: theme.red,
     marginTop: -8,
   },
   submitBtn: {
-    backgroundColor: PALETTE.text,
+    backgroundColor: theme.text,
     height: 56,
     borderRadius: 0,
     alignItems: 'center',
@@ -243,7 +236,7 @@ const styles = StyleSheet.create({
   },
   submitBtnDisabled: { opacity: 0.5 },
   submitText: {
-    color: PALETTE.onPrimary,
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 0.3,
@@ -251,12 +244,12 @@ const styles = StyleSheet.create({
   forgotBtn: { alignSelf: 'flex-start', paddingVertical: 4 },
   forgotText: {
     fontSize: 13,
-    color: PALETTE.textSub,
+    color: theme.textSecondary,
     textDecorationLine: 'underline',
   },
   divider: {
     height: 1,
-    backgroundColor: PALETTE.borderSubtle,
+    backgroundColor: theme.border,
     marginTop: 40,
     marginBottom: 24,
   },
@@ -267,12 +260,12 @@ const styles = StyleSheet.create({
   },
   switchHint: {
     fontSize: 14,
-    color: PALETTE.textSub,
+    color: theme.textSecondary,
     fontWeight: '400',
   },
   switchLink: {
     fontSize: 14,
-    color: PALETTE.text,
+    color: theme.text,
     fontWeight: '700',
     textDecorationLine: 'underline',
   },

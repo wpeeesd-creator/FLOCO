@@ -69,7 +69,7 @@ function median(nums: number[]): number {
 
 export default function AdminDashboardScreen() {
   const { theme } = useTheme();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
 
   // ── 디자인 토큰 (PPT 캡처용 고정 라이트 톤) ──
   const DS = {
@@ -786,10 +786,15 @@ export default function AdminDashboardScreen() {
             </View>
             <View style={{ marginTop: 4 }}>
               {communityMetrics.topAuthors.map((a, i) => (
-                <View key={a.uid} style={styles.listRow}>
+                <TouchableOpacity
+                  key={a.uid}
+                  style={styles.listRow}
+                  activeOpacity={0.7}
+                  onPress={() => navigation.navigate('유저게시글', { uid: a.uid, name: a.nickname })}
+                >
                   <Text style={styles.listText}>{i + 1}. {a.nickname}</Text>
                   <Text style={styles.listMeta}>{a.count}건</Text>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           </View>
@@ -799,7 +804,7 @@ export default function AdminDashboardScreen() {
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => {
-            const parent = navigation.getParent<any>();
+            const parent = navigation.getParent();
             if (parent) parent.navigate('거래내역Tab');
           }}
           style={styles.navCard}

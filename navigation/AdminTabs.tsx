@@ -21,6 +21,7 @@ import AdminGrowthScreen from '../screens/admin/AdminGrowthScreen';
 import AdminExportScreen from '../screens/admin/AdminExportScreen';
 import AdminRiskMonitorScreen from '../screens/admin/AdminRiskMonitorScreen';
 import AdminReasonQualityScreen from '../screens/admin/AdminReasonQualityScreen';
+import AdminUserPostsScreen from '../screens/admin/AdminUserPostsScreen';
 import RankingScreen from '../screens/RankingScreen';
 
 export type AdminTabParamList = {
@@ -52,6 +53,7 @@ function DashboardNavigator() {
       <DashboardStack.Screen name="데이터내보내기" component={AdminExportScreen} />
       <DashboardStack.Screen name="위험모니터링" component={AdminRiskMonitorScreen} />
       <DashboardStack.Screen name="이유품질" component={AdminReasonQualityScreen} />
+      <DashboardStack.Screen name="유저게시글" component={AdminUserPostsScreen} />
     </DashboardStack.Navigator>
   );
 }

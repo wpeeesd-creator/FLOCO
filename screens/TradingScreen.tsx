@@ -15,20 +15,21 @@ import { useAppStore, STOCKS } from '../store/appStore';
 import { Colors, Typography, Button, Card, Toast } from '../components/ui';
 import { validateTradeQty } from '../lib/errorHandler';
 import { useTheme } from '../context/ThemeContext';
-import { validateReason, getReasonStatus, REASON_TEMPLATES } from '../utils/reasonValidator';
+import { validateTradeReason, getReasonStatus, REASON_TEMPLATES } from '../utils/reasonValidator';
 
 export default function TradingScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const ticker = route.params?.ticker ?? '';
   const stock = STOCKS.find(s => s.ticker === ticker);
-  const { cash, holdings, buyStock, sellStock } = useAppStore();
+  const { cash, holdings, buyStock, sellStock, userId, exchangeRate } = useAppStore();
   const holding = holdings.find(h => h.ticker === ticker);
   const { theme, isDark } = useTheme();
 
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [qtyStr, setQtyStr] = useState('1');
   const [reasonStr, setReasonStr] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState({
     visible: false,
     message: '',
@@ -60,6 +61,8 @@ export default function TradingScreen() {
   };
 
   const handleConfirm = async () => {
+    if (isSubmitting) return;
+
     // 수량 입력값 검증
     const { qty: validQty, error: qtyError } = validateTradeQty(qtyStr);
     if (qtyError) {
@@ -79,31 +82,37 @@ export default function TradingScreen() {
       return;
     }
 
-    const reasonResult = validateReason(reasonStr);
-    if (!reasonResult.valid) {
-      Alert.alert('이유 입력 확인', reasonResult.message);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      return;
-    }
-    const trimmedReason = reasonStr.trim();
+    setIsSubmitting(true);
+    try {
+      // 로컬 + 세이프가드 AI 이유 검증 (네트워크 왕복 발생)
+      const reasonResult = await validateTradeReason(reasonStr, userId, ticker);
+      if (!reasonResult.valid) {
+        Alert.alert('이유 입력 확인', reasonResult.error);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        return;
+      }
+      const trimmedReason = reasonStr.trim();
 
-    const result = await (tradeType === 'buy'
-      ? buyStock(ticker, qty, stock.price, trimmedReason)
-      : sellStock(ticker, qty, stock.price, trimmedReason));
+      const result = await (tradeType === 'buy'
+        ? buyStock(ticker, qty, stock.krw ? stock.price : Math.round(stock.price * exchangeRate), trimmedReason)
+        : sellStock(ticker, qty, stock.krw ? stock.price : Math.round(stock.price * exchangeRate), trimmedReason));
 
-    if (result.success) {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast(
-        tradeType === 'buy'
-          ? `✅ ${stock.name} ${qty}주 매수 완료!`
-          : `✅ ${stock.name} ${qty}주 매도 완료!`,
-        'success',
-      );
-      setReasonStr('');
-      setTimeout(() => navigation.goBack(), 1500);
-    } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      showToast(result.message, 'error');
+      if (result.success) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast(
+          tradeType === 'buy'
+            ? `✅ ${stock.name} ${qty}주 매수 완료!`
+            : `✅ ${stock.name} ${qty}주 매도 완료!`,
+          'success',
+        );
+        setReasonStr('');
+        setTimeout(() => navigation.goBack(), 1500);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        showToast(result.message, 'error');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -305,11 +314,13 @@ export default function TradingScreen() {
       {/* ── Confirm Button ───────────────────── */}
       <View style={styles.confirmWrap}>
         <Button
-          title="응, 결정했어!"
+          title={isSubmitting ? '확인 중...' : '응, 결정했어!'}
           onPress={handleConfirm}
           variant={tradeType === 'buy' ? 'primary' : 'danger'}
           fullWidth
           size="lg"
+          loading={isSubmitting}
+          disabled={isSubmitting}
         />
       </View>
 

@@ -14,6 +14,7 @@ import { Text, NumberText } from '../components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle } from 'react-native-svg';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAppStore, STOCKS } from '../store/appStore';
@@ -116,8 +117,35 @@ export default function AssetDetailScreen() {
     const pnlRate = (h.avgPrice ?? 0) > 0
       ? ((livePriceKRW - (h.avgPrice ?? 0)) / (h.avgPrice ?? 0)) * 100
       : 0;
-    return { ...h, stock, evalAmt, pnlRate };
+    const pnlAmt = (livePriceKRW - (h.avgPrice ?? 0)) * (h.qty ?? 0);
+    return { ...h, stock, evalAmt, pnlRate, pnlAmt };
   }).filter(Boolean).sort((a: any, b: any) => b.evalAmt - a.evalAmt);
+
+  // ── 포트폴리오 도넛 차트 세그먼트 계산 ──
+  const COLORS = ['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#888780','#4a3aa7','#e34948'];
+  const totalEval = holdingsData.reduce((s: number, h: any) => s + h.evalAmt, 0);
+  const profitRate = ((totalEval - initialBalance) / initialBalance * 100);
+  const isProfit = profitRate >= 0;
+
+  const RADIUS = 54;
+  const STROKE = 18;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  let cumPct = 0;
+  const segments = holdingsData.map((h: any, i: number) => {
+    const pct = totalEval > 0 ? h.evalAmt / totalEval : 0;
+    const dash = pct * CIRCUMFERENCE;
+    const offset = -cumPct * CIRCUMFERENCE;
+    cumPct += pct;
+    return { ...h, pct, dash, offset, color: i < 5 ? COLORS[i] : '#888780' };
+  });
+
+  const todayPnl = holdingsData.reduce((s: number, h: any) => s + h.pnlAmt, 0);
+  const usRatio = 100 - (totalEval > 0 ? holdingsData.filter((h: any) => h.stock?.krw).reduce((s: number, h: any) => s + h.evalAmt, 0) / totalEval * 100 : 0);
+  const aiMessage = usRatio > 70
+    ? '해외 비중이 높아요. 분산 투자로 리스크를 줄여보는 건 어떨까요?'
+    : usRatio < 30
+    ? '국내 비중이 높아요. 해외 주식으로 분산해보는 건 어떨까요?'
+    : '국내외 균형 잡힌 포트폴리오예요. 훌륭해요! 🎉';
 
   // 시장별 분류
   const krHoldings = holdingsData.filter((h: any) => h.stock.market === '한국');
@@ -125,7 +153,6 @@ export default function AssetDetailScreen() {
   const krEval = krHoldings.reduce((sum: number, h: any) => sum + h.evalAmt, 0);
   const usEval = usHoldings.reduce((sum: number, h: any) => sum + h.evalAmt, 0);
 
-  const totalEval = krEval + usEval;
   const krPct = totalEval > 0 ? ((krEval / totalEval) * 100).toFixed(1) : '0.0';
   const usPct = totalEval > 0 ? ((usEval / totalEval) * 100).toFixed(1) : '0.0';
 
@@ -231,6 +258,121 @@ export default function AssetDetailScreen() {
             <NumberText style={styles.marketPct}>{usPct}%</NumberText>
           </View>
         </View>
+
+        {holdingsData.length > 0 && (
+          <>
+            {/* 히어로 헤더 */}
+            <View style={{ backgroundColor: theme.bgCard, borderRadius: 22, padding: 20, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <Text style={{ fontSize: 13, color: theme.textSecondary }}>내 포트폴리오</Text>
+                <View style={{ backgroundColor: isProfit ? '#eaf3de' : '#fcebeb', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: isProfit ? '#3b6d11' : '#a32d2d' }}>
+                    {isProfit ? '▲' : '▼'} 오늘 {todayPnl >= 0 ? '+' : ''}{Math.round(todayPnl).toLocaleString()}원
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 28, fontWeight: '500', color: theme.text, letterSpacing: -0.5 }}>{Math.round(totalEval).toLocaleString()}원</Text>
+              <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: 4 }}>총 평가금액 · {holdingsData.length}종목 보유</Text>
+              <View style={{ height: 0.5, backgroundColor: theme.border, marginVertical: 16 }} />
+              <View style={{ flexDirection: 'row' }}>
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 10, color: theme.textSecondary, marginBottom: 4 }}>수익률</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '500', color: isProfit ? '#3b6d11' : '#a32d2d' }}>{isProfit ? '+' : ''}{profitRate.toFixed(2)}%</Text>
+                </View>
+                <View style={{ width: 0.5, backgroundColor: theme.border }} />
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 10, color: theme.textSecondary, marginBottom: 4 }}>국내 비중</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '500', color: theme.text }}>{(100 - usRatio).toFixed(1)}%</Text>
+                </View>
+                <View style={{ width: 0.5, backgroundColor: theme.border }} />
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 10, color: theme.textSecondary, marginBottom: 4 }}>해외 비중</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '500', color: '#185fa5' }}>{usRatio.toFixed(1)}%</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* AI 조언 배너 */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: theme.bgCard, borderRadius: 14, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
+              <Text style={{ fontSize: 20 }}>💡</Text>
+              <Text style={{ flex: 1, fontSize: 12, color: theme.textSecondary, lineHeight: 18 }}>
+                <Text style={{ color: theme.text, fontWeight: '600' }}>{aiMessage.split('.')[0]}.</Text>
+                {aiMessage.includes('.') ? ' ' + aiMessage.split('.').slice(1).join('.').trim() : ''}
+              </Text>
+            </View>
+
+            {/* 도넛 차트 */}
+            <View style={{ backgroundColor: theme.bgCard, borderRadius: 22, padding: 20, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={{ fontSize: 13, fontWeight: '500', color: theme.text }}>구성 비중</Text>
+                <Text style={{ fontSize: 11, color: theme.textSecondary }}>평가금액 기준</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                <View style={{ position: 'relative', width: 128, height: 128 }}>
+                  <Svg width={128} height={128} viewBox="0 0 128 128">
+                    <Circle cx="64" cy="64" r={RADIUS} fill="none" stroke={theme.bg} strokeWidth={STROKE} />
+                    {segments.map((seg: any) => (
+                      <Circle key={seg.ticker} cx="64" cy="64" r={RADIUS} fill="none"
+                        stroke={seg.color} strokeWidth={STROKE}
+                        strokeDasharray={`${seg.dash} ${CIRCUMFERENCE}`}
+                        strokeDashoffset={seg.offset}
+                        transform="rotate(-90 64 64)"
+                      />
+                    ))}
+                  </Svg>
+                  <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 20, fontWeight: '500', color: isProfit ? '#3b6d11' : '#a32d2d' }}>{isProfit ? '+' : ''}{profitRate.toFixed(2)}%</Text>
+                    <Text style={{ fontSize: 10, color: theme.textSecondary, marginTop: 2 }}>수익률</Text>
+                  </View>
+                </View>
+                <View style={{ flex: 1, gap: 8 }}>
+                  {segments.slice(0, 6).map((seg: any) => (
+                    <View key={seg.ticker} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: seg.color }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '500', color: theme.text }} numberOfLines={1}>{seg.stock?.name ?? seg.ticker}</Text>
+                        <Text style={{ fontSize: 10, color: theme.textSecondary }}>{Math.round(seg.evalAmt / 10000)}만원</Text>
+                      </View>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: theme.textSecondary }}>{(seg.pct * 100).toFixed(1)}%</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+              {/* 비율 바 */}
+              <View style={{ flexDirection: 'row', height: 7, borderRadius: 99, overflow: 'hidden', gap: 2, marginTop: 16 }}>
+                {segments.map((seg: any) => (
+                  <View key={seg.ticker} style={{ flex: seg.pct * 100, backgroundColor: seg.color }} />
+                ))}
+              </View>
+            </View>
+
+            {/* 트리맵 */}
+            <View style={{ backgroundColor: theme.bgCard, borderRadius: 22, padding: 20, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <Text style={{ fontSize: 13, fontWeight: '500', color: theme.text }}>비중 블록</Text>
+                <Text style={{ fontSize: 11, color: theme.textSecondary }}>크기 = 평가금액</Text>
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {segments.map((seg: any, i: number) => {
+                  const pct = seg.pct * 100;
+                  const w = i === 0 ? '47%' : i === 1 ? '49%' : i === 2 ? '31%' : i === 3 ? '23%' : i === 4 ? '20%' : '17%';
+                  const h = i < 2 ? 110 : i < 5 ? 72 : 52;
+                  const bgMap: Record<string,string> = { '#2a78d6': '#e6f1fb', '#eb6834': '#faeeda', '#1baf7a': '#eaf3de', '#eda100': '#faeeda', '#e87ba4': '#fbeaf0', '#888780': '#f1efe8' };
+                  const textMap: Record<string,string> = { '#2a78d6': '#0c447c', '#eb6834': '#633806', '#1baf7a': '#27500a', '#eda100': '#633806', '#e87ba4': '#4b1528', '#888780': '#2c2c2a' };
+                  const bg = bgMap[seg.color] ?? '#f1efe8';
+                  const tc = textMap[seg.color] ?? '#2c2c2a';
+                  return (
+                    <View key={seg.ticker} style={{ width: w, height: h, backgroundColor: bg, borderRadius: 16, padding: 11, justifyContent: 'flex-end', overflow: 'hidden' }}>
+                      <Text style={{ fontSize: h > 80 ? 12 : 11, fontWeight: '500', color: tc }} numberOfLines={2}>{seg.stock?.name ?? seg.ticker}</Text>
+                      <Text style={{ fontSize: 11, color: tc, opacity: 0.8, marginTop: 3 }}>{pct.toFixed(1)}%</Text>
+                      {h > 80 && <Text style={{ fontSize: 10, color: tc, opacity: 0.55, marginTop: 1 }}>{Math.round(seg.evalAmt / 10000)}만원</Text>}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </>
+        )}
 
         {/* ── 보유 종목 ─────────────────────────── */}
         <View style={styles.card}>

@@ -18,7 +18,7 @@ import { BottomSheet, Button, Toast, Colors } from '../components/ui';
 import { useTheme } from '../context/ThemeContext';
 
 type StockTab = '보유' | '관심';
-type MarketFilter = '전체' | '국내' | '미국';
+type MarketFilter = '전체' | '국내' | '미국' | '배당주' | '암호화폐';
 
 // 관심 종목 더미
 const WATCHLIST_TICKERS = [
@@ -28,7 +28,7 @@ const WATCHLIST_TICKERS = [
 export default function StockScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation<any>();
-  const { holdings, cash, getTotalValue, getReturnRate, buyStock, sellStock } = useAppStore();
+  const { holdings, cash, getTotalValue, getReturnRate, buyStock, sellStock, exchangeRate } = useAppStore();
 
   const [tab, setTab] = useState<StockTab>('보유');
   const [market, setMarket] = useState<MarketFilter>('전체');
@@ -99,7 +99,9 @@ export default function StockScreen() {
     const matchesMarket =
       market === '전체' ||
       (market === '국내' && h.stock.market === '한국') ||
-      (market === '미국' && h.stock.market === '미국');
+      (market === '미국' && h.stock.market === '미국') ||
+      (market === '배당주' && h.stock.isDividend === true) ||
+      (market === '암호화폐' && h.stock.market === '암호화폐');
     const matchesSearch =
       search.trim() === '' ||
       h.stock.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -115,7 +117,9 @@ export default function StockScreen() {
     const matchesMarket =
       market === '전체' ||
       (market === '국내' && s.market === '한국') ||
-      (market === '미국' && s.market === '미국');
+      (market === '미국' && s.market === '미국') ||
+      (market === '배당주' && s.isDividend === true) ||
+      (market === '암호화폐' && s.market === '암호화폐');
     const matchesSearch =
       search.trim() === '' ||
       s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -150,8 +154,8 @@ export default function StockScreen() {
     }
     setSheetTicker(null);
     const result = await (tradeType === 'buy'
-      ? buyStock(sheetTicker, qty, sheetStock.price)
-      : sellStock(sheetTicker, qty, sheetStock.price));
+      ? buyStock(sheetTicker, qty, sheetStock.krw ? sheetStock.price : Math.round(sheetStock.price * exchangeRate))
+      : sellStock(sheetTicker, qty, sheetStock.krw ? sheetStock.price : Math.round(sheetStock.price * exchangeRate)));
     if (result.success) {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
@@ -209,7 +213,7 @@ export default function StockScreen() {
 
           {/* ── 국내 / 미국 필터 (pill) ─────────────── */}
           <View style={styles.pillRow}>
-            {(['전체', '국내', '미국'] as MarketFilter[]).map(m => (
+            {(['전체', '국내', '미국', '배당주', '암호화폐'] as MarketFilter[]).map(m => (
               <TouchableOpacity
                 key={m}
                 style={[styles.pill, market === m && styles.pillActive]}
@@ -274,7 +278,14 @@ export default function StockScreen() {
                       >
                         <StockLogo ticker={h.ticker} size={44} />
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.stockName}>{h.stock.name}</Text>
+                          <View style={styles.nameRow}>
+                            <Text style={styles.stockName}>{h.stock.name}</Text>
+                            {h.stock.isDividend && (
+                              <View style={styles.dividendBadge}>
+                                <Text style={styles.dividendBadgeText}>배당</Text>
+                              </View>
+                            )}
+                          </View>
                           <Text style={styles.stockSub}>{h.qty}주</Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
@@ -331,7 +342,14 @@ export default function StockScreen() {
                       >
                         <StockLogo ticker={s.ticker} size={44} />
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.stockName}>{s.name}</Text>
+                          <View style={styles.nameRow}>
+                            <Text style={styles.stockName}>{s.name}</Text>
+                            {s.isDividend && (
+                              <View style={styles.dividendBadge}>
+                                <Text style={styles.dividendBadgeText}>배당</Text>
+                              </View>
+                            )}
+                          </View>
                           <Text style={styles.stockSub}>{s.ticker}</Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
@@ -552,6 +570,7 @@ const styles = StyleSheet.create({
   // 국내 / 미국 pill 필터
   pillRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: 20,
     gap: 8,
     marginBottom: 16,
@@ -635,10 +654,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   stockName: {
     fontSize: 15,
     fontWeight: '600',
     color: Colors.text,
+  },
+  dividendBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 4,
+  },
+  dividendBadgeText: {
+    fontSize: 10,
+    color: '#92400E',
+    fontWeight: '700',
   },
   stockSub: {
     fontSize: 12,

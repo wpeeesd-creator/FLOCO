@@ -5,6 +5,48 @@
  * - AdminLearningImpactScreen이 "유효한 이유 작성률" 판정에도 재사용.
  */
 
+import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { moderateText } from './safeguard';
+import { db } from '../lib/firebase';
+
+/**
+ * users/{uid}.transactions 배열의 마지막 거래 reason 조회
+ * 실패 시 null (직전 이유 비교를 건너뛰고 정상 검증 진행)
+ */
+async function getLastTradeReason(uid: string): Promise<string | null> {
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    const txs = snap.data()?.transactions;
+    if (Array.isArray(txs) && txs.length > 0) {
+      return txs[txs.length - 1]?.reason ?? null;
+    }
+  } catch (e) {
+    console.warn('마지막 거래 이유 조회 실패:', e);
+  }
+  return null;
+}
+
+/**
+ * 이유 검증 반려 로그 — tradeReasonRejects 컬렉션
+ * fire-and-forget: 실패해도 거래 흐름에 영향 주지 않음
+ */
+function logReasonReject(
+  uid: string,
+  ticker: string,
+  rejectType: 'local' | 'safeguard',
+  charCount: number,
+  safeguardResult?: 'safe' | 'review' | 'block',
+): void {
+  addDoc(collection(db, 'tradeReasonRejects'), {
+    uid,
+    ticker,
+    timestamp: serverTimestamp(),
+    rejectType,
+    charCount,
+    ...(safeguardResult ? { safeguardResult } : {}),
+  }).catch((e) => console.warn('tradeReasonReject 로그 저장 실패:', e));
+}
+
 export interface ValidationResult {
   valid: boolean;
   message?: string;
@@ -124,10 +166,35 @@ export function validateReason(reason: string): ValidationResult {
 
 /**
  * 스펙 호환 시그니처 — { valid, error } 형태가 필요한 곳에서 사용
+ * 1단계: 로컬 검증 → 2단계: 세이프가드 AI 검증 (fail-closed)
  */
-export function validateTradeReason(reason: string): { valid: boolean; error?: string } {
-  const result = validateReason(reason);
-  return { valid: result.valid, error: result.message };
+export async function validateTradeReason(
+  reason: string,
+  uid: string,
+  ticker: string,
+): Promise<{ valid: boolean; error?: string }> {
+  // 1단계: 로컬 검증
+  const local = validateReason(reason);
+  if (!local.valid) {
+    logReasonReject(uid, ticker, 'local', local.charCount);
+    return { valid: false, error: local.message };
+  }
+
+  // 2단계: 직전 거래 이유와 동일하면 차단 (대소문자·앞뒤공백 무시)
+  const normReason = reason.trim().toLowerCase();
+  const lastReason = await getLastTradeReason(uid);
+  if (normReason && lastReason && lastReason.trim().toLowerCase() === normReason) {
+    return { valid: false, error: '직전 거래와 같은 이유는 사용할 수 없어요' };
+  }
+
+  // 3단계: 세이프가드 AI 검증
+  const result = await moderateText(reason);
+  if (result === 'block') {
+    logReasonReject(uid, ticker, 'safeguard', local.charCount, result);
+    return { valid: false, error: '적절하지 않은 내용이 포함되어 있어요' };
+  }
+
+  return { valid: true };
 }
 
 /**

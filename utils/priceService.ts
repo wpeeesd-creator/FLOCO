@@ -239,17 +239,27 @@ async function fetchYahooIndex(tickers: string[]): Promise<Record<string, PriceD
 //  단일 종목 가격 (v7 → v8 fallback)
 // ══════════════════════════════════════════════════
 
-export const fetchSinglePrice = async (
+// 한국 종목 거래소 접미사 캐시 (.KS 코스피 / .KQ 코스닥)
+// 한 번 성공한 접미사를 기억해 다음 호출 시 바로 사용 → 불필요한 재시도 방지
+const tickerExchangeCache: Record<string, 'KS' | 'KQ'> = {};
+const getKRSuffix = (ticker: string): 'KS' | 'KQ' => tickerExchangeCache[ticker] ?? 'KS';
+
+// Yahoo는 잘못된 거래소(.KS/.KQ) 심볼에도 가격을 echo하므로 (예: 코스닥 종목을 .KS로
+// 조회 시 "247540.KS,0P00..." 같은 가짜 종목명으로 엉뚱한 가격 반환), 종목명으로 진위 판별.
+// 실제 상장 종목은 사람이 읽는 이름을 반환하고, 미등록 심볼은 코드를 그대로 echo한다.
+const isRealKRListing = (name: unknown, ticker: string): boolean => {
+  if (typeof name !== 'string' || name.trim() === '') return true; // 이름 미제공 시 보수적으로 통과
+  const n = name.trim();
+  return !n.startsWith(ticker) && !/^\d{6}[.,\s]/.test(n);
+};
+
+// 단일 Yahoo 심볼 가격 조회 (v7 → v8 fallback).
+// yahooTicker는 접미사 포함 완성 심볼, ticker는 로그/표시용 원본.
+const fetchYahooSymbol = async (
+  yahooTicker: string,
   ticker: string,
   isKR: boolean,
-  type?: 'stock' | 'etf' | 'crypto' | 'index',
 ): Promise<PriceData | null> => {
-  if (type === 'crypto') {
-    const result = await fetchUpbitPrices([ticker]);
-    return result[ticker] ?? null;
-  }
-  const yahooTicker = isKR ? `${ticker}.KS` : ticker;
-
   // v7 시도
   try {
     const res = await fetch(
@@ -257,12 +267,17 @@ export const fetchSinglePrice = async (
       { headers: YAHOO_HEADERS_V7 },
     );
     const text = await res.text();
-    if (!text || text.trim() === '') return null;
-    const data = JSON.parse(text);
-    const item = data.quoteResponse?.result?.[0];
-    if (item?.regularMarketPrice) {
-      console.log(`✅ 가격 (${ticker}): ${isKR ? Math.round(item.regularMarketPrice) : item.regularMarketPrice}`);
-      return toPriceData(item, isKR);
+    if (text && text.trim() !== '') {
+      const data = JSON.parse(text);
+      const item = data.quoteResponse?.result?.[0];
+      if (item?.regularMarketPrice) {
+        const nm = item.longName ?? item.shortName ?? item.displayName;
+        if (!isKR || isRealKRListing(nm, ticker)) {
+          console.log(`✅ 가격 (${ticker}): ${isKR ? Math.round(item.regularMarketPrice) : item.regularMarketPrice}`);
+          return toPriceData(item, isKR);
+        }
+        return null; // 잘못된 거래소 매칭 → 호출부가 다른 접미사 재시도
+      }
     }
   } catch {
     console.log(`v7 실패 (${ticker}), v8 시도`);
@@ -280,6 +295,8 @@ export const fetchSinglePrice = async (
     const result = data.chart?.result?.[0];
     const meta = result?.meta;
     if (meta?.regularMarketPrice) {
+      // 잘못된 거래소 매칭 (가짜 종목명) → 실패 처리하여 다른 접미사 재시도
+      if (isKR && !isRealKRListing(meta.longName ?? meta.shortName, ticker)) return null;
       const price = isKR ? Math.round(meta.regularMarketPrice) : meta.regularMarketPrice;
 
       // 전일 종가: 차트 데이터의 첫 번째 캔들 close 사용 (2d 범위이므로 전일 데이터)
@@ -317,6 +334,34 @@ export const fetchSinglePrice = async (
   }
 
   return null;
+};
+
+export const fetchSinglePrice = async (
+  ticker: string,
+  isKR: boolean,
+  type?: 'stock' | 'etf' | 'crypto' | 'index',
+): Promise<PriceData | null> => {
+  if (type === 'crypto') {
+    const result = await fetchUpbitPrices([ticker]);
+    return result[ticker] ?? null;
+  }
+
+  if (isKR) {
+    // .KS(코스피) → .KQ(코스닥) 순서로 시도, 성공한 접미사 캐싱.
+    // 캐시에 .KQ로 기록된 종목은 .KQ부터 시도.
+    const primary = getKRSuffix(ticker);
+    const order: Array<'KS' | 'KQ'> = primary === 'KQ' ? ['KQ', 'KS'] : ['KS', 'KQ'];
+    for (const suffix of order) {
+      const d = await fetchYahooSymbol(`${ticker}.${suffix}`, ticker, true);
+      if (d && d.price > 0) {
+        tickerExchangeCache[ticker] = suffix;
+        return d;
+      }
+    }
+    return null;
+  }
+
+  return fetchYahooSymbol(ticker, ticker, false);
 };
 
 // 하위 호환 alias
@@ -379,8 +424,21 @@ export const fetchMultiplePrices = async (
         results.forEach((item: any) => {
           const t = item.symbol.replace('.KS', '');
           const kr = item.symbol.endsWith('.KS');
+          // 코스닥 종목을 .KS로 조회 시 Yahoo가 가짜 종목명+엉뚱한 가격을 echo함 → 제외.
+          // 제외된 종목은 아래 missing 개별 재시도(.KQ)로 정확히 채워짐.
+          if (kr && !isRealKRListing(item.longName ?? item.shortName ?? item.displayName, t)) return;
           map[t] = toPriceData(item, kr);
         });
+        // v7 .KS 배치에서 누락된 종목 (코스닥 .KQ 등) 개별 재시도
+        const missing = nonCryptoStocks.filter(s => !map[s.ticker]);
+        if (missing.length > 0) {
+          await Promise.allSettled(
+            missing.map(async ({ ticker, isKR }) => {
+              const d = await fetchSinglePrice(ticker, isKR);
+              if (d) map[ticker] = d;
+            }),
+          );
+        }
         console.log(`✅ 다중 가격: ${Object.keys(map).length}개`);
         return map;
       }

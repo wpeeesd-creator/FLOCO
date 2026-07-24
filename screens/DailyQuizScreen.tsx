@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -28,6 +28,36 @@ export default function DailyQuizScreen() {
   const [answered, setAnswered] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [alreadyDone, setAlreadyDone] = useState(false);
+
+  // 진입 시 1회: 오늘 이미 풀었으면 결과 화면으로 막기
+  useEffect(() => {
+    let active = true;
+    const checkAlreadyDone = async () => {
+      if (!user?.id) {
+        if (active) setChecking(false);
+        return;
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      try {
+        const learnRef = doc(db, 'users', user.id, 'learning', 'data');
+        const snap = await getDoc(learnRef);
+        const dq = snap.data()?.dailyQuiz;
+        if (active && dq?.lastDate === today) {
+          setCorrectCount(dq.correctCount ?? 0);
+          setAlreadyDone(true);
+          setPhase('result');
+        }
+      } catch (e) {
+        console.warn('데일리 OX 진입 체크 실패:', e);
+      } finally {
+        if (active) setChecking(false);
+      }
+    };
+    checkAlreadyDone();
+    return () => { active = false; };
+  }, [user?.id]);
 
   const current = questions[idx];
   const isCorrect = selected === current?.answer;
@@ -123,6 +153,16 @@ export default function DailyQuizScreen() {
     resultReward: { color: theme.text, fontSize: 18, fontWeight: '700', marginTop: 24 },
   });
 
+  if (checking) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (phase === 'result') {
     const reward = correctCount * REWARD_PER_CORRECT;
     const allCorrect = correctCount === questions.length;
@@ -139,7 +179,9 @@ export default function DailyQuizScreen() {
           <Text style={styles.resultTitle}>오늘의 OX 완료!</Text>
           <Text style={styles.resultScore}>{correctCount}/{questions.length}</Text>
           <Text style={styles.resultLabel}>정답</Text>
-          {submitting ? (
+          {alreadyDone ? (
+            <Text style={[styles.resultReward, { color: theme.textSecondary }]}>오늘은 이미 완료했어요</Text>
+          ) : submitting ? (
             <ActivityIndicator size="small" color={theme.primary} style={{ marginTop: 24 }} />
           ) : (
             <Text style={styles.resultReward}>+{reward.toLocaleString()}원 지급!</Text>
